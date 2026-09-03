@@ -12,8 +12,14 @@ create table if not exists eventos (
   fecha_evento      date,
   slug              text unique not null,
   activo            boolean default true,
+  turno_horas       integer default 12,        -- duración del turno en horas (ej: 12 = día/noche)
+  turno_inicio      text default '08:00',      -- hora de inicio del 1er turno (HH:MM)
   created_at        timestamptz default now()
 );
+
+-- Migración para bases ya existentes (agrega las columnas de turno si faltan):
+alter table eventos add column if not exists turno_horas  integer default 12;
+alter table eventos add column if not exists turno_inicio text    default '08:00';
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9
