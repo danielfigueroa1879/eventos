@@ -952,26 +952,30 @@
 
     /* ---- QR con logo O.S.10 + margen blanco ---- */
     function renderQRConLogo(container, text) {
-      const SIZE = 150;      // módulo del QR
+      const SIZE = 150;      // módulo del QR (unidades lógicas)
       const MARGIN = 7;      // margen blanco (quiet zone) discreto
+      const SCALE = 4;       // supersampling: el canvas se dibuja a 4x para que no se pixele al ampliar/imprimir
       const total = SIZE + MARGIN * 2;
+      const px = total * SCALE;
       container.innerHTML = "";
       // Genera el QR en un contenedor temporal (correctLevel H para tolerar el logo central)
       const tmp = document.createElement("div");
       new QRCode(tmp, { text, width: SIZE, height: SIZE, correctLevel: QRCode.CorrectLevel.H });
 
       const canvas = document.createElement("canvas");
-      canvas.width = total; canvas.height = total;
-      canvas.style.width = total + "px"; canvas.style.height = total + "px";
+      canvas.width = px; canvas.height = px;                 // resolución real (alta)
+      canvas.style.width = total + "px"; canvas.style.height = total + "px"; // tamaño en pantalla
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, total, total);
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, px, px);
       container.appendChild(canvas);
 
       const pintarQR = () => {
+        const s = MARGIN * SCALE, d = SIZE * SCALE;
+        ctx.imageSmoothingEnabled = false;                  // módulos del QR nítidos (sin difuminar)
         const qrCanvas = tmp.querySelector("canvas");
-        if (qrCanvas) { ctx.drawImage(qrCanvas, MARGIN, MARGIN, SIZE, SIZE); return true; }
+        if (qrCanvas) { ctx.drawImage(qrCanvas, s, s, d, d); return true; }
         const qrImg = tmp.querySelector("img");
-        if (qrImg && qrImg.complete && qrImg.naturalWidth) { ctx.drawImage(qrImg, MARGIN, MARGIN, SIZE, SIZE); return true; }
+        if (qrImg && qrImg.complete && qrImg.naturalWidth) { ctx.drawImage(qrImg, s, s, d, d); return true; }
         return false;
       };
 
@@ -980,16 +984,18 @@
         logo.onload = () => {
           // Tamaño del logo: ~27% del QR. Con correctLevel H (30% de tolerancia)
           // queda bien visible y centrado sin interrumpir la lectura.
-          const box = Math.round(SIZE * 0.27);
+          const box = Math.round(SIZE * 0.27) * SCALE;
           // Mantener la proporción real del logo (150x153) para que no se deforme
           const ar = (logo.naturalHeight && logo.naturalWidth) ? logo.naturalHeight / logo.naturalWidth : 1;
           const lw = box, lh = Math.round(box * ar);
-          const pad = 1;                               // orilla blanca mínima alrededor del logo
-          const cx = total / 2, cy = total / 2;        // centro exacto del QR
+          const pad = 1 * SCALE;                       // orilla blanca mínima alrededor del logo
+          const cx = px / 2, cy = px / 2;              // centro exacto del QR
           ctx.fillStyle = "#fff";
           const rw = lw / 2 + pad, rh = lh / 2 + pad;
-          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(cx - rw, cy - rh, rw * 2, rh * 2, 8); ctx.fill(); }
+          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(cx - rw, cy - rh, rw * 2, rh * 2, 8 * SCALE); ctx.fill(); }
           else ctx.fillRect(cx - rw, cy - rh, rw * 2, rh * 2);
+          ctx.imageSmoothingEnabled = true;                 // logo suavizado (nítido, no pixelado)
+          ctx.imageSmoothingQuality = "high";
           ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
         };
         logo.src = "images/logo-os10-original.webp";
