@@ -788,7 +788,9 @@
           </tbody>
         </table>
       </div>
-    </div>`;
+    </div>
+
+    ${estadisticasHTML(ev, asist)}`;
 
       // QR (con logo O.S.10 al centro y margen blanco)
       renderQRConLogo($("#qrbox"), guardLink(ev.slug));
@@ -804,6 +806,96 @@
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
     }
     function chip(label, n, color) { return `<div class="rounded-lg py-2 b-${color}"><div class="text-lg font-bold">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
+
+    /* ---- Estadísticas y gráficas por evento ---- */
+    function estadisticasHTML(ev, asist) {
+      if (!asist || !asist.length) {
+        return `<div class="card p-4 mt-5">
+          <div class="font-semibold text-slate-700 mb-1">📊 Estadísticas y gráficas</div>
+          <div class="text-slate-400 text-sm">Aún no hay ingresos registrados. Las estadísticas aparecerán aquí a medida que los guardias marquen su ingreso.</div>
+        </div>`;
+      }
+
+      // --- Ingresos por día (fecha de hora_ingreso) ---
+      const porDia = {};
+      asist.forEach(a => {
+        const d = new Date(a.hora_ingreso); if (isNaN(d.getTime())) return;
+        const key = d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit" });
+        const ord = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+        if (!porDia[key]) porDia[key] = { key, ord, count: 0 };
+        porDia[key].count++;
+      });
+      const dias = Object.values(porDia).sort((a, b) => a.ord - b.ord);
+      const maxDia = Math.max(1, ...dias.map(d => d.count));
+
+      // --- Ingresos por hora del día (0-23) ---
+      const horas = Array.from({ length: 24 }, (_, h) => ({ h, count: 0 }));
+      asist.forEach(a => { const d = new Date(a.hora_ingreso); if (!isNaN(d.getTime())) horas[d.getHours()].count++; });
+      const maxHora = Math.max(1, ...horas.map(h => h.count));
+
+      // --- Estado de vigencia ---
+      const vig = { VIGENTE: 0, VENCIDO_CON_PRORROGA: 0, VENCIDO_SIN_PRORROGA: 0, SIN_CURSO: 0 };
+      asist.forEach(a => { const e = calcularVigencia(a.guardia?.fecha_ultimo_examen).estado; if (e in vig) vig[e]++; });
+      const totalV = asist.length;
+      const vigItems = [
+        { l: "Vigentes", n: vig.VIGENTE, c: "#16a34a" },
+        { l: "Prórroga", n: vig.VENCIDO_CON_PRORROGA, c: "#d97706" },
+        { l: "Vencidos", n: vig.VENCIDO_SIN_PRORROGA, c: "#dc2626" },
+        { l: "Sin curso", n: vig.SIN_CURSO, c: "#64748b" },
+      ];
+
+      const CH = 120; // alto útil de las barras en px
+      const barrasDia = dias.map(d => {
+        const h = Math.max(4, Math.round(d.count / maxDia * CH));
+        return `<div class="flex flex-col items-center justify-end" style="min-width:34px;flex:1">
+          <div class="text-[11px] font-bold text-slate-700 mb-0.5">${d.count}</div>
+          <div class="w-6 rounded-t brand-bg" style="height:${h}px" title="${esc(d.key)}: ${d.count}"></div>
+          <div class="text-[10px] text-slate-500 mt-1 whitespace-nowrap">${esc(d.key)}</div>
+        </div>`;
+      }).join("");
+
+      const barrasHora = horas.map(o => {
+        const h = Math.max(2, Math.round(o.count / maxHora * CH));
+        const activo = o.count > 0;
+        return `<div class="flex flex-col items-center justify-end" style="min-width:16px;flex:1">
+          <div class="text-[9px] font-semibold ${activo ? 'text-slate-600' : 'text-transparent'}">${o.count || 0}</div>
+          <div class="rounded-t" style="width:9px;height:${h}px;background:${activo ? '#0f5323' : '#e2e8f0'}" title="${o.h}:00 h — ${o.count}"></div>
+          <div class="text-[9px] text-slate-400 mt-1">${o.h}</div>
+        </div>`;
+      }).join("");
+
+      const barrasVig = vigItems.map(v => {
+        const pct = totalV ? Math.round(v.n / totalV * 100) : 0;
+        return `<div class="mb-2">
+          <div class="flex justify-between text-xs mb-0.5"><span class="font-medium text-slate-600">${v.l}</span><span class="font-semibold text-slate-700">${v.n} · ${pct}%</span></div>
+          <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="h-2.5 rounded-full" style="width:${pct}%;background:${v.c}"></div></div>
+        </div>`;
+      }).join("");
+
+      const total = ev.cantidad_esperada || 0;
+      const pct = total ? Math.round(asist.length / total * 100) : 0;
+
+      return `<div class="card p-4 mt-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-semibold text-slate-700">📊 Estadísticas y gráficas</div>
+          <div class="text-xs text-slate-400">${asist.length} ingreso(s)${total ? ` · ${pct}% de lo esperado` : ""}</div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div>
+            <div class="text-sm font-medium text-slate-600 mb-2">Ingresos por día</div>
+            <div class="flex items-end gap-2 overflow-x-auto pb-1" style="height:${CH + 34}px">${barrasDia}</div>
+          </div>
+          <div>
+            <div class="text-sm font-medium text-slate-600 mb-2">Ingresos por hora del día</div>
+            <div class="flex items-end gap-1 overflow-x-auto pb-1" style="height:${CH + 30}px">${barrasHora}</div>
+          </div>
+          <div class="lg:col-span-2">
+            <div class="text-sm font-medium text-slate-600 mb-2">Estado de vigencia (O.S.10)</div>
+            ${barrasVig}
+          </div>
+        </div>
+      </div>`;
+    }
     function fila(a, i, ev, rutCount, nomCount) {
       const g = a.guardia || {};
       const v = calcularVigencia(g.fecha_ultimo_examen);
