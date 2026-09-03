@@ -790,8 +790,8 @@
       </div>
     </div>`;
 
-      // QR
-      $("#qrbox").innerHTML = ""; new QRCode($("#qrbox"), { text: guardLink(ev.slug), width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
+      // QR (con logo O.S.10 al centro y margen blanco)
+      renderQRConLogo($("#qrbox"), guardLink(ev.slug));
       $("#qrDl").addEventListener("click", () => dlQR(ev));
       $("#qrPr").addEventListener("click", () => prQR(ev));
       $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLink(ev.slug)).then(() => toast("Link copiado")); });
@@ -825,6 +825,54 @@
       <button data-del="${a.id}" class="text-slate-500 hover:text-red-600 px-1" title="Quitar">🗑</button>
     </td>
   </tr>`;
+    }
+
+    /* ---- QR con logo O.S.10 + margen blanco ---- */
+    function renderQRConLogo(container, text) {
+      const SIZE = 150;      // módulo del QR
+      const MARGIN = 14;     // un poco más de margen blanco (quiet zone)
+      const total = SIZE + MARGIN * 2;
+      container.innerHTML = "";
+      // Genera el QR en un contenedor temporal (correctLevel H para tolerar el logo central)
+      const tmp = document.createElement("div");
+      new QRCode(tmp, { text, width: SIZE, height: SIZE, correctLevel: QRCode.CorrectLevel.H });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = total; canvas.height = total;
+      canvas.style.width = total + "px"; canvas.style.height = total + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, total, total);
+      container.appendChild(canvas);
+
+      const pintarQR = () => {
+        const qrCanvas = tmp.querySelector("canvas");
+        if (qrCanvas) { ctx.drawImage(qrCanvas, MARGIN, MARGIN, SIZE, SIZE); return true; }
+        const qrImg = tmp.querySelector("img");
+        if (qrImg && qrImg.complete && qrImg.naturalWidth) { ctx.drawImage(qrImg, MARGIN, MARGIN, SIZE, SIZE); return true; }
+        return false;
+      };
+
+      const pintarLogo = () => {
+        const logo = new Image();
+        logo.onload = () => {
+          const box = Math.round(SIZE * 0.24);        // tamaño del logo (~24% del QR)
+          const pad = 4;                               // recuadro blanco alrededor del logo
+          const cx = total / 2, cy = total / 2;
+          ctx.fillStyle = "#fff";
+          const r = box / 2 + pad;
+          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(cx - r, cy - r, r * 2, r * 2, 6); ctx.fill(); }
+          else ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+          ctx.drawImage(logo, cx - box / 2, cy - box / 2, box, box);
+        };
+        logo.src = "images/icon-192x192.png";
+      };
+
+      // qrcodejs dibuja de forma síncrona en canvas; reintenta por si usa <img>
+      if (pintarQR()) pintarLogo();
+      else {
+        let intentos = 0;
+        const t = setInterval(() => { if (pintarQR() || ++intentos > 20) { clearInterval(t); pintarLogo(); } }, 50);
+      }
     }
 
     /* ---- QR descargar / imprimir ---- */
