@@ -183,6 +183,12 @@
       display: none !important
     }
 
+    /* QR del panel: mostrarlo un poco más compacto (la resolución del PNG/impresión no cambia) */
+    #qrbox canvas {
+      width: 128px !important;
+      height: 128px !important
+    }
+
     /* En PC: marcar un poco más las líneas de separación entre contenedores */
     @media (min-width: 768px) {
       .card {
@@ -787,24 +793,24 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-      <div class="card p-4 lg:col-span-2">
-        <div class="flex items-center justify-between mb-2">
-          <div class="font-semibold text-slate-700">Progreso de asistencia</div>
-          <div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+      <div class="card p-3 lg:col-span-2">
+        <div class="flex items-center justify-between mb-1.5">
+          <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia</div>
+          <div class="text-xl font-bold text-green-700">${asist.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
         </div>
-        <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
-        <div class="grid grid-cols-4 gap-2 mt-4 text-center">
+        <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
+        <div class="grid grid-cols-4 gap-2 mt-3 text-center">
           ${chip("Vigentes", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VIGENTE").length, "verde")}
           ${chip("Prórroga", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length, "amarillo")}
           ${chip("Vencidos", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length, "rojo")}
           ${chip("Sin curso", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length, "gris")}
         </div>
       </div>
-      <div class="card p-4 flex flex-col items-center">
-        <div class="font-semibold text-slate-700 mb-2 self-start">Código QR del evento</div>
-        <div id="qrbox" class="bg-white p-2 rounded-lg border border-slate-200"></div>
-        <div class="flex gap-2 mt-3 w-full">
+      <div class="card p-3 flex flex-col items-center">
+        <div class="font-semibold text-slate-700 text-sm mb-1.5 self-start">Código QR del evento</div>
+        <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
+        <div class="flex gap-2 mt-2 w-full">
           <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
           <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
           <button id="qrCp" class="btn btn-ghost text-xs flex-1">🔗 Link</button>
