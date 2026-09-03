@@ -68,7 +68,7 @@ const ENTRADA_VIGENCIA_LEY = new Date(2025, 10, 28);        // 28-nov-2025 (entr
 const FECHA_TOPE_PRORROGA  = new Date(2027, 4, 28, 23,59,59); // 28-may-2027 (tope prórroga)
 
 const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-const APP_VERSION = "v2.0";
+const APP_VERSION = "v2.1";
 // En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
 if(USING_SUPABASE){ try{ ["os10_eventos","os10_guardias","os10_asistencias","os10_seeded"].forEach(k=>localStorage.removeItem(k)); }catch(e){} }
 
@@ -418,7 +418,7 @@ async function renderAdmin(){
     <main id="main" class="flex-1 p-4 md:p-6 bg-[#f1f5f4]"></main>
   </div>`;
 
-  $("#nuevoEv").addEventListener("click",modalNuevoEvento);
+  $("#nuevoEv").addEventListener("click",()=>modalNuevoEvento());
   $("#salir").addEventListener("click",()=>{ sessionStorage.removeItem("os10_admin"); route(); });
   const hamb=$("#hamb"), sidebar=$("#sidebar");
   if(hamb) hamb.addEventListener("click",()=>{ sidebar.classList.toggle("hidden"); });
@@ -564,7 +564,8 @@ function prQR(ev){ const url=qrCanvasDataURL(); if(!url)return; const w=window.o
 
 /* ---- Modales evento ---- */
 function modalNuevoEvento(ev){
-  const edit=!!ev;
+  if(ev instanceof Event) ev=undefined;           // proteger: nunca tratar un click como edición
+  const edit=!!ev && !!ev.id;                       // solo es edición si trae un evento con id real
   openModal(`
     <h2 class="font-bold text-lg text-slate-800 mb-3">${edit?"Editar evento":"Nuevo evento"}</h2>
     <div class="space-y-3">
