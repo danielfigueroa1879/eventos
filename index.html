@@ -830,7 +830,7 @@
     /* ---- QR con logo O.S.10 + margen blanco ---- */
     function renderQRConLogo(container, text) {
       const SIZE = 150;      // módulo del QR
-      const MARGIN = 14;     // un poco más de margen blanco (quiet zone)
+      const MARGIN = 7;      // margen blanco (quiet zone) discreto
       const total = SIZE + MARGIN * 2;
       container.innerHTML = "";
       // Genera el QR en un contenedor temporal (correctLevel H para tolerar el logo central)
@@ -855,8 +855,8 @@
       const pintarLogo = () => {
         const logo = new Image();
         logo.onload = () => {
-          const box = Math.round(SIZE * 0.24);        // tamaño del logo (~24% del QR)
-          const pad = 4;                               // recuadro blanco alrededor del logo
+          const box = Math.round(SIZE * 0.22);        // tamaño del logo (~22% del QR)
+          const pad = 1;                               // recuadro blanco mínimo alrededor del logo
           const cx = total / 2, cy = total / 2;
           ctx.fillStyle = "#fff";
           const r = box / 2 + pad;
