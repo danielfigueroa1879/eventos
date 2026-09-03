@@ -629,7 +629,7 @@
     /* =========================================================================
        PANEL ADMIN
        ========================================================================= */
-    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false };
+    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false };
 
     async function renderAdmin() {
       app.innerHTML = `
@@ -790,13 +790,30 @@
       </div>
     </div>
 
-    ${estadisticasHTML(ev, asist)}`;
+    <div class="mt-5">
+      <button id="toggleStats" class="btn btn-ghost text-sm">📊 Ver estadísticas y gráficas</button>
+      <div id="statsBox" hidden></div>
+    </div>`;
 
       // QR (con logo O.S.10 al centro y margen blanco)
       renderQRConLogo($("#qrbox"), guardLink(ev.slug));
       $("#qrDl").addEventListener("click", () => dlQR(ev));
       $("#qrPr").addEventListener("click", () => prQR(ev));
       $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLink(ev.slug)).then(() => toast("Link copiado")); });
+      const statsBtn = $("#toggleStats"), statsBox = $("#statsBox");
+      const pintarStats = () => {
+        if (ADMIN_STATE.showStats) {
+          statsBox.innerHTML = estadisticasHTML(ev, asist);
+          statsBox.hidden = false;
+          statsBtn.textContent = "📊 Ocultar estadísticas y gráficas";
+        } else {
+          statsBox.innerHTML = "";
+          statsBox.hidden = true;
+          statsBtn.textContent = "📊 Ver estadísticas y gráficas";
+        }
+      };
+      statsBtn.addEventListener("click", () => { ADMIN_STATE.showStats = !ADMIN_STATE.showStats; pintarStats(); });
+      pintarStats();
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
