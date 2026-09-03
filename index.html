@@ -988,12 +988,8 @@
           // Mantener la proporción real del logo (150x153) para que no se deforme
           const ar = (logo.naturalHeight && logo.naturalWidth) ? logo.naturalHeight / logo.naturalWidth : 1;
           const lw = box, lh = Math.round(box * ar);
-          const pad = 1 * SCALE;                       // orilla blanca mínima alrededor del logo
           const cx = px / 2, cy = px / 2;              // centro exacto del QR
-          ctx.fillStyle = "#fff";
-          const rw = lw / 2 + pad, rh = lh / 2 + pad;
-          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(cx - rw, cy - rh, rw * 2, rh * 2, 8 * SCALE); ctx.fill(); }
-          else ctx.fillRect(cx - rw, cy - rh, rw * 2, rh * 2);
+          // Sin recuadro/contorno blanco: se dibuja el logo directamente sobre el QR
           ctx.imageSmoothingEnabled = true;                 // logo suavizado (nítido, no pixelado)
           ctx.imageSmoothingQuality = "high";
           ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
