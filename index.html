@@ -475,7 +475,7 @@
         <div class="flex items-center justify-between mb-1">
           <img src="images/aniversario1.webp" alt="Centenario" class="w-16 h-16 object-contain drop-shadow">
           <img src="images/poli.webp" alt="" class="w-20 h-20 rounded-full bg-white/20 p-1 ring-2 ring-white/40 -mt-1">
-          <img src="images/icon-192x192.png" alt="OS10" class="w-16 h-16 object-contain drop-shadow rounded-full bg-white/90 p-1">
+          <img src="images/logo-os10-original.webp" alt="OS10" class="w-16 h-16 object-contain drop-shadow rounded-full bg-white/90 p-1">
         </div>
         <div class="text-[11px] uppercase tracking-widest opacity-90 font-semibold">Seguridad Privada · O.S.10 Coquimbo</div>
         <h1 class="text-xl font-bold mt-1">${esc(ev.nombre_evento)}</h1>
@@ -651,14 +651,14 @@
     <!-- Topbar móvil -->
     <div class="md:hidden brand-bg text-white flex items-center justify-between px-4 py-3">
       <button id="hamb" class="text-2xl leading-none">☰</button>
-      <div class="font-bold flex items-center gap-2"><img src="images/icon-192x192.png" class="w-7 h-7 rounded-full bg-white/90 p-0.5" alt="OS10">Control de Guardias</div>
+      <div class="font-bold flex items-center gap-2"><img src="images/logo-os10-original.webp" class="w-7 h-7 rounded-full bg-white/90 p-0.5" alt="OS10">Control de Guardias</div>
       <div class="w-6"></div>
     </div>
 
     <!-- Sidebar -->
     <aside id="sidebar" class="bg-white border-r border-slate-200 w-full md:w-72 md:min-h-screen md:block ${'hidden'}">
       <div class="brand-bg text-white p-4 hidden md:flex items-center gap-3">
-        <img src="images/icon-192x192.png" class="w-11 h-11 rounded-full bg-white/90 p-1" alt="OS10">
+        <img src="images/logo-os10-original.webp" class="w-11 h-11 rounded-full bg-white/90 p-1" alt="OS10">
         <div class="flex-1">
           <div class="font-bold text-lg leading-tight">Control Guardias</div>
           <div class="text-xs opacity-80">Fiestas Patrias · O.S.10 Coquimbo</div>
@@ -991,7 +991,7 @@
           const cx = px / 2, cy = px / 2;              // centro exacto del QR
           // Fondo blanco CIRCULAR que sigue la forma del emblema (el logo es transparente):
           // devuelve el blanco interior del logo y deja solo una orilla mínima, sin recuadro cuadrado.
-          const r = Math.max(lw, lh) / 2 + 1.5 * SCALE;
+          const r = Math.max(lw, lh) / 2 + 0.5 * SCALE;
           ctx.fillStyle = "#fff";
           ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
           ctx.imageSmoothingEnabled = true;                 // logo suavizado (nítido, no pixelado)
@@ -1189,7 +1189,7 @@
         app.innerHTML = `
     <div class="min-h-screen p-3 md:p-6 max-w-4xl mx-auto">
       <div class="brand-bg rounded-2xl p-5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
-        <img src="images/icon-192x192.png" class="w-14 h-14 rounded-full bg-white/90 p-1 flex-shrink-0" alt="OS10">
+        <img src="images/logo-os10-original.webp" class="w-14 h-14 rounded-full bg-white/90 p-1 flex-shrink-0" alt="OS10">
         <div class="flex-1 min-w-0">
           <div class="text-xs uppercase tracking-widest opacity-90 font-semibold">Vista de empresa · solo lectura</div>
           <h1 class="text-xl font-bold leading-tight">${esc(ev.nombre_evento)}</h1>
@@ -1220,7 +1220,7 @@
           </table>
         </div>
       </div>
-      <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/icon-192x192.png" class="w-5 h-5 opacity-60" alt="">Prefectura O.S.10 · Vista de solo lectura</p>
+      <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" class="w-5 h-5 opacity-60" alt="">Prefectura O.S.10 · Vista de solo lectura</p>
     </div>`;
       };
       await paint();
