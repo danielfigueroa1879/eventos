@@ -68,6 +68,9 @@ const ENTRADA_VIGENCIA_LEY = new Date(2025, 10, 28);        // 28-nov-2025 (entr
 const FECHA_TOPE_PRORROGA  = new Date(2027, 4, 28, 23,59,59); // 28-may-2027 (tope prórroga)
 
 const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+const APP_VERSION = "v2.0";
+// En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
+if(USING_SUPABASE){ try{ ["os10_eventos","os10_guardias","os10_asistencias","os10_seeded"].forEach(k=>localStorage.removeItem(k)); }catch(e){} }
 
 /* =========================================================================
    LÓGICA DE VIGENCIA
@@ -373,7 +376,7 @@ function renderAdminGate(){
       <p class="text-slate-500 text-sm mb-4">Ingresa el PIN de administrador</p>
       <input id="pin" type="password" inputmode="numeric" class="fld text-center tracking-widest text-lg" placeholder="••••"/>
       <button id="pinBtn" class="btn btn-p w-full mt-3">Entrar</button>
-      <p class="text-xs text-slate-400 mt-3">${USING_SUPABASE?'Conectado a Supabase':'MODO DEMO — datos solo en este dispositivo'}</p>
+      <p class="text-xs text-slate-400 mt-3">${USING_SUPABASE?'● Conectado a Supabase':'MODO DEMO — datos solo en este dispositivo'} · ${APP_VERSION}</p>
     </div></div>`;
   const go=()=>{ if($("#pin").value===ADMIN_PIN){ sessionStorage.setItem("os10_admin","1"); renderAdmin(); } else toast("PIN incorrecto",false); };
   $("#pinBtn").addEventListener("click",go);
@@ -578,6 +581,7 @@ function modalNuevoEvento(ev){
   $("#m_save").addEventListener("click",async()=>{
     const nombre=$("#m_nom").value.trim(), empresa=$("#m_emp").value.trim(), cant=parseInt($("#m_cant").value)||0, fecha=$("#m_fecha").value||null;
     if(!nombre||!empresa){ toast("Nombre y empresa son obligatorios",false); return; }
+    if(edit && !ev.id){ toast("Este evento no tiene ID válido (dato viejo). Recarga la página (Ctrl+Shift+R) y créalo de nuevo.",false); return; }
     try{
       if(edit){ await Data.updateEvento(ev.id,{nombre_evento:nombre,empresa,cantidad_esperada:cant,fecha_evento:fecha}); }
       else{ const nuevo=await Data.createEvento({nombre_evento:nombre,empresa,cantidad_esperada:cant,fecha_evento:fecha,slug:makeSlug(nombre,empresa)}); ADMIN_STATE.selected=nuevo.id; }
