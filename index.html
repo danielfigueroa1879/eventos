@@ -855,16 +855,21 @@
       const pintarLogo = () => {
         const logo = new Image();
         logo.onload = () => {
-          const box = Math.round(SIZE * 0.22);        // tamaño del logo (~22% del QR)
-          const pad = 1;                               // recuadro blanco mínimo alrededor del logo
-          const cx = total / 2, cy = total / 2;
+          // Tamaño del logo: ~27% del QR. Con correctLevel H (30% de tolerancia)
+          // queda bien visible y centrado sin interrumpir la lectura.
+          const box = Math.round(SIZE * 0.27);
+          // Mantener la proporción real del logo (150x153) para que no se deforme
+          const ar = (logo.naturalHeight && logo.naturalWidth) ? logo.naturalHeight / logo.naturalWidth : 1;
+          const lw = box, lh = Math.round(box * ar);
+          const pad = 4;                               // recuadro blanco alrededor del logo (mejora la lectura)
+          const cx = total / 2, cy = total / 2;        // centro exacto del QR
           ctx.fillStyle = "#fff";
-          const r = box / 2 + pad;
-          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(cx - r, cy - r, r * 2, r * 2, 6); ctx.fill(); }
-          else ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-          ctx.drawImage(logo, cx - box / 2, cy - box / 2, box, box);
+          const rw = lw / 2 + pad, rh = lh / 2 + pad;
+          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(cx - rw, cy - rh, rw * 2, rh * 2, 8); ctx.fill(); }
+          else ctx.fillRect(cx - rw, cy - rh, rw * 2, rh * 2);
+          ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
         };
-        logo.src = "images/icon-192x192.png";
+        logo.src = "images/logo-os10-original.webp";
       };
 
       // qrcodejs dibuja de forma síncrona en canvas; reintenta por si usa <img>
