@@ -668,6 +668,10 @@
       <div class="p-3">
         <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm">📥 Importar guardias (CSV)</button>
+        <div class="flex items-center justify-between px-1 mb-1.5">
+          <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
+          <span id="evCount" class="text-[11px] font-medium text-slate-300"></span>
+        </div>
         <div id="listaEventos" class="space-y-1"></div>
       </div>
       <div class="p-3 border-t border-slate-100 text-xs text-slate-400 flex items-center justify-between">
@@ -702,12 +706,13 @@
     function renderSidebarList() {
       const cont = $("#listaEventos"); if (!cont) return;
       if (!ADMIN_STATE.eventos.length) { cont.innerHTML = `<p class="text-sm text-slate-400 p-2">Aún no hay eventos. Crea el primero.</p>`; return; }
+      const ec = $("#evCount"); if (ec) ec.textContent = ADMIN_STATE.eventos.length;
       cont.innerHTML = ADMIN_STATE.eventos.map(e => {
         const act = e.id === ADMIN_STATE.selected;
-        return `<button data-id="${e.id}" class="evItem w-full text-left rounded-lg px-3 py-2 ${act ? 'bg-green-50 border border-green-200' : 'hover:bg-slate-50 border border-transparent'}">
-      <div class="font-semibold text-sm text-slate-800 leading-tight">${esc(e.nombre_evento)}</div>
-      <div class="text-xs text-slate-500">Empresa: ${esc(e.empresa)}</div>
-      <div class="text-[11px] text-slate-400 mt-0.5" data-count="${e.id}">…</div>
+        return `<button data-id="${e.id}" class="evItem w-full text-left rounded-lg px-3 py-2 border-l-4 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
+      <div class="font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight">${esc(e.nombre_evento)}</div>
+      <div class="text-xs ${act ? 'text-green-800/70' : 'text-slate-500'}">Empresa: ${esc(e.empresa)}</div>
+      <div class="text-[11px] ${act ? 'text-green-700/70' : 'text-slate-400'} mt-0.5" data-count="${e.id}">…</div>
     </button>`;
       }).join("");
       cont.querySelectorAll(".evItem").forEach(b => b.addEventListener("click", () => { ADMIN_STATE.selected = b.dataset.id; ADMIN_STATE.turnoFiltro = "all"; if (window.innerWidth < 768) $("#sidebar").classList.add("hidden"); refreshAdmin(); }));
