@@ -4,6 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Control de Guardias — Eventos OS10</title>
+<link rel="icon" href="images/icon-192x192.png">
+<link rel="apple-touch-icon" href="images/icon-192x192.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -68,7 +70,7 @@ const ENTRADA_VIGENCIA_LEY = new Date(2025, 10, 28);        // 28-nov-2025 (entr
 const FECHA_TOPE_PRORROGA  = new Date(2027, 4, 28, 23,59,59); // 28-may-2027 (tope prórroga)
 
 const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-const APP_VERSION = "v2.1";
+const APP_VERSION = "v3.0";
 // En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
 if(USING_SUPABASE){ try{ ["os10_eventos","os10_guardias","os10_asistencias","os10_seeded"].forEach(k=>localStorage.removeItem(k)); }catch(e){} }
 
@@ -161,6 +163,7 @@ const Local = (()=>{
     async getEventoBySlug(slug){ return get(K.ev).find(x=>x.slug===slug)||null; },
     async getGuardia(rut){ return get(K.gu).find(x=>x.rut===rut)||null; },
     async upsertGuardia(g){ const a=get(K.gu); const i=a.findIndex(x=>x.rut===g.rut); const rec={...g,updated_at:nowISO()}; if(i>=0)a[i]={...a[i],...rec}; else a.push(rec); set(K.gu,a); ping(); return rec; },
+    async bulkUpsertGuardias(arr){ const a=get(K.gu); const by={}; a.forEach(g=>by[g.rut]=g); arr.forEach(g=>by[g.rut]={...by[g.rut],...g,updated_at:nowISO()}); set(K.gu,Object.values(by)); ping(); return arr.length; },
     async listAsistencias(evId){
       const as=get(K.as).filter(x=>x.evento_id===evId);
       const gu=get(K.gu);
@@ -190,6 +193,7 @@ const Remote = (()=>{
     async getEventoBySlug(slug){ const d=ok(await sb.from("eventos").select("*").eq("slug",slug).limit(1)); return d[0]||null; },
     async getGuardia(rut){ const d=ok(await sb.from("guardias_central").select("*").eq("rut",rut).limit(1)); return d[0]||null; },
     async upsertGuardia(g){ return ok(await sb.from("guardias_central").upsert({...g,updated_at:nowISO()}).select().single()); },
+    async bulkUpsertGuardias(arr){ let n=0; for(let i=0;i<arr.length;i+=150){ const chunk=arr.slice(i,i+150).map(g=>({...g,updated_at:nowISO()})); const r=await sb.from("guardias_central").upsert(chunk); if(r.error) throw r.error; n+=chunk.length; } return n; },
     async listAsistencias(evId){
       const as=ok(await sb.from("asistencias").select("*").eq("evento_id",evId).order("hora_ingreso",{ascending:true}));
       const ruts=[...new Set(as.map(a=>a.rut))];
@@ -227,8 +231,16 @@ function route(){
   const params=new URLSearchParams(location.search);
   const e=params.get("e");
   if(e) return renderGuard(e);
+  const emp=params.get("empresa");
+  if(emp) return renderEmpresa(emp);
   return renderAdminGate();
 }
+function empresaLink(slug){ return location.origin+location.pathname.replace(/index\.html$/,"")+"?empresa="+encodeURIComponent(slug); }
+
+/* ---- Utilidades de importación CSV ---- */
+function fechaISO(f){ f=(f||"").trim(); let m=/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(f); if(m) return `${m[3]}-${String(+m[2]).padStart(2,"0")}-${String(+m[1]).padStart(2,"0")}`; m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(f); return m?f:null; }
+function splitNombre(n){ const w=(n||"").toUpperCase().replace(/\s+/g," ").trim().split(" ").filter(Boolean); if(w.length>=4) return [w.slice(0,-2).join(" "), w.slice(-2).join(" ")]; if(w.length===3) return [w[0], w.slice(1).join(" ")]; if(w.length===2) return [w[0],w[1]]; return [w.join(" "),""]; }
+function parseCSV(text){ const rows=[]; let i=0,f="",row=[],q=false; while(i<text.length){ const c=text[i]; if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; } else { if(c==='"') q=true; else if(c===","){row.push(f);f="";} else if(c==="\n"){row.push(f);rows.push(row);row=[];f="";} else if(c==="\r"){} else f+=c; } i++; } if(f.length||row.length){row.push(f);rows.push(row);} return rows; }
 
 /* =========================================================================
    VISTA GUARDIA (formulario del QR)
@@ -242,10 +254,12 @@ async function renderGuard(slug){
   app.innerHTML=`
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
-      <div class="brand-bg rounded-2xl p-5 text-white text-center shadow">
-        <div class="text-xs uppercase tracking-wide opacity-90">Control de acceso · OS10</div>
-        <h1 class="text-xl font-bold mt-1">${esc(ev.nombre_evento)}</h1>
-        <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
+      <div class="brand-bg rounded-2xl p-5 text-white text-center shadow relative overflow-hidden">
+        <img src="images/icon-192x192.png" alt="" class="absolute -right-3 -top-3 w-24 opacity-20 pointer-events-none">
+        <img src="images/poli.webp" alt="OS10" class="w-24 h-24 mx-auto rounded-full bg-white/25 p-1 mb-2 relative">
+        <div class="text-xs uppercase tracking-wide opacity-90">Control de acceso · Prefectura O.S.10</div>
+        <h1 class="text-xl font-bold mt-1 relative">${esc(ev.nombre_evento)}</h1>
+        <div class="text-sm opacity-90 relative">Empresa: ${esc(ev.empresa)}</div>
       </div>
 
       <div class="card p-5 mt-4 space-y-4">
@@ -394,18 +408,22 @@ async function renderAdmin(){
     <!-- Topbar móvil -->
     <div class="md:hidden brand-bg text-white flex items-center justify-between px-4 py-3">
       <button id="hamb" class="text-2xl leading-none">☰</button>
-      <div class="font-bold">Control de Guardias</div>
+      <div class="font-bold flex items-center gap-2"><img src="images/icon-192x192.png" class="w-7 h-7 rounded-full bg-white/90 p-0.5" alt="OS10">Control de Guardias</div>
       <div class="w-6"></div>
     </div>
 
     <!-- Sidebar -->
     <aside id="sidebar" class="bg-white border-r border-slate-200 w-full md:w-72 md:min-h-screen md:block ${'hidden'}">
-      <div class="brand-bg text-white p-4 hidden md:block">
-        <div class="font-bold text-lg">🛡️ Control Guardias</div>
-        <div class="text-xs opacity-80">Eventos Fiestas Patrias · OS10</div>
+      <div class="brand-bg text-white p-4 hidden md:flex items-center gap-3">
+        <img src="images/icon-192x192.png" class="w-11 h-11 rounded-full bg-white/90 p-1" alt="OS10">
+        <div>
+          <div class="font-bold text-lg leading-tight">Control Guardias</div>
+          <div class="text-xs opacity-80">Eventos Fiestas Patrias · O.S.10</div>
+        </div>
       </div>
       <div class="p-3">
-        <button id="nuevoEv" class="btn btn-p w-full mb-3">+ Nuevo evento</button>
+        <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
+        <button id="importar" class="btn btn-ghost w-full mb-3 text-sm">📥 Importar guardias (CSV)</button>
         <div id="listaEventos" class="space-y-1"></div>
       </div>
       <div class="p-3 border-t border-slate-100 text-xs text-slate-400 flex items-center justify-between">
@@ -419,6 +437,7 @@ async function renderAdmin(){
   </div>`;
 
   $("#nuevoEv").addEventListener("click",()=>modalNuevoEvento());
+  $("#importar").addEventListener("click",modalImportar);
   $("#salir").addEventListener("click",()=>{ sessionStorage.removeItem("os10_admin"); route(); });
   const hamb=$("#hamb"), sidebar=$("#sidebar");
   if(hamb) hamb.addEventListener("click",()=>{ sidebar.classList.toggle("hidden"); });
@@ -473,7 +492,8 @@ async function renderMain(){
         <h1 class="text-xl md:text-2xl font-bold text-slate-800">${esc(ev.nombre_evento)}</h1>
         <div class="text-slate-500 text-sm">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento?` · ${esc(ev.fecha_evento)}`:""}</div>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
+        <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
         <button id="editEv" class="btn btn-ghost text-sm">✎ Editar evento</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
       </div>
@@ -526,6 +546,7 @@ async function renderMain(){
   $("#qrDl").addEventListener("click",()=>dlQR(ev));
   $("#qrPr").addEventListener("click",()=>prQR(ev));
   $("#qrCp").addEventListener("click",()=>{ navigator.clipboard.writeText(guardLink(ev.slug)).then(()=>toast("Link copiado")); });
+  $("#linkEmpresa").addEventListener("click",()=>modalLinkEmpresa(ev));
   $("#editEv").addEventListener("click",()=>modalNuevoEvento(ev));
   $("#delEv").addEventListener("click",()=>{ confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`,async()=>{ await Data.deleteEvento(ev.id); ADMIN_STATE.selected=null; closeModal(); refreshAdmin(true); }); });
   const b=$("#buscar"); b.addEventListener("input",()=>{ ADMIN_STATE.search=b.value; const pos=b.selectionStart; renderMain().then(()=>{ const nb=$("#buscar"); if(nb){nb.focus(); try{nb.setSelectionRange(pos,pos);}catch{}} }); });
@@ -619,6 +640,104 @@ function confirmar(msg,onOk){
   openModal(`<h2 class="font-bold text-slate-800 mb-3">Confirmar</h2><p class="text-slate-600 text-sm mb-4">${esc(msg)}</p>
     <div class="flex gap-2"><button id="c_no" class="btn btn-ghost flex-1">Cancelar</button><button id="c_si" class="btn btn-danger flex-1">Sí, continuar</button></div>`);
   $("#c_no").addEventListener("click",closeModal); $("#c_si").addEventListener("click",onOk);
+}
+
+/* ---- Modal: link de empresa (solo lectura) ---- */
+function modalLinkEmpresa(ev){
+  const link=empresaLink(ev.slug);
+  openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">👁 Link para la empresa</h2>
+    <p class="text-sm text-slate-500 mb-3">Comparte este enlace con <b>${esc(ev.empresa)}</b>. Podrán ver en tiempo real cuántos guardias ingresan a "<b>${esc(ev.nombre_evento)}</b>", <b>sin poder modificar nada</b>.</p>
+    <input id="le_url" class="fld text-xs" readonly value="${esc(link)}">
+    <div class="flex gap-2 mt-3">
+      <button id="le_copy" class="btn btn-p flex-1">🔗 Copiar link</button>
+      <button id="le_close" class="btn btn-ghost flex-1">Cerrar</button>
+    </div>`);
+  $("#le_copy").addEventListener("click",()=>{ const i=$("#le_url"); i.select(); navigator.clipboard.writeText(link).then(()=>toast("Link copiado")); });
+  $("#le_close").addEventListener("click",closeModal);
+}
+
+/* ---- Modal: importar guardias desde CSV ---- */
+function modalImportar(){
+  openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📥 Importar guardias</h2>
+    <p class="text-sm text-slate-500 mb-3">Sube un <b>CSV</b> (en Google Sheets: Archivo → Descargar → CSV). Debe tener columnas <b>RUT</b> y <b>NOMBRE</b> (opcional FONO/TELÉFONO y FECHA EXAMEN). El RUT, las mayúsculas y las fechas se formatean solos.</p>
+    <input id="imp_file" type="file" accept=".csv,text/csv" class="fld">
+    <div id="imp_prev" class="text-xs text-slate-500 mt-2"></div>
+    <div class="flex gap-2 mt-4">
+      <button id="imp_cancel" class="btn btn-ghost flex-1">Cancelar</button>
+      <button id="imp_go" class="btn btn-p flex-1" disabled>Importar</button>
+    </div>`);
+  let rows=null; const prev=$("#imp_prev"), go=$("#imp_go");
+  $("#imp_cancel").addEventListener("click",closeModal);
+  $("#imp_file").addEventListener("change",async(e)=>{
+    const file=e.target.files[0]; if(!file) return;
+    try{
+      const all=parseCSV(await file.text()).filter(r=>r.some(c=>c&&c.trim()));
+      if(!all.length){ prev.textContent="Archivo vacío."; go.disabled=true; return; }
+      const head=all.shift().map(h=>(h||"").trim().toUpperCase());
+      const idx=(re)=>head.findIndex(h=>re.test(h));
+      const iR=idx(/RUT/), iN=idx(/NOMBRE/), iT=idx(/FONO|TELEF/), iF=idx(/FECHA/);
+      if(iR<0||iN<0){ prev.innerHTML='<span class="text-red-600">El CSV debe tener columnas RUT y NOMBRE.</span>'; go.disabled=true; return; }
+      const map={};
+      all.forEach(r=>{ const rut=formatRut(r[iR]||""); if(rut.length<3) return; const [nom,ape]=splitNombre(r[iN]||""); map[rut]={rut,nombres:nom,apellidos:ape,telefono:iT>=0?(r[iT]||"").trim():"",fecha_ultimo_examen:iF>=0?fechaISO(r[iF]):null}; });
+      rows=Object.values(map);
+      prev.innerHTML=`Detectados <b>${rows.length}</b> guardias únicos.`+(rows[0]?` Ej: ${esc(rows[0].rut)} — ${esc((rows[0].nombres+" "+rows[0].apellidos).trim())}`:"");
+      go.disabled=rows.length===0;
+    }catch(err){ prev.innerHTML='<span class="text-red-600">Error leyendo el archivo.</span>'; }
+  });
+  go.addEventListener("click",async()=>{
+    if(!rows||!rows.length) return;
+    go.disabled=true; go.textContent="Importando…";
+    try{ const n=await Data.bulkUpsertGuardias(rows); closeModal(); toast(`✔ ${n} guardias importados a la base central`); refreshAdmin(); }
+    catch(err){ toast("Error al importar: "+(err.message||err),false); go.disabled=false; go.textContent="Importar"; }
+  });
+}
+
+/* =========================================================================
+   VISTA EMPRESA (solo lectura, por evento) — ?empresa=<slug>
+   ========================================================================= */
+async function renderEmpresa(slug){
+  app.innerHTML=`<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
+  let ev=null; try{ ev=await Data.getEventoBySlug(slug); }catch(e){}
+  if(!ev){ app.innerHTML=`<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
+  const paint=async()=>{
+    let asist=[]; try{ asist=await Data.listAsistencias(ev.id); }catch(e){}
+    const total=ev.cantidad_esperada||0;
+    const pct= total? Math.min(100,Math.round(asist.length/total*100)):0;
+    const cont=(estado)=>asist.filter(a=>calcularVigencia(a.guardia?.fecha_ultimo_examen).estado===estado).length;
+    app.innerHTML=`
+    <div class="min-h-screen p-3 md:p-6 max-w-4xl mx-auto">
+      <div class="brand-bg rounded-2xl p-5 text-white shadow flex items-center gap-4 relative overflow-hidden">
+        <img src="images/icon-192x192.png" class="w-14 h-14 rounded-full bg-white/90 p-1 flex-shrink-0" alt="OS10">
+        <div class="flex-1 min-w-0">
+          <div class="text-xs uppercase opacity-90">Vista de empresa · solo lectura</div>
+          <h1 class="text-xl font-bold leading-tight">${esc(ev.nombre_evento)}</h1>
+          <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
+        </div>
+      </div>
+      <div class="card p-4 mt-4">
+        <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total||"—"}</span></div></div>
+        <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
+        <div class="grid grid-cols-4 gap-2 mt-4 text-center">
+          ${chip("Vigentes",cont("VIGENTE"),"verde")}
+          ${chip("Prórroga",cont("VENCIDO_CON_PRORROGA"),"amarillo")}
+          ${chip("Vencidos",cont("VENCIDO_SIN_PRORROGA"),"rojo")}
+          ${chip("Sin curso",cont("SIN_CURSO"),"gris")}
+        </div>
+      </div>
+      <div class="card mt-4">
+        <div class="p-3 border-b border-slate-100 font-semibold text-slate-700">Listado (${asist.length})</div>
+        <div class="p-3 overflow-x-auto">
+          <table class="resp w-full text-sm">
+            <thead class="text-left text-slate-500 border-b border-slate-100"><tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th><th class="pr-2">Ingreso</th></tr></thead>
+            <tbody>${asist.length?asist.map((a,i)=>{const g=a.guardia||{};const v=calcularVigencia(g.fecha_ultimo_examen);return `<tr class="border-b border-slate-50"><td data-label="#" class="py-2 pr-2 text-slate-400">${i+1}</td><td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(((g.nombres||"")+" "+(g.apellidos||"")).trim()||"—")}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges==='OK'?'text-green-700':v.siges?'text-amber-700':'text-slate-400'}">${esc(v.siges||"—")}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`;}).join(""):`<tr><td colspan="6" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
+          </table>
+        </div>
+      </div>
+      <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/icon-192x192.png" class="w-5 h-5 opacity-60" alt="">Prefectura O.S.10 · Vista de solo lectura</p>
+    </div>`;
+  };
+  await paint();
+  Data.onChange(paint);
 }
 
 /* ===== Semilla de demo (solo la primera vez en modo demo) ===== */
