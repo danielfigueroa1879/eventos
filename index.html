@@ -1,257 +1,399 @@
 <!doctype html>
 <html lang="es">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Control de Guardias — Eventos OS10</title>
-<link rel="icon" href="images/icon-192x192.png">
-<link rel="apple-touch-icon" href="images/icon-192x192.png">
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<style>
-  :root{ --brand:#0c4a1f; --brand2:#13612b; }
-  html,body{height:100%}
-  body{background:#eef2f0;font-family:ui-sans-serif,system-ui,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
-  .brand-bg{background:linear-gradient(135deg,#0a3d18 0%,#0f5323 55%,#15662f 100%)}
-  ::-webkit-scrollbar{width:10px;height:10px}
-  ::-webkit-scrollbar-thumb{background:#c7d2ce;border-radius:8px}
-  /* Tabla responsiva -> tarjetas en móvil */
-  @media (max-width:700px){
-    table.resp, table.resp thead, table.resp tbody, table.resp th, table.resp td, table.resp tr{display:block}
-    table.resp thead{display:none}
-    table.resp tr{margin-bottom:.6rem;border:1px solid #e2e8e6;border-radius:.75rem;background:#fff;padding:.4rem .6rem;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    table.resp td{display:flex;justify-content:space-between;gap:1rem;border:none;padding:.35rem .1rem;text-align:right}
-    table.resp td::before{content:attr(data-label);font-weight:600;color:#64748b;text-align:left}
-    table.resp td.acciones{justify-content:flex-end}
-  }
-  .badge{display:inline-flex;align-items:center;gap:.3rem;font-weight:700;font-size:.72rem;padding:.15rem .5rem;border-radius:9999px;white-space:nowrap}
-  .b-verde{background:#dcfce7;color:#166534}
-  .b-amarillo{background:#fef9c3;color:#854d0e}
-  .b-rojo{background:#fee2e2;color:#991b1b}
-  .b-gris{background:#e2e8f0;color:#334155}
-  .row-dup{background:#fef2f2 !important;outline:2px solid #fca5a5;outline-offset:-2px}
-  input,select{outline:none}
-  .fld{width:100%;border:1px solid #cbd5e1;border-radius:.6rem;padding:.7rem .8rem;font-size:1rem;background:#fff}
-  .fld:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(34,197,94,.15)}
-  .btn{border:none;border-radius:.6rem;padding:.7rem 1rem;font-weight:600;cursor:pointer;font-size:.95rem}
-  .btn-p{background:var(--brand);color:#fff}
-  .btn-p:active{transform:translateY(1px)}
-  .btn-ghost{background:#fff;border:1px solid #cbd5e1;color:#334155}
-  .btn-danger{background:#dc2626;color:#fff}
-  .card{background:#fff;border:1px solid #e6ecea;border-radius:1rem;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-  [hidden]{display:none!important}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Control de Guardias — Eventos OS10</title>
+  <link rel="icon" href="images/icon-192x192.png">
+  <link rel="apple-touch-icon" href="images/icon-192x192.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --brand: #0c4a1f;
+      --brand2: #13612b;
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      background: #eef2f0;
+      font-family: ui-sans-serif, system-ui, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent
+    }
+
+    .brand-bg {
+      background: linear-gradient(135deg, #0a3d18 0%, #0f5323 55%, #15662f 100%)
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #c7d2ce;
+      border-radius: 8px
+    }
+
+    /* Tabla responsiva -> tarjetas en móvil */
+    @media (max-width:700px) {
+
+      table.resp,
+      table.resp thead,
+      table.resp tbody,
+      table.resp th,
+      table.resp td,
+      table.resp tr {
+        display: block
+      }
+
+      table.resp thead {
+        display: none
+      }
+
+      table.resp tr {
+        margin-bottom: .6rem;
+        border: 1px solid #e2e8e6;
+        border-radius: .75rem;
+        background: #fff;
+        padding: .4rem .6rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .04)
+      }
+
+      table.resp td {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        border: none;
+        padding: .35rem .1rem;
+        text-align: right
+      }
+
+      table.resp td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #64748b;
+        text-align: left
+      }
+
+      table.resp td.acciones {
+        justify-content: flex-end
+      }
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      font-weight: 700;
+      font-size: .72rem;
+      padding: .15rem .5rem;
+      border-radius: 9999px;
+      white-space: nowrap
+    }
+
+    .b-verde {
+      background: #dcfce7;
+      color: #166534
+    }
+
+    .b-amarillo {
+      background: #fef9c3;
+      color: #854d0e
+    }
+
+    .b-rojo {
+      background: #fee2e2;
+      color: #991b1b
+    }
+
+    .b-gris {
+      background: #e2e8f0;
+      color: #334155
+    }
+
+    .row-dup {
+      background: #fef2f2 !important;
+      outline: 2px solid #fca5a5;
+      outline-offset: -2px
+    }
+
+    input,
+    select {
+      outline: none
+    }
+
+    .fld {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: .6rem;
+      padding: .7rem .8rem;
+      font-size: 1rem;
+      background: #fff
+    }
+
+    .fld:focus {
+      border-color: var(--brand2);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, .15)
+    }
+
+    .btn {
+      border: none;
+      border-radius: .6rem;
+      padding: .7rem 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: .95rem
+    }
+
+    .btn-p {
+      background: var(--brand);
+      color: #fff
+    }
+
+    .btn-p:active {
+      transform: translateY(1px)
+    }
+
+    .btn-ghost {
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      color: #334155
+    }
+
+    .btn-danger {
+      background: #dc2626;
+      color: #fff
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e6ecea;
+      border-radius: 1rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .05)
+    }
+
+    [hidden] {
+      display: none !important
+    }
+  </style>
 </head>
+
 <body>
-<div id="app"></div>
+  <div id="app"></div>
 
-<!-- ===== Modales ===== -->
-<div id="modal" class="fixed inset-0 bg-black/40 z-50 items-center justify-center p-4" style="display:none">
-  <div class="card w-full max-w-md p-5 max-h-[90vh] overflow-auto" id="modalBox"></div>
-</div>
-<div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50" style="display:none"></div>
+  <!-- ===== Modales ===== -->
+  <div id="modal" class="fixed inset-0 bg-black/40 z-50 items-center justify-center p-4" style="display:none">
+    <div class="card w-full max-w-md p-5 max-h-[90vh] overflow-auto" id="modalBox"></div>
+  </div>
+  <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50" style="display:none"></div>
 
-<script>
-/* =========================================================================
-   CONFIGURACIÓN
-   ========================================================================= */
-// 1) Pega aquí tu URL y ANON KEY de Supabase para pasar a PRODUCCIÓN.
-//    Déjalas vacías para usar MODO DEMO (datos guardados solo en este dispositivo).
-const SUPABASE_URL = "https://ncnopdsbiirbicslfnvk.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jbm9wZHNiaWlyYmljc2xmbnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NDQ5NzcsImV4cCI6MjEwNDAyMDk3N30.498aWvQrs6Zqgd-PoKmKT11AQukcjuQ9VmZs0PUun2A";
+  <script>
+    /* =========================================================================
+       CONFIGURACIÓN
+       ========================================================================= */
+    // 1) Pega aquí tu URL y ANON KEY de Supabase para pasar a PRODUCCIÓN.
+    //    Déjalas vacías para usar MODO DEMO (datos guardados solo en este dispositivo).
+    const SUPABASE_URL = "https://ncnopdsbiirbicslfnvk.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jbm9wZHNiaWlyYmljc2xmbnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NDQ5NzcsImV4cCI6MjEwNDAyMDk3N30.498aWvQrs6Zqgd-PoKmKT11AQukcjuQ9VmZs0PUun2A";
 
-// 2) PIN para entrar al panel de administrador (cámbialo).
-const ADMIN_PIN = "1234";
+    // 2) PIN para entrar al panel de administrador (cámbialo).
+    const ADMIN_PIN = "1234";
 
-// 3) Reglas legales OS10 (Ley 21.659 / prórroga Ley 21.825). No suelen cambiar.
-const MESES_VIGENCIA = 36;
-const ENTRADA_VIGENCIA_LEY = new Date(2025, 10, 28);        // 28-nov-2025 (entrada en vigor)
-const FECHA_TOPE_PRORROGA  = new Date(2027, 4, 28, 23,59,59); // 28-may-2027 (tope prórroga)
+    // 3) Reglas legales OS10 (Ley 21.659 / prórroga Ley 21.825). No suelen cambiar.
+    const MESES_VIGENCIA = 36;
+    const ENTRADA_VIGENCIA_LEY = new Date(2025, 10, 28);        // 28-nov-2025 (entrada en vigor)
+    const FECHA_TOPE_PRORROGA = new Date(2027, 4, 28, 23, 59, 59); // 28-may-2027 (tope prórroga)
 
-const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-const APP_VERSION = "v3.1";
-// En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
-if(USING_SUPABASE){ try{ ["os10_eventos","os10_guardias","os10_asistencias","os10_seeded"].forEach(k=>localStorage.removeItem(k)); }catch(e){} }
+    const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+    const APP_VERSION = "v3.1";
+    // En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
+    if (USING_SUPABASE) { try { ["os10_eventos", "os10_guardias", "os10_asistencias", "os10_seeded"].forEach(k => localStorage.removeItem(k)); } catch (e) { } }
 
-/* =========================================================================
-   LÓGICA DE VIGENCIA
-   ========================================================================= */
-function addMonths(date, months){
-  const d = new Date(date.getTime());
-  const day = d.getDate();
-  d.setMonth(d.getMonth() + months);
-  if (d.getDate() < day) d.setDate(0); // ajuste fin de mes
-  return d;
-}
-function parseFecha(str){
-  if(!str) return null;
-  // acepta YYYY-MM-DD o DD-MM-YYYY o DD/MM/YYYY
-  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
-  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
-  m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(str);
-  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
-  const d = new Date(str); return isNaN(d)?null:d;
-}
-function startOfDay(d){ const x=new Date(d.getTime()); x.setHours(0,0,0,0); return x; }
+    /* =========================================================================
+       LÓGICA DE VIGENCIA
+       ========================================================================= */
+    function addMonths(date, months) {
+      const d = new Date(date.getTime());
+      const day = d.getDate();
+      d.setMonth(d.getMonth() + months);
+      if (d.getDate() < day) d.setDate(0); // ajuste fin de mes
+      return d;
+    }
+    function parseFecha(str) {
+      if (!str) return null;
+      // acepta YYYY-MM-DD o DD-MM-YYYY o DD/MM/YYYY
+      let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+      m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(str);
+      if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+      const d = new Date(str); return isNaN(d) ? null : d;
+    }
+    function startOfDay(d) { const x = new Date(d.getTime()); x.setHours(0, 0, 0, 0); return x; }
 
-function calcularVigencia(fechaStr, hoy = new Date()){
-  const h = startOfDay(hoy);
-  if(!fechaStr) return {estado:"SIN_CURSO", vigencia:"SIN CURSO", siges:"", color:"gris", puedeTrabajar:false, vence:null};
-  const fx = parseFecha(fechaStr);
-  if(!fx) return {estado:"SIN_CURSO", vigencia:"FECHA INVÁLIDA", siges:"", color:"gris", puedeTrabajar:false, vence:null};
-  const vence = addMonths(fx, MESES_VIGENCIA);
-  if(vence.getTime() >= h.getTime())
-    return {estado:"VIGENTE", vigencia:"VIGENTE", siges:"OK", color:"verde", puedeTrabajar:true, vence};
-  const estabaVigenteAlEntrarLey = vence.getTime() >= ENTRADA_VIGENCIA_LEY.getTime();
-  const dentroDelTope = h.getTime() <= FECHA_TOPE_PRORROGA.getTime();
-  if(estabaVigenteAlEntrarLey && dentroDelTope)
-    return {estado:"VENCIDO_CON_PRORROGA", vigencia:"NO VIGENTE", siges:"LEY 21.825", color:"amarillo", puedeTrabajar:true, vence};
-  return {estado:"VENCIDO_SIN_PRORROGA", vigencia:"NO VIGENTE", siges:"", color:"rojo", puedeTrabajar:false, vence};
-}
+    function calcularVigencia(fechaStr, hoy = new Date()) {
+      const h = startOfDay(hoy);
+      if (!fechaStr) return { estado: "SIN_CURSO", vigencia: "SIN CURSO", siges: "", color: "gris", puedeTrabajar: false, vence: null };
+      const fx = parseFecha(fechaStr);
+      if (!fx) return { estado: "SIN_CURSO", vigencia: "FECHA INVÁLIDA", siges: "", color: "gris", puedeTrabajar: false, vence: null };
+      const vence = addMonths(fx, MESES_VIGENCIA);
+      if (vence.getTime() >= h.getTime())
+        return { estado: "VIGENTE", vigencia: "VIGENTE", siges: "OK", color: "verde", puedeTrabajar: true, vence };
+      const estabaVigenteAlEntrarLey = vence.getTime() >= ENTRADA_VIGENCIA_LEY.getTime();
+      const dentroDelTope = h.getTime() <= FECHA_TOPE_PRORROGA.getTime();
+      if (estabaVigenteAlEntrarLey && dentroDelTope)
+        return { estado: "VENCIDO_CON_PRORROGA", vigencia: "NO VIGENTE", siges: "LEY 21.825", color: "amarillo", puedeTrabajar: true, vence };
+      return { estado: "VENCIDO_SIN_PRORROGA", vigencia: "NO VIGENTE", siges: "", color: "rojo", puedeTrabajar: false, vence };
+    }
 
-/* =========================================================================
-   FORMATO / VALIDACIÓN DE RUT y NOMBRES
-   ========================================================================= */
-function limpiaRut(v){ return (v||"").replace(/[^0-9kK]/g,"").toUpperCase(); }
-function formatRut(v){
-  const c = limpiaRut(v);
-  if(c.length <= 1) return c;
-  return c.slice(0,-1) + "-" + c.slice(-1);
-}
-function rutValido(rut){
-  const c = limpiaRut(rut);
-  if(c.length < 2) return false;
-  const cuerpo = c.slice(0,-1), dv = c.slice(-1);
-  if(!/^\d+$/.test(cuerpo)) return false;
-  let suma=0, mul=2;
-  for(let i=cuerpo.length-1;i>=0;i--){ suma += (+cuerpo[i])*mul; mul = mul===7?2:mul+1; }
-  const res = 11 - (suma % 11);
-  const dvCalc = res===11?"0":res===10?"K":String(res);
-  return dvCalc === dv;
-}
-function formatNombre(v){
-  return (v||"").toUpperCase().replace(/\s+/g," ").trimStart();
-}
-function esc(s){ return (s==null?"":String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    /* =========================================================================
+       FORMATO / VALIDACIÓN DE RUT y NOMBRES
+       ========================================================================= */
+    function limpiaRut(v) { return (v || "").replace(/[^0-9kK]/g, "").toUpperCase(); }
+    function formatRut(v) {
+      const c = limpiaRut(v);
+      if (c.length <= 1) return c;
+      return c.slice(0, -1) + "-" + c.slice(-1);
+    }
+    function rutValido(rut) {
+      const c = limpiaRut(rut);
+      if (c.length < 2) return false;
+      const cuerpo = c.slice(0, -1), dv = c.slice(-1);
+      if (!/^\d+$/.test(cuerpo)) return false;
+      let suma = 0, mul = 2;
+      for (let i = cuerpo.length - 1; i >= 0; i--) { suma += (+cuerpo[i]) * mul; mul = mul === 7 ? 2 : mul + 1; }
+      const res = 11 - (suma % 11);
+      const dvCalc = res === 11 ? "0" : res === 10 ? "K" : String(res);
+      return dvCalc === dv;
+    }
+    function formatNombre(v) {
+      return (v || "").toUpperCase().replace(/\s+/g, " ").trimStart();
+    }
+    function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-/* =========================================================================
-   CAPA DE DATOS  (Supabase  ó  LocalStorage/Demo)
-   ========================================================================= */
-function makeSlug(nombre, empresa){
-  const base = (nombre+"-"+empresa).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
-    .replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,28);
-  return base + "-" + Math.random().toString(36).slice(2,6);
-}
-function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
-function nowISO(){ return new Date().toISOString(); }
+    /* =========================================================================
+       CAPA DE DATOS  (Supabase  ó  LocalStorage/Demo)
+       ========================================================================= */
+    function makeSlug(nombre, empresa) {
+      const base = (nombre + "-" + empresa).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 28);
+      return base + "-" + Math.random().toString(36).slice(2, 6);
+    }
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+    function nowISO() { return new Date().toISOString(); }
 
-/* ---- Adaptador LocalStorage (DEMO) ---- */
-const Local = (()=>{
-  const K={ev:"os10_eventos",gu:"os10_guardias",as:"os10_asistencias"};
-  const get=(k)=>{ try{return JSON.parse(localStorage.getItem(k)||"[]")}catch{return []} };
-  const set=(k,v)=>{ localStorage.setItem(k,JSON.stringify(v)); };
-  let listeners=[];
-  window.addEventListener("storage",e=>{ if(Object.values(K).includes(e.key)) listeners.forEach(f=>f()); });
-  const ping=()=>listeners.forEach(f=>f());
-  return {
-    onChange(f){ listeners.push(f); return ()=>{listeners=listeners.filter(x=>x!==f)}; },
-    async listEventos(){ return get(K.ev).sort((a,b)=>(a.created_at<b.created_at?-1:1)); },
-    async createEvento(e){ const ev={...e,id:uid(),created_at:nowISO(),activo:true}; const a=get(K.ev); a.push(ev); set(K.ev,a); ping(); return ev; },
-    async updateEvento(id,patch){ const a=get(K.ev).map(x=>x.id===id?{...x,...patch}:x); set(K.ev,a); ping(); },
-    async deleteEvento(id){ set(K.ev,get(K.ev).filter(x=>x.id!==id)); set(K.as,get(K.as).filter(x=>x.evento_id!==id)); ping(); },
-    async getEventoBySlug(slug){ return get(K.ev).find(x=>x.slug===slug)||null; },
-    async getGuardia(rut){ return get(K.gu).find(x=>x.rut===rut)||null; },
-    async upsertGuardia(g){ const a=get(K.gu); const i=a.findIndex(x=>x.rut===g.rut); const rec={...g,updated_at:nowISO()}; if(i>=0)a[i]={...a[i],...rec}; else a.push(rec); set(K.gu,a); ping(); return rec; },
-    async bulkUpsertGuardias(arr){ const a=get(K.gu); const by={}; a.forEach(g=>by[g.rut]=g); arr.forEach(g=>by[g.rut]={...by[g.rut],...g,updated_at:nowISO()}); set(K.gu,Object.values(by)); ping(); return arr.length; },
-    async listAsistencias(evId){
-      const as=get(K.as).filter(x=>x.evento_id===evId);
-      const gu=get(K.gu);
-      return as.map(a=>({...a, guardia: gu.find(g=>g.rut===a.rut)||null})).sort((a,b)=>(a.hora_ingreso<b.hora_ingreso?-1:1));
-    },
-    async yaRegistrado(evId,rut){ return get(K.as).find(x=>x.evento_id===evId && x.rut===rut)||null; },
-    async createAsistencia(evId,rut){ const rec={id:uid(),evento_id:evId,rut,hora_ingreso:nowISO()}; const a=get(K.as); a.push(rec); set(K.as,a); ping(); return rec; },
-    async deleteAsistencia(id){ set(K.as,get(K.as).filter(x=>x.id!==id)); ping(); },
-  };
-})();
+    /* ---- Adaptador LocalStorage (DEMO) ---- */
+    const Local = (() => {
+      const K = { ev: "os10_eventos", gu: "os10_guardias", as: "os10_asistencias" };
+      const get = (k) => { try { return JSON.parse(localStorage.getItem(k) || "[]") } catch { return [] } };
+      const set = (k, v) => { localStorage.setItem(k, JSON.stringify(v)); };
+      let listeners = [];
+      window.addEventListener("storage", e => { if (Object.values(K).includes(e.key)) listeners.forEach(f => f()); });
+      const ping = () => listeners.forEach(f => f());
+      return {
+        onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
+        async listEventos() { return get(K.ev).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)); },
+        async createEvento(e) { const ev = { ...e, id: uid(), created_at: nowISO(), activo: true }; const a = get(K.ev); a.push(ev); set(K.ev, a); ping(); return ev; },
+        async updateEvento(id, patch) { const a = get(K.ev).map(x => x.id === id ? { ...x, ...patch } : x); set(K.ev, a); ping(); },
+        async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); ping(); },
+        async getEventoBySlug(slug) { return get(K.ev).find(x => x.slug === slug) || null; },
+        async getGuardia(rut) { return get(K.gu).find(x => x.rut === rut) || null; },
+        async upsertGuardia(g) { const a = get(K.gu); const i = a.findIndex(x => x.rut === g.rut); const rec = { ...g, updated_at: nowISO() }; if (i >= 0) a[i] = { ...a[i], ...rec }; else a.push(rec); set(K.gu, a); ping(); return rec; },
+        async bulkUpsertGuardias(arr) { const a = get(K.gu); const by = {}; a.forEach(g => by[g.rut] = g); arr.forEach(g => by[g.rut] = { ...by[g.rut], ...g, updated_at: nowISO() }); set(K.gu, Object.values(by)); ping(); return arr.length; },
+        async listAsistencias(evId) {
+          const as = get(K.as).filter(x => x.evento_id === evId);
+          const gu = get(K.gu);
+          return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
+        },
+        async yaRegistrado(evId, rut) { return get(K.as).find(x => x.evento_id === evId && x.rut === rut) || null; },
+        async createAsistencia(evId, rut) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO() }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
+        async deleteAsistencia(id) { set(K.as, get(K.as).filter(x => x.id !== id)); ping(); },
+      };
+    })();
 
-/* ---- Adaptador Supabase (PRODUCCIÓN) ---- */
-const Remote = (()=>{
-  if(!USING_SUPABASE) return null;
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  let listeners=[];
-  sb.channel("os10-rt")
-    .on("postgres_changes",{event:"*",schema:"public"}, ()=>listeners.forEach(f=>f()))
-    .subscribe();
-  const ok=(r)=>{ if(r.error) throw r.error; return r.data; };
-  return {
-    onChange(f){ listeners.push(f); return ()=>{listeners=listeners.filter(x=>x!==f)}; },
-    async listEventos(){ return ok(await sb.from("eventos").select("*").order("created_at",{ascending:true})); },
-    async createEvento(e){ return ok(await sb.from("eventos").insert({...e,activo:true}).select().single()); },
-    async updateEvento(id,patch){ ok(await sb.from("eventos").update(patch).eq("id",id)); },
-    async deleteEvento(id){ ok(await sb.from("eventos").delete().eq("id",id)); },
-    async getEventoBySlug(slug){ const d=ok(await sb.from("eventos").select("*").eq("slug",slug).limit(1)); return d[0]||null; },
-    async getGuardia(rut){ const d=ok(await sb.from("guardias_central").select("*").eq("rut",rut).limit(1)); return d[0]||null; },
-    async upsertGuardia(g){ return ok(await sb.from("guardias_central").upsert({...g,updated_at:nowISO()}).select().single()); },
-    async bulkUpsertGuardias(arr){ let n=0; for(let i=0;i<arr.length;i+=150){ const chunk=arr.slice(i,i+150).map(g=>({...g,updated_at:nowISO()})); const r=await sb.from("guardias_central").upsert(chunk); if(r.error) throw r.error; n+=chunk.length; } return n; },
-    async listAsistencias(evId){
-      const as=ok(await sb.from("asistencias").select("*").eq("evento_id",evId).order("hora_ingreso",{ascending:true}));
-      const ruts=[...new Set(as.map(a=>a.rut))];
-      let gu=[]; if(ruts.length) gu=ok(await sb.from("guardias_central").select("*").in("rut",ruts));
-      return as.map(a=>({...a, guardia: gu.find(g=>g.rut===a.rut)||null}));
-    },
-    async yaRegistrado(evId,rut){ const d=ok(await sb.from("asistencias").select("*").eq("evento_id",evId).eq("rut",rut).limit(1)); return d[0]||null; },
-    async createAsistencia(evId,rut){ return ok(await sb.from("asistencias").insert({evento_id:evId,rut,hora_ingreso:nowISO()}).select().single()); },
-    async deleteAsistencia(id){ ok(await sb.from("asistencias").delete().eq("id",id)); },
-  };
-})();
+    /* ---- Adaptador Supabase (PRODUCCIÓN) ---- */
+    const Remote = (() => {
+      if (!USING_SUPABASE) return null;
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      let listeners = [];
+      sb.channel("os10-rt")
+        .on("postgres_changes", { event: "*", schema: "public" }, () => listeners.forEach(f => f()))
+        .subscribe();
+      const ok = (r) => { if (r.error) throw r.error; return r.data; };
+      return {
+        onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
+        async listEventos() { return ok(await sb.from("eventos").select("*").order("created_at", { ascending: true })); },
+        async createEvento(e) { return ok(await sb.from("eventos").insert({ ...e, activo: true }).select().single()); },
+        async updateEvento(id, patch) { ok(await sb.from("eventos").update(patch).eq("id", id)); },
+        async deleteEvento(id) { ok(await sb.from("eventos").delete().eq("id", id)); },
+        async getEventoBySlug(slug) { const d = ok(await sb.from("eventos").select("*").eq("slug", slug).limit(1)); return d[0] || null; },
+        async getGuardia(rut) { const d = ok(await sb.from("guardias_central").select("*").eq("rut", rut).limit(1)); return d[0] || null; },
+        async upsertGuardia(g) { return ok(await sb.from("guardias_central").upsert({ ...g, updated_at: nowISO() }).select().single()); },
+        async bulkUpsertGuardias(arr) { let n = 0; for (let i = 0; i < arr.length; i += 150) { const chunk = arr.slice(i, i + 150).map(g => ({ ...g, updated_at: nowISO() })); const r = await sb.from("guardias_central").upsert(chunk); if (r.error) throw r.error; n += chunk.length; } return n; },
+        async listAsistencias(evId) {
+          const as = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).order("hora_ingreso", { ascending: true }));
+          const ruts = [...new Set(as.map(a => a.rut))];
+          let gu = []; if (ruts.length) gu = ok(await sb.from("guardias_central").select("*").in("rut", ruts));
+          return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
+        },
+        async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).limit(1)); return d[0] || null; },
+        async createAsistencia(evId, rut) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO() }).select().single()); },
+        async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
+      };
+    })();
 
-const Data = Remote || Local;
+    const Data = Remote || Local;
 
-/* =========================================================================
-   UI helpers
-   ========================================================================= */
-const $ = (s,r=document)=>r.querySelector(s);
-const app = $("#app");
-function toast(msg,ok=true){
-  const t=$("#toast"); t.innerHTML=`<div class="card px-4 py-3 text-sm font-medium ${ok?'text-green-800':'text-red-700'}" style="border-left:4px solid ${ok?'#16a34a':'#dc2626'}">${esc(msg)}</div>`;
-  t.style.display="block"; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display="none",2600);
-}
-function openModal(html){ $("#modalBox").innerHTML=html; $("#modal").style.display="flex"; }
-function closeModal(){ $("#modal").style.display="none"; }
-$("#modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal(); });
-function badge(v){ return `<span class="badge b-${v.color}">${esc(v.vigencia)}</span>`; }
-function horaFmt(iso){ const d=new Date(iso); return d.toLocaleString("es-CL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); }
-function guardLink(slug){ return location.origin+location.pathname+"?e="+encodeURIComponent(slug); }
+    /* =========================================================================
+       UI helpers
+       ========================================================================= */
+    const $ = (s, r = document) => r.querySelector(s);
+    const app = $("#app");
+    function toast(msg, ok = true) {
+      const t = $("#toast"); t.innerHTML = `<div class="card px-4 py-3 text-sm font-medium ${ok ? 'text-green-800' : 'text-red-700'}" style="border-left:4px solid ${ok ? '#16a34a' : '#dc2626'}">${esc(msg)}</div>`;
+      t.style.display = "block"; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", 2600);
+    }
+    function openModal(html) { $("#modalBox").innerHTML = html; $("#modal").style.display = "flex"; }
+    function closeModal() { $("#modal").style.display = "none"; }
+    $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+    function badge(v) { return `<span class="badge b-${v.color}">${esc(v.vigencia)}</span>`; }
+    function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+    function guardLink(slug) { return location.origin + location.pathname + "?e=" + encodeURIComponent(slug); }
 
-/* =========================================================================
-   ROUTER
-   ========================================================================= */
-function route(){
-  const params=new URLSearchParams(location.search);
-  const e=params.get("e");
-  if(e) return renderGuard(e);
-  const emp=params.get("empresa");
-  if(emp) return renderEmpresa(emp);
-  return renderAdminGate();
-}
-function empresaLink(slug){ return location.origin+location.pathname.replace(/index\.html$/,"")+"?empresa="+encodeURIComponent(slug); }
+    /* =========================================================================
+       ROUTER
+       ========================================================================= */
+    function route() {
+      const params = new URLSearchParams(location.search);
+      const e = params.get("e");
+      if (e) return renderGuard(e);
+      const emp = params.get("empresa");
+      if (emp) return renderEmpresa(emp);
+      return renderAdminGate();
+    }
+    function empresaLink(slug) { return location.origin + location.pathname.replace(/index\.html$/, "") + "?empresa=" + encodeURIComponent(slug); }
 
-/* ---- Utilidades de importación CSV ---- */
-function fechaISO(f){ f=(f||"").trim(); let m=/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(f); if(m) return `${m[3]}-${String(+m[2]).padStart(2,"0")}-${String(+m[1]).padStart(2,"0")}`; m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(f); return m?f:null; }
-function splitNombre(n){ const w=(n||"").toUpperCase().replace(/\s+/g," ").trim().split(" ").filter(Boolean); if(w.length>=4) return [w.slice(0,-2).join(" "), w.slice(-2).join(" ")]; if(w.length===3) return [w[0], w.slice(1).join(" ")]; if(w.length===2) return [w[0],w[1]]; return [w.join(" "),""]; }
-function parseCSV(text){ const rows=[]; let i=0,f="",row=[],q=false; while(i<text.length){ const c=text[i]; if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; } else { if(c==='"') q=true; else if(c===","){row.push(f);f="";} else if(c==="\n"){row.push(f);rows.push(row);row=[];f="";} else if(c==="\r"){} else f+=c; } i++; } if(f.length||row.length){row.push(f);rows.push(row);} return rows; }
+    /* ---- Utilidades de importación CSV ---- */
+    function fechaISO(f) { f = (f || "").trim(); let m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(f); if (m) return `${m[3]}-${String(+m[2]).padStart(2, "0")}-${String(+m[1]).padStart(2, "0")}`; m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f); return m ? f : null; }
+    function splitNombre(n) { const w = (n || "").toUpperCase().replace(/\s+/g, " ").trim().split(" ").filter(Boolean); if (w.length >= 4) return [w.slice(0, -2).join(" "), w.slice(-2).join(" ")]; if (w.length === 3) return [w[0], w.slice(1).join(" ")]; if (w.length === 2) return [w[0], w[1]]; return [w.join(" "), ""]; }
+    function parseCSV(text) { const rows = []; let i = 0, f = "", row = [], q = false; while (i < text.length) { const c = text[i]; if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; } else { if (c === '"') q = true; else if (c === ",") { row.push(f); f = ""; } else if (c === "\n") { row.push(f); rows.push(row); row = []; f = ""; } else if (c === "\r") { } else f += c; } i++; } if (f.length || row.length) { row.push(f); rows.push(row); } return rows; }
 
-/* =========================================================================
-   VISTA GUARDIA (formulario del QR)
-   ========================================================================= */
-async function renderGuard(slug){
-  app.innerHTML=`<div class="min-h-screen flex flex-col items-center p-4"><div class="w-full max-w-md text-center text-slate-500 mt-16">Cargando…</div></div>`;
-  let ev=null; try{ ev=await Data.getEventoBySlug(slug); }catch(err){ console.error(err); }
-  if(!ev){
-    app.innerHTML=`<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 max-w-sm text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-lg text-slate-800">Evento no encontrado</h1><p class="text-slate-500 text-sm mt-1">El código QR no corresponde a un evento activo.</p></div></div>`; return;
-  }
-  app.innerHTML=`
+    /* =========================================================================
+       VISTA GUARDIA (formulario del QR)
+       ========================================================================= */
+    async function renderGuard(slug) {
+      app.innerHTML = `<div class="min-h-screen flex flex-col items-center p-4"><div class="w-full max-w-md text-center text-slate-500 mt-16">Cargando…</div></div>`;
+      let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (err) { console.error(err); }
+      if (!ev) {
+        app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 max-w-sm text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-lg text-slate-800">Evento no encontrado</h1><p class="text-slate-500 text-sm mt-1">El código QR no corresponde a un evento activo.</p></div></div>`; return;
+      }
+      app.innerHTML = `
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
       <div class="brand-bg rounded-2xl px-4 pt-4 pb-5 text-white text-center shadow-lg relative overflow-hidden border border-white/10">
@@ -260,7 +402,7 @@ async function renderGuard(slug){
           <img src="images/poli.webp" alt="" class="w-20 h-20 rounded-full bg-white/20 p-1 ring-2 ring-white/40 -mt-1">
           <img src="images/icon-192x192.png" alt="OS10" class="w-16 h-16 object-contain drop-shadow rounded-full bg-white/90 p-1">
         </div>
-        <div class="text-[11px] uppercase tracking-widest opacity-90 font-semibold">Prefectura Seguridad Privada · O.S.10 Coquimbo</div>
+        <div class="text-[11px] uppercase tracking-widest opacity-90 font-semibold">Seguridad Privada · O.S.10 Coquimbo</div>
         <h1 class="text-xl font-bold mt-1">${esc(ev.nombre_evento)}</h1>
         <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
       </div>
@@ -302,111 +444,111 @@ async function renderGuard(slug){
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
       </div>
 
-      <p class="text-center text-xs text-slate-400 mt-4">Sistema de fiscalización OS10 · ${USING_SUPABASE?'':'MODO DEMO'}</p>
+      <p class="text-center text-xs text-slate-400 mt-4">Sistema de fiscalización OS10 · ${USING_SUPABASE ? '' : 'MODO DEMO'}</p>
     </div>
   </div>`;
 
-  const rut=$("#g_rut"), extra=$("#camposExtra"), vigBox=$("#vigBox"), vigBadge=$("#vigBadge"),
-        submit=$("#g_submit"), rutMsg=$("#rutMsg"),
-        nombres=$("#g_nombres"), apellidos=$("#g_apellidos"), tel=$("#g_tel"), fecha=$("#g_fecha");
-  let modo=null, guardiaExiste=false;
+      const rut = $("#g_rut"), extra = $("#camposExtra"), vigBox = $("#vigBox"), vigBadge = $("#vigBadge"),
+        submit = $("#g_submit"), rutMsg = $("#rutMsg"),
+        nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha");
+      let modo = null, guardiaExiste = false;
 
-  nombres.addEventListener("input",()=>{ nombres.value=formatNombre(nombres.value); actualizarBtn(); });
-  apellidos.addEventListener("input",()=>{ apellidos.value=formatNombre(apellidos.value); actualizarBtn(); });
-  tel.addEventListener("input",actualizarBtn);
-  fecha.addEventListener("change",()=>{ mostrarVigencia(fecha.value); actualizarBtn(); });
+      nombres.addEventListener("input", () => { nombres.value = formatNombre(nombres.value); actualizarBtn(); });
+      apellidos.addEventListener("input", () => { apellidos.value = formatNombre(apellidos.value); actualizarBtn(); });
+      tel.addEventListener("input", actualizarBtn);
+      fecha.addEventListener("change", () => { mostrarVigencia(fecha.value); actualizarBtn(); });
 
-  rut.addEventListener("input",()=>{
-    rut.value=formatRut(rut.value); rutMsg.innerHTML=""; submit.disabled=true; submit.textContent="Ingrese su RUT";
-  });
-  rut.addEventListener("blur",lookup);
-  rut.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();lookup();} });
+      rut.addEventListener("input", () => {
+        rut.value = formatRut(rut.value); rutMsg.innerHTML = ""; submit.disabled = true; submit.textContent = "Ingrese su RUT";
+      });
+      rut.addEventListener("blur", lookup);
+      rut.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); lookup(); } });
 
-  async function lookup(){
-    const val=rut.value.trim();
-    if(!val) return;
-    if(!rutValido(val)){ rutMsg.innerHTML=`<span class="text-red-600">RUT inválido, revísalo.</span>`; return; }
-    rutMsg.innerHTML=`<span class="text-slate-400">Buscando…</span>`;
-    let g=null; try{ g=await Data.getGuardia(val); }catch(err){ console.error(err); }
-    const ya=await Data.yaRegistrado(ev.id,val).catch(()=>null);
-    if(ya){ rutMsg.innerHTML=`<span class="text-amber-600 font-medium">Ya registraste tu ingreso a este evento (${horaFmt(ya.hora_ingreso)}).</span>`; submit.disabled=true; submit.textContent="Ya registrado"; return; }
-    if(g){
-      guardiaExiste=true; modo="existe";
-      extra.hidden=false;
-      nombres.value=g.nombres||""; apellidos.value=g.apellidos||""; tel.value=g.telefono||""; fecha.value=g.fecha_ultimo_examen||"";
-      [nombres,apellidos,tel,fecha].forEach(i=>i.setAttribute("readonly","readonly"));
-      fecha.removeAttribute("readonly"); // por si quiere corregir fecha vencida
-      rutMsg.innerHTML=`<span class="text-green-700 font-medium">✔ Datos encontrados. Verifica y confirma tu ingreso.</span>`;
-      mostrarVigencia(fecha.value);
-      submit.disabled=false; submit.textContent="✔ Confirmar ingreso";
-    }else{
-      guardiaExiste=false; modo="nuevo";
-      extra.hidden=false;
-      [nombres,apellidos,tel,fecha].forEach(i=>i.removeAttribute("readonly"));
-      nombres.value=apellidos.value=tel.value=""; fecha.value="";
-      rutMsg.innerHTML=`<span class="text-red-600 font-semibold">⚠ RUT NO ENCONTRADO EN LA BASE DE DATOS. Por favor, ingrese sus datos.</span>`;
-      vigBox.hidden=true; actualizarBtn();
-    }
-  }
-  function mostrarVigencia(f){ if(!f){vigBox.hidden=true;return;} const v=calcularVigencia(f); vigBox.hidden=false; vigBadge.innerHTML=badge(v)+(v.siges?` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>`:""); }
-  function actualizarBtn(){
-    if(modo==="existe"){ submit.disabled=false; return; }
-    if(modo==="nuevo"){
-      const ok=rutValido(rut.value)&&nombres.value.trim()&&apellidos.value.trim()&&tel.value.trim()&&fecha.value;
-      submit.disabled=!ok; submit.textContent=ok?"Registrar ingreso":"Complete los datos";
-    }
-  }
-
-  submit.addEventListener("click",async()=>{
-    submit.disabled=true;
-    try{
-      const rutV=formatRut(rut.value);
-      if(modo==="nuevo" || (modo==="existe" && !guardiaExiste)){
-        await Data.upsertGuardia({rut:rutV,nombres:formatNombre(nombres.value).trim(),apellidos:formatNombre(apellidos.value).trim(),telefono:tel.value.trim(),fecha_ultimo_examen:fecha.value});
-      }else if(modo==="existe"){
-        // permitir corrección de fecha
-        await Data.upsertGuardia({rut:rutV,nombres:nombres.value,apellidos:apellidos.value,telefono:tel.value,fecha_ultimo_examen:fecha.value});
+      async function lookup() {
+        const val = rut.value.trim();
+        if (!val) return;
+        if (!rutValido(val)) { rutMsg.innerHTML = `<span class="text-red-600">RUT inválido, revísalo.</span>`; return; }
+        rutMsg.innerHTML = `<span class="text-slate-400">Buscando…</span>`;
+        let g = null; try { g = await Data.getGuardia(val); } catch (err) { console.error(err); }
+        const ya = await Data.yaRegistrado(ev.id, val).catch(() => null);
+        if (ya) { rutMsg.innerHTML = `<span class="text-amber-600 font-medium">Ya registraste tu ingreso a este evento (${horaFmt(ya.hora_ingreso)}).</span>`; submit.disabled = true; submit.textContent = "Ya registrado"; return; }
+        if (g) {
+          guardiaExiste = true; modo = "existe";
+          extra.hidden = false;
+          nombres.value = g.nombres || ""; apellidos.value = g.apellidos || ""; tel.value = g.telefono || ""; fecha.value = g.fecha_ultimo_examen || "";
+          [nombres, apellidos, tel, fecha].forEach(i => i.setAttribute("readonly", "readonly"));
+          fecha.removeAttribute("readonly"); // por si quiere corregir fecha vencida
+          rutMsg.innerHTML = `<span class="text-green-700 font-medium">✔ Datos encontrados. Verifica y confirma tu ingreso.</span>`;
+          mostrarVigencia(fecha.value);
+          submit.disabled = false; submit.textContent = "✔ Confirmar ingreso";
+        } else {
+          guardiaExiste = false; modo = "nuevo";
+          extra.hidden = false;
+          [nombres, apellidos, tel, fecha].forEach(i => i.removeAttribute("readonly"));
+          nombres.value = apellidos.value = tel.value = ""; fecha.value = "";
+          rutMsg.innerHTML = `<span class="text-red-600 font-semibold">⚠ RUT NO ENCONTRADO EN LA BASE DE DATOS. Por favor, ingrese sus datos.</span>`;
+          vigBox.hidden = true; actualizarBtn();
+        }
       }
-      await Data.createAsistencia(ev.id,rutV);
-      const v=calcularVigencia(fecha.value);
-      app.innerHTML=`<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
+      function mostrarVigencia(f) { if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
+      function actualizarBtn() {
+        if (modo === "existe") { submit.disabled = false; return; }
+        if (modo === "nuevo") {
+          const ok = rutValido(rut.value) && nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
+          submit.disabled = !ok; submit.textContent = ok ? "Registrar ingreso" : "Complete los datos";
+        }
+      }
+
+      submit.addEventListener("click", async () => {
+        submit.disabled = true;
+        try {
+          const rutV = formatRut(rut.value);
+          if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
+            await Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value });
+          } else if (modo === "existe") {
+            // permitir corrección de fecha
+            await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value });
+          }
+          await Data.createAsistencia(ev.id, rutV);
+          const v = calcularVigencia(fecha.value);
+          app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
         <div class="text-5xl mb-3">✅</div>
         <h1 class="font-bold text-xl text-slate-800">Ingreso registrado</h1>
         <p class="text-slate-600 mt-1">${esc(formatNombre(nombres.value))} ${esc(formatNombre(apellidos.value))}</p>
-        <div class="mt-3">${badge(v)} ${v.siges?`<span class="text-xs text-slate-500">(${esc(v.siges)})</span>`:""}</div>
-        ${!v.puedeTrabajar?`<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>`:""}
+        <div class="mt-3">${badge(v)} ${v.siges ? `<span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""}</div>
+        ${!v.puedeTrabajar ? `<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>` : ""}
         <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt(nowISO())}</p>
       </div></div>`;
-    }catch(err){ console.error(err); toast("Error al registrar: "+(err.message||err),false); submit.disabled=false; }
-  });
-}
+        } catch (err) { console.error(err); toast("Error al registrar: " + (err.message || err), false); submit.disabled = false; }
+      });
+    }
 
-/* =========================================================================
-   PANEL ADMIN — gate por PIN
-   ========================================================================= */
-function renderAdminGate(){
-  if(sessionStorage.getItem("os10_admin")==="1") return renderAdmin();
-  app.innerHTML=`<div class="min-h-screen flex items-center justify-center p-6">
+    /* =========================================================================
+       PANEL ADMIN — gate por PIN
+       ========================================================================= */
+    function renderAdminGate() {
+      if (sessionStorage.getItem("os10_admin") === "1") return renderAdmin();
+      app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6">
     <div class="card p-6 w-full max-w-sm text-center">
       <div class="text-4xl mb-2">🛡️</div>
       <h1 class="font-bold text-lg text-slate-800">Panel de Control de Guardias</h1>
       <p class="text-slate-500 text-sm mb-4">Ingresa el PIN de administrador</p>
       <input id="pin" type="password" inputmode="numeric" class="fld text-center tracking-widest text-lg" placeholder="••••"/>
       <button id="pinBtn" class="btn btn-p w-full mt-3">Entrar</button>
-      <p class="text-xs text-slate-400 mt-3">${USING_SUPABASE?'● Conectado a Supabase':'MODO DEMO — datos solo en este dispositivo'} · ${APP_VERSION}</p>
+      <p class="text-xs text-slate-400 mt-3">${USING_SUPABASE ? '● Conectado a Supabase' : 'MODO DEMO — datos solo en este dispositivo'} · ${APP_VERSION}</p>
     </div></div>`;
-  const go=()=>{ if($("#pin").value===ADMIN_PIN){ sessionStorage.setItem("os10_admin","1"); renderAdmin(); } else toast("PIN incorrecto",false); };
-  $("#pinBtn").addEventListener("click",go);
-  $("#pin").addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
-}
+      const go = () => { if ($("#pin").value === ADMIN_PIN) { sessionStorage.setItem("os10_admin", "1"); renderAdmin(); } else toast("PIN incorrecto", false); };
+      $("#pinBtn").addEventListener("click", go);
+      $("#pin").addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+    }
 
-/* =========================================================================
-   PANEL ADMIN
-   ========================================================================= */
-let ADMIN_STATE={ eventos:[], selected:null, search:"", unsub:null, sidebarOpen:false };
+    /* =========================================================================
+       PANEL ADMIN
+       ========================================================================= */
+    let ADMIN_STATE = { eventos: [], selected: null, search: "", unsub: null, sidebarOpen: false };
 
-async function renderAdmin(){
-  app.innerHTML=`
+    async function renderAdmin() {
+      app.innerHTML = `
   <div class="min-h-screen flex flex-col md:flex-row">
     <!-- Topbar móvil -->
     <div class="md:hidden brand-bg text-white flex items-center justify-between px-4 py-3">
@@ -431,7 +573,7 @@ async function renderAdmin(){
         <div id="listaEventos" class="space-y-1"></div>
       </div>
       <div class="p-3 border-t border-slate-100 text-xs text-slate-400 flex items-center justify-between">
-        <span>${USING_SUPABASE?'● Supabase':'● Modo Demo'}</span>
+        <span>${USING_SUPABASE ? '● Supabase' : '● Modo Demo'}</span>
         <button id="salir" class="underline">Salir</button>
       </div>
     </aside>
@@ -440,61 +582,61 @@ async function renderAdmin(){
     <main id="main" class="flex-1 p-4 md:p-6 bg-[#f1f5f4]"></main>
   </div>`;
 
-  $("#nuevoEv").addEventListener("click",()=>modalNuevoEvento());
-  $("#importar").addEventListener("click",modalImportar);
-  $("#salir").addEventListener("click",()=>{ sessionStorage.removeItem("os10_admin"); route(); });
-  const hamb=$("#hamb"), sidebar=$("#sidebar");
-  if(hamb) hamb.addEventListener("click",()=>{ sidebar.classList.toggle("hidden"); });
+      $("#nuevoEv").addEventListener("click", () => modalNuevoEvento());
+      $("#importar").addEventListener("click", modalImportar);
+      $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); route(); });
+      const hamb = $("#hamb"), sidebar = $("#sidebar");
+      if (hamb) hamb.addEventListener("click", () => { sidebar.classList.toggle("hidden"); });
 
-  if(ADMIN_STATE.unsub) ADMIN_STATE.unsub();
-  ADMIN_STATE.unsub = Data.onChange(()=>refreshAdmin());
-  await refreshAdmin(true);
-}
+      if (ADMIN_STATE.unsub) ADMIN_STATE.unsub();
+      ADMIN_STATE.unsub = Data.onChange(() => refreshAdmin());
+      await refreshAdmin(true);
+    }
 
-async function refreshAdmin(first){
-  ADMIN_STATE.eventos = await Data.listEventos();
-  if(first && !ADMIN_STATE.selected && ADMIN_STATE.eventos[0]) ADMIN_STATE.selected=ADMIN_STATE.eventos[0].id;
-  if(ADMIN_STATE.selected && !ADMIN_STATE.eventos.find(e=>e.id===ADMIN_STATE.selected)) ADMIN_STATE.selected=ADMIN_STATE.eventos[0]?.id||null;
-  renderSidebarList();
-  await renderMain();
-}
+    async function refreshAdmin(first) {
+      ADMIN_STATE.eventos = await Data.listEventos();
+      if (first && !ADMIN_STATE.selected && ADMIN_STATE.eventos[0]) ADMIN_STATE.selected = ADMIN_STATE.eventos[0].id;
+      if (ADMIN_STATE.selected && !ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected)) ADMIN_STATE.selected = ADMIN_STATE.eventos[0]?.id || null;
+      renderSidebarList();
+      await renderMain();
+    }
 
-function renderSidebarList(){
-  const cont=$("#listaEventos"); if(!cont) return;
-  if(!ADMIN_STATE.eventos.length){ cont.innerHTML=`<p class="text-sm text-slate-400 p-2">Aún no hay eventos. Crea el primero.</p>`; return; }
-  cont.innerHTML=ADMIN_STATE.eventos.map(e=>{
-    const act=e.id===ADMIN_STATE.selected;
-    return `<button data-id="${e.id}" class="evItem w-full text-left rounded-lg px-3 py-2 ${act?'bg-green-50 border border-green-200':'hover:bg-slate-50 border border-transparent'}">
+    function renderSidebarList() {
+      const cont = $("#listaEventos"); if (!cont) return;
+      if (!ADMIN_STATE.eventos.length) { cont.innerHTML = `<p class="text-sm text-slate-400 p-2">Aún no hay eventos. Crea el primero.</p>`; return; }
+      cont.innerHTML = ADMIN_STATE.eventos.map(e => {
+        const act = e.id === ADMIN_STATE.selected;
+        return `<button data-id="${e.id}" class="evItem w-full text-left rounded-lg px-3 py-2 ${act ? 'bg-green-50 border border-green-200' : 'hover:bg-slate-50 border border-transparent'}">
       <div class="font-semibold text-sm text-slate-800 leading-tight">${esc(e.nombre_evento)}</div>
       <div class="text-xs text-slate-500">Empresa: ${esc(e.empresa)}</div>
       <div class="text-[11px] text-slate-400 mt-0.5" data-count="${e.id}">…</div>
     </button>`;
-  }).join("");
-  cont.querySelectorAll(".evItem").forEach(b=>b.addEventListener("click",()=>{ ADMIN_STATE.selected=b.dataset.id; if(window.innerWidth<768)$("#sidebar").classList.add("hidden"); refreshAdmin(); }));
-  // contadores
-  ADMIN_STATE.eventos.forEach(async e=>{ const as=await Data.listAsistencias(e.id); const el=$(`[data-count="${e.id}"]`); if(el) el.textContent=`${as.length} / ${e.cantidad_esperada||"—"} guardias`; });
-}
+      }).join("");
+      cont.querySelectorAll(".evItem").forEach(b => b.addEventListener("click", () => { ADMIN_STATE.selected = b.dataset.id; if (window.innerWidth < 768) $("#sidebar").classList.add("hidden"); refreshAdmin(); }));
+      // contadores
+      ADMIN_STATE.eventos.forEach(async e => { const as = await Data.listAsistencias(e.id); const el = $(`[data-count="${e.id}"]`); if (el) el.textContent = `${as.length} / ${e.cantidad_esperada || "—"} guardias`; });
+    }
 
-async function renderMain(){
-  const main=$("#main"); if(!main) return;
-  const ev=ADMIN_STATE.eventos.find(e=>e.id===ADMIN_STATE.selected);
-  if(!ev){ main.innerHTML=`<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>Crea un evento para comenzar.</div>`; return; }
-  const asist=await Data.listAsistencias(ev.id);
-  const total=ev.cantidad_esperada||0;
-  const pct= total? Math.min(100,Math.round(asist.length/total*100)) : 0;
+    async function renderMain() {
+      const main = $("#main"); if (!main) return;
+      const ev = ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected);
+      if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>Crea un evento para comenzar.</div>`; return; }
+      const asist = await Data.listAsistencias(ev.id);
+      const total = ev.cantidad_esperada || 0;
+      const pct = total ? Math.min(100, Math.round(asist.length / total * 100)) : 0;
 
-  // detectar duplicados (rut o nombre completo repetidos)
-  const rutCount={}, nomCount={};
-  asist.forEach(a=>{ rutCount[a.rut]=(rutCount[a.rut]||0)+1; const n=((a.guardia?.nombres||"")+" "+(a.guardia?.apellidos||"")).trim(); if(n) nomCount[n]=(nomCount[n]||0)+1; });
+      // detectar duplicados (rut o nombre completo repetidos)
+      const rutCount = {}, nomCount = {};
+      asist.forEach(a => { rutCount[a.rut] = (rutCount[a.rut] || 0) + 1; const n = ((a.guardia?.nombres || "") + " " + (a.guardia?.apellidos || "")).trim(); if (n) nomCount[n] = (nomCount[n] || 0) + 1; });
 
-  const q=ADMIN_STATE.search.toLowerCase();
-  const filas=asist.filter(a=>{ if(!q)return true; const g=a.guardia||{}; return (a.rut+" "+(g.nombres||"")+" "+(g.apellidos||"")).toLowerCase().includes(q); });
+      const q = ADMIN_STATE.search.toLowerCase();
+      const filas = asist.filter(a => { if (!q) return true; const g = a.guardia || {}; return (a.rut + " " + (g.nombres || "") + " " + (g.apellidos || "")).toLowerCase().includes(q); });
 
-  main.innerHTML=`
+      main.innerHTML = `
     <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
       <div>
         <h1 class="text-xl md:text-2xl font-bold text-slate-800">${esc(ev.nombre_evento)}</h1>
-        <div class="text-slate-500 text-sm">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento?` · ${esc(ev.fecha_evento)}`:""}</div>
+        <div class="text-slate-500 text-sm">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(ev.fecha_evento)}` : ""}</div>
       </div>
       <div class="flex gap-2 flex-wrap">
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
@@ -507,14 +649,14 @@ async function renderMain(){
       <div class="card p-4 lg:col-span-2">
         <div class="flex items-center justify-between mb-2">
           <div class="font-semibold text-slate-700">Progreso de asistencia</div>
-          <div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total||"—"}</span></div>
+          <div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div>
         </div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
         <div class="grid grid-cols-4 gap-2 mt-4 text-center">
-          ${chip("Vigentes",asist.filter(a=>calcularVigencia(a.guardia?.fecha_ultimo_examen).estado==="VIGENTE").length,"verde")}
-          ${chip("Prórroga",asist.filter(a=>calcularVigencia(a.guardia?.fecha_ultimo_examen).estado==="VENCIDO_CON_PRORROGA").length,"amarillo")}
-          ${chip("Vencidos",asist.filter(a=>calcularVigencia(a.guardia?.fecha_ultimo_examen).estado==="VENCIDO_SIN_PRORROGA").length,"rojo")}
-          ${chip("Sin curso",asist.filter(a=>calcularVigencia(a.guardia?.fecha_ultimo_examen).estado==="SIN_CURSO").length,"gris")}
+          ${chip("Vigentes", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VIGENTE").length, "verde")}
+          ${chip("Prórroga", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length, "amarillo")}
+          ${chip("Vencidos", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length, "rojo")}
+          ${chip("Sin curso", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length, "gris")}
         </div>
       </div>
       <div class="card p-4 flex flex-col items-center">
@@ -539,130 +681,132 @@ async function renderMain(){
             <tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre completo</th><th class="pr-2">Teléfono</th><th class="pr-2">Examen</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th><th class="pr-2">Ingreso</th><th></th></tr>
           </thead>
           <tbody>
-            ${filas.length? filas.map((a,i)=>fila(a,i,ev,rutCount,nomCount)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay guardias registrados en este evento.</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay guardias registrados en este evento.</td></tr>`}
           </tbody>
         </table>
       </div>
     </div>`;
 
-  // QR
-  $("#qrbox").innerHTML=""; new QRCode($("#qrbox"),{text:guardLink(ev.slug),width:150,height:150,correctLevel:QRCode.CorrectLevel.M});
-  $("#qrDl").addEventListener("click",()=>dlQR(ev));
-  $("#qrPr").addEventListener("click",()=>prQR(ev));
-  $("#qrCp").addEventListener("click",()=>{ navigator.clipboard.writeText(guardLink(ev.slug)).then(()=>toast("Link copiado")); });
-  $("#linkEmpresa").addEventListener("click",()=>modalLinkEmpresa(ev));
-  $("#editEv").addEventListener("click",()=>modalNuevoEvento(ev));
-  $("#delEv").addEventListener("click",()=>{ confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`,async()=>{ await Data.deleteEvento(ev.id); ADMIN_STATE.selected=null; closeModal(); refreshAdmin(true); }); });
-  const b=$("#buscar"); b.addEventListener("input",()=>{ ADMIN_STATE.search=b.value; const pos=b.selectionStart; renderMain().then(()=>{ const nb=$("#buscar"); if(nb){nb.focus(); try{nb.setSelectionRange(pos,pos);}catch{}} }); });
-  main.querySelectorAll("[data-edit]").forEach(x=>x.addEventListener("click",()=>modalEditarGuardia(asist.find(a=>a.id===x.dataset.edit),ev)));
-  main.querySelectorAll("[data-del]").forEach(x=>x.addEventListener("click",()=>{ const a=asist.find(a=>a.id===x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres||a.rut)} de este evento?`,async()=>{ await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
-}
-function chip(label,n,color){ return `<div class="rounded-lg py-2 b-${color}"><div class="text-lg font-bold">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
-function fila(a,i,ev,rutCount,nomCount){
-  const g=a.guardia||{};
-  const v=calcularVigencia(g.fecha_ultimo_examen);
-  const nom=((g.nombres||"")+" "+(g.apellidos||"")).trim();
-  const dup=(rutCount[a.rut]>1)||(nom && nomCount[nom]>1);
-  return `<tr class="${dup?'row-dup':''} border-b border-slate-50">
-    <td data-label="#" class="py-2 pr-2 text-slate-400">${i+1}</td>
-    <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup?' <span class="text-red-600" title="Duplicado">⚠</span>':''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom||"—")}</td>
-    <td data-label="Teléfono" class="pr-2">${esc(g.telefono||"—")}</td>
-    <td data-label="Examen" class="pr-2">${esc(g.fecha_ultimo_examen||"—")}</td>
+      // QR
+      $("#qrbox").innerHTML = ""; new QRCode($("#qrbox"), { text: guardLink(ev.slug), width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
+      $("#qrDl").addEventListener("click", () => dlQR(ev));
+      $("#qrPr").addEventListener("click", () => prQR(ev));
+      $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLink(ev.slug)).then(() => toast("Link copiado")); });
+      $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
+      $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
+      $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
+      const b = $("#buscar"); b.addEventListener("input", () => { ADMIN_STATE.search = b.value; const pos = b.selectionStart; renderMain().then(() => { const nb = $("#buscar"); if (nb) { nb.focus(); try { nb.setSelectionRange(pos, pos); } catch { } } }); });
+      main.querySelectorAll("[data-edit]").forEach(x => x.addEventListener("click", () => modalEditarGuardia(asist.find(a => a.id === x.dataset.edit), ev)));
+      main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
+    }
+    function chip(label, n, color) { return `<div class="rounded-lg py-2 b-${color}"><div class="text-lg font-bold">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
+    function fila(a, i, ev, rutCount, nomCount) {
+      const g = a.guardia || {};
+      const v = calcularVigencia(g.fecha_ultimo_examen);
+      const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
+      const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
+      return `<tr class="${dup ? 'row-dup' : ''} border-b border-slate-50">
+    <td data-label="#" class="py-2 pr-2 text-slate-400">${i + 1}</td>
+    <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
+    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}</td>
+    <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
+    <td data-label="Examen" class="pr-2">${esc(g.fecha_ultimo_examen || "—")}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
-    <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges==='OK'?'text-green-700':v.siges?'text-amber-700':'text-slate-400'}">${esc(v.siges||"—")}</td>
+    <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td>
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
     <td class="acciones whitespace-nowrap">
       <button data-edit="${a.id}" class="text-slate-500 hover:text-green-700 px-1" title="Editar">✎</button>
       <button data-del="${a.id}" class="text-slate-500 hover:text-red-600 px-1" title="Quitar">🗑</button>
     </td>
   </tr>`;
-}
+    }
 
-/* ---- QR descargar / imprimir ---- */
-function qrCanvasDataURL(){ const c=$("#qrbox canvas"); if(c) return c.toDataURL("image/png"); const img=$("#qrbox img"); return img?img.src:null; }
-function dlQR(ev){ const url=qrCanvasDataURL(); if(!url)return; const a=document.createElement("a"); a.href=url; a.download="QR-"+ev.slug+".png"; a.click(); }
-function prQR(ev){ const url=qrCanvasDataURL(); if(!url)return; const w=window.open("","_blank");
-  w.document.write(`<html><head><title>QR ${esc(ev.nombre_evento)}</title></head><body style="text-align:center;font-family:sans-serif;padding:40px">
+    /* ---- QR descargar / imprimir ---- */
+    function qrCanvasDataURL() { const c = $("#qrbox canvas"); if (c) return c.toDataURL("image/png"); const img = $("#qrbox img"); return img ? img.src : null; }
+    function dlQR(ev) { const url = qrCanvasDataURL(); if (!url) return; const a = document.createElement("a"); a.href = url; a.download = "QR-" + ev.slug + ".png"; a.click(); }
+    function prQR(ev) {
+      const url = qrCanvasDataURL(); if (!url) return; const w = window.open("", "_blank");
+      w.document.write(`<html><head><title>QR ${esc(ev.nombre_evento)}</title></head><body style="text-align:center;font-family:sans-serif;padding:40px">
    <h2>${esc(ev.nombre_evento)}</h2><p>Empresa: ${esc(ev.empresa)}</p><img src="${url}" style="width:300px"/><p style="font-size:12px;color:#666">Escanee para registrar su ingreso</p>
-   <script>window.onload=()=>{window.print()}<\/script></body></html>`); w.document.close(); }
+   <script>window.onload=()=>{window.print()}<\/script></body></html>`); w.document.close();
+    }
 
-/* ---- Modales evento ---- */
-function modalNuevoEvento(ev){
-  if(ev instanceof Event) ev=undefined;           // proteger: nunca tratar un click como edición
-  const edit=!!ev && !!ev.id;                       // solo es edición si trae un evento con id real
-  openModal(`
-    <h2 class="font-bold text-lg text-slate-800 mb-3">${edit?"Editar evento":"Nuevo evento"}</h2>
+    /* ---- Modales evento ---- */
+    function modalNuevoEvento(ev) {
+      if (ev instanceof Event) ev = undefined;           // proteger: nunca tratar un click como edición
+      const edit = !!ev && !!ev.id;                       // solo es edición si trae un evento con id real
+      openModal(`
+    <h2 class="font-bold text-lg text-slate-800 mb-3">${edit ? "Editar evento" : "Nuevo evento"}</h2>
     <div class="space-y-3">
-      <div><label class="text-sm font-semibold text-slate-700">Nombre del evento</label><input id="m_nom" class="fld" placeholder="Pampilla La Serena" value="${edit?esc(ev.nombre_evento):""}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Empresa de seguridad</label><input id="m_emp" class="fld" placeholder="MAGATY" value="${edit?esc(ev.empresa):""}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld" placeholder="100" value="${edit?esc(ev.cantidad_esperada):""}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Fecha del evento (opcional)</label><input id="m_fecha" type="date" class="fld" value="${edit?esc(ev.fecha_evento||""):""}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Nombre del evento</label><input id="m_nom" class="fld" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Empresa de seguridad</label><input id="m_emp" class="fld" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Fecha del evento (opcional)</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="m_cancel" class="btn btn-ghost flex-1">Cancelar</button>
-      <button id="m_save" class="btn btn-p flex-1">${edit?"Guardar":"Crear evento"}</button>
+      <button id="m_save" class="btn btn-p flex-1">${edit ? "Guardar" : "Crear evento"}</button>
     </div>`);
-  $("#m_cancel").addEventListener("click",closeModal);
-  $("#m_save").addEventListener("click",async()=>{
-    const nombre=$("#m_nom").value.trim(), empresa=$("#m_emp").value.trim(), cant=parseInt($("#m_cant").value)||0, fecha=$("#m_fecha").value||null;
-    if(!nombre||!empresa){ toast("Nombre y empresa son obligatorios",false); return; }
-    if(edit && !ev.id){ toast("Este evento no tiene ID válido (dato viejo). Recarga la página (Ctrl+Shift+R) y créalo de nuevo.",false); return; }
-    try{
-      if(edit){ await Data.updateEvento(ev.id,{nombre_evento:nombre,empresa,cantidad_esperada:cant,fecha_evento:fecha}); }
-      else{ const nuevo=await Data.createEvento({nombre_evento:nombre,empresa,cantidad_esperada:cant,fecha_evento:fecha,slug:makeSlug(nombre,empresa)}); ADMIN_STATE.selected=nuevo.id; }
-      closeModal(); refreshAdmin();
-    }catch(err){ toast("Error: "+(err.message||err),false); }
-  });
-}
-function modalEditarGuardia(a,ev){
-  const g=a.guardia||{rut:a.rut};
-  openModal(`
+      $("#m_cancel").addEventListener("click", closeModal);
+      $("#m_save").addEventListener("click", async () => {
+        const nombre = $("#m_nom").value.trim(), empresa = $("#m_emp").value.trim(), cant = parseInt($("#m_cant").value) || 0, fecha = $("#m_fecha").value || null;
+        if (!nombre || !empresa) { toast("Nombre y empresa son obligatorios", false); return; }
+        if (edit && !ev.id) { toast("Este evento no tiene ID válido (dato viejo). Recarga la página (Ctrl+Shift+R) y créalo de nuevo.", false); return; }
+        try {
+          if (edit) { await Data.updateEvento(ev.id, { nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha }); }
+          else { const nuevo = await Data.createEvento({ nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha, slug: makeSlug(nombre, empresa) }); ADMIN_STATE.selected = nuevo.id; }
+          closeModal(); refreshAdmin();
+        } catch (err) { toast("Error: " + (err.message || err), false); }
+      });
+    }
+    function modalEditarGuardia(a, ev) {
+      const g = a.guardia || { rut: a.rut };
+      openModal(`
     <h2 class="font-bold text-lg text-slate-800 mb-1">Editar guardia</h2>
     <p class="text-xs text-slate-400 mb-3">RUT: ${esc(a.rut)}</p>
     <div class="space-y-3">
-      <div><label class="text-sm font-semibold text-slate-700">Nombres</label><input id="e_nom" class="fld" value="${esc(g.nombres||"")}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Apellidos</label><input id="e_ape" class="fld" value="${esc(g.apellidos||"")}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Teléfono</label><input id="e_tel" class="fld" value="${esc(g.telefono||"")}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Fecha último examen</label><input id="e_fec" type="date" class="fld" value="${esc(g.fecha_ultimo_examen||"")}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Nombres</label><input id="e_nom" class="fld" value="${esc(g.nombres || "")}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Apellidos</label><input id="e_ape" class="fld" value="${esc(g.apellidos || "")}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Teléfono</label><input id="e_tel" class="fld" value="${esc(g.telefono || "")}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Fecha último examen</label><input id="e_fec" type="date" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="e_cancel" class="btn btn-ghost flex-1">Cancelar</button>
       <button id="e_save" class="btn btn-p flex-1">Guardar</button>
     </div>`);
-  $("#e_nom").addEventListener("input",e=>e.target.value=formatNombre(e.target.value));
-  $("#e_ape").addEventListener("input",e=>e.target.value=formatNombre(e.target.value));
-  $("#e_cancel").addEventListener("click",closeModal);
-  $("#e_save").addEventListener("click",async()=>{
-    try{
-      await Data.upsertGuardia({rut:a.rut,nombres:formatNombre($("#e_nom").value).trim(),apellidos:formatNombre($("#e_ape").value).trim(),telefono:$("#e_tel").value.trim(),fecha_ultimo_examen:$("#e_fec").value||null});
-      closeModal(); refreshAdmin();
-    }catch(err){ toast("Error: "+(err.message||err),false); }
-  });
-}
-function confirmar(msg,onOk){
-  openModal(`<h2 class="font-bold text-slate-800 mb-3">Confirmar</h2><p class="text-slate-600 text-sm mb-4">${esc(msg)}</p>
+      $("#e_nom").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
+      $("#e_ape").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
+      $("#e_cancel").addEventListener("click", closeModal);
+      $("#e_save").addEventListener("click", async () => {
+        try {
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: $("#e_fec").value || null });
+          closeModal(); refreshAdmin();
+        } catch (err) { toast("Error: " + (err.message || err), false); }
+      });
+    }
+    function confirmar(msg, onOk) {
+      openModal(`<h2 class="font-bold text-slate-800 mb-3">Confirmar</h2><p class="text-slate-600 text-sm mb-4">${esc(msg)}</p>
     <div class="flex gap-2"><button id="c_no" class="btn btn-ghost flex-1">Cancelar</button><button id="c_si" class="btn btn-danger flex-1">Sí, continuar</button></div>`);
-  $("#c_no").addEventListener("click",closeModal); $("#c_si").addEventListener("click",onOk);
-}
+      $("#c_no").addEventListener("click", closeModal); $("#c_si").addEventListener("click", onOk);
+    }
 
-/* ---- Modal: link de empresa (solo lectura) ---- */
-function modalLinkEmpresa(ev){
-  const link=empresaLink(ev.slug);
-  openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">👁 Link para la empresa</h2>
+    /* ---- Modal: link de empresa (solo lectura) ---- */
+    function modalLinkEmpresa(ev) {
+      const link = empresaLink(ev.slug);
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">👁 Link para la empresa</h2>
     <p class="text-sm text-slate-500 mb-3">Comparte este enlace con <b>${esc(ev.empresa)}</b>. Podrán ver en tiempo real cuántos guardias ingresan a "<b>${esc(ev.nombre_evento)}</b>", <b>sin poder modificar nada</b>.</p>
     <input id="le_url" class="fld text-xs" readonly value="${esc(link)}">
     <div class="flex gap-2 mt-3">
       <button id="le_copy" class="btn btn-p flex-1">🔗 Copiar link</button>
       <button id="le_close" class="btn btn-ghost flex-1">Cerrar</button>
     </div>`);
-  $("#le_copy").addEventListener("click",()=>{ const i=$("#le_url"); i.select(); navigator.clipboard.writeText(link).then(()=>toast("Link copiado")); });
-  $("#le_close").addEventListener("click",closeModal);
-}
+      $("#le_copy").addEventListener("click", () => { const i = $("#le_url"); i.select(); navigator.clipboard.writeText(link).then(() => toast("Link copiado")); });
+      $("#le_close").addEventListener("click", closeModal);
+    }
 
-/* ---- Modal: importar guardias desde CSV ---- */
-function modalImportar(){
-  openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📥 Importar guardias</h2>
+    /* ---- Modal: importar guardias desde CSV ---- */
+    function modalImportar() {
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📥 Importar guardias</h2>
     <p class="text-sm text-slate-500 mb-3">Sube un <b>CSV</b> (en Google Sheets: Archivo → Descargar → CSV). Debe tener columnas <b>RUT</b> y <b>NOMBRE</b> (opcional FONO/TELÉFONO y FECHA EXAMEN). El RUT, las mayúsculas y las fechas se formatean solos.</p>
     <input id="imp_file" type="file" accept=".csv,text/csv" class="fld">
     <div id="imp_prev" class="text-xs text-slate-500 mt-2"></div>
@@ -670,45 +814,45 @@ function modalImportar(){
       <button id="imp_cancel" class="btn btn-ghost flex-1">Cancelar</button>
       <button id="imp_go" class="btn btn-p flex-1" disabled>Importar</button>
     </div>`);
-  let rows=null; const prev=$("#imp_prev"), go=$("#imp_go");
-  $("#imp_cancel").addEventListener("click",closeModal);
-  $("#imp_file").addEventListener("change",async(e)=>{
-    const file=e.target.files[0]; if(!file) return;
-    try{
-      const all=parseCSV(await file.text()).filter(r=>r.some(c=>c&&c.trim()));
-      if(!all.length){ prev.textContent="Archivo vacío."; go.disabled=true; return; }
-      const head=all.shift().map(h=>(h||"").trim().toUpperCase());
-      const idx=(re)=>head.findIndex(h=>re.test(h));
-      const iR=idx(/RUT/), iN=idx(/NOMBRE/), iT=idx(/FONO|TELEF/), iF=idx(/FECHA/);
-      if(iR<0||iN<0){ prev.innerHTML='<span class="text-red-600">El CSV debe tener columnas RUT y NOMBRE.</span>'; go.disabled=true; return; }
-      const map={};
-      all.forEach(r=>{ const rut=formatRut(r[iR]||""); if(rut.length<3) return; const [nom,ape]=splitNombre(r[iN]||""); map[rut]={rut,nombres:nom,apellidos:ape,telefono:iT>=0?(r[iT]||"").trim():"",fecha_ultimo_examen:iF>=0?fechaISO(r[iF]):null}; });
-      rows=Object.values(map);
-      prev.innerHTML=`Detectados <b>${rows.length}</b> guardias únicos.`+(rows[0]?` Ej: ${esc(rows[0].rut)} — ${esc((rows[0].nombres+" "+rows[0].apellidos).trim())}`:"");
-      go.disabled=rows.length===0;
-    }catch(err){ prev.innerHTML='<span class="text-red-600">Error leyendo el archivo.</span>'; }
-  });
-  go.addEventListener("click",async()=>{
-    if(!rows||!rows.length) return;
-    go.disabled=true; go.textContent="Importando…";
-    try{ const n=await Data.bulkUpsertGuardias(rows); closeModal(); toast(`✔ ${n} guardias importados a la base central`); refreshAdmin(); }
-    catch(err){ toast("Error al importar: "+(err.message||err),false); go.disabled=false; go.textContent="Importar"; }
-  });
-}
+      let rows = null; const prev = $("#imp_prev"), go = $("#imp_go");
+      $("#imp_cancel").addEventListener("click", closeModal);
+      $("#imp_file").addEventListener("change", async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        try {
+          const all = parseCSV(await file.text()).filter(r => r.some(c => c && c.trim()));
+          if (!all.length) { prev.textContent = "Archivo vacío."; go.disabled = true; return; }
+          const head = all.shift().map(h => (h || "").trim().toUpperCase());
+          const idx = (re) => head.findIndex(h => re.test(h));
+          const iR = idx(/RUT/), iN = idx(/NOMBRE/), iT = idx(/FONO|TELEF/), iF = idx(/FECHA/);
+          if (iR < 0 || iN < 0) { prev.innerHTML = '<span class="text-red-600">El CSV debe tener columnas RUT y NOMBRE.</span>'; go.disabled = true; return; }
+          const map = {};
+          all.forEach(r => { const rut = formatRut(r[iR] || ""); if (rut.length < 3) return; const [nom, ape] = splitNombre(r[iN] || ""); map[rut] = { rut, nombres: nom, apellidos: ape, telefono: iT >= 0 ? (r[iT] || "").trim() : "", fecha_ultimo_examen: iF >= 0 ? fechaISO(r[iF]) : null }; });
+          rows = Object.values(map);
+          prev.innerHTML = `Detectados <b>${rows.length}</b> guardias únicos.` + (rows[0] ? ` Ej: ${esc(rows[0].rut)} — ${esc((rows[0].nombres + " " + rows[0].apellidos).trim())}` : "");
+          go.disabled = rows.length === 0;
+        } catch (err) { prev.innerHTML = '<span class="text-red-600">Error leyendo el archivo.</span>'; }
+      });
+      go.addEventListener("click", async () => {
+        if (!rows || !rows.length) return;
+        go.disabled = true; go.textContent = "Importando…";
+        try { const n = await Data.bulkUpsertGuardias(rows); closeModal(); toast(`✔ ${n} guardias importados a la base central`); refreshAdmin(); }
+        catch (err) { toast("Error al importar: " + (err.message || err), false); go.disabled = false; go.textContent = "Importar"; }
+      });
+    }
 
-/* =========================================================================
-   VISTA EMPRESA (solo lectura, por evento) — ?empresa=<slug>
-   ========================================================================= */
-async function renderEmpresa(slug){
-  app.innerHTML=`<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
-  let ev=null; try{ ev=await Data.getEventoBySlug(slug); }catch(e){}
-  if(!ev){ app.innerHTML=`<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
-  const paint=async()=>{
-    let asist=[]; try{ asist=await Data.listAsistencias(ev.id); }catch(e){}
-    const total=ev.cantidad_esperada||0;
-    const pct= total? Math.min(100,Math.round(asist.length/total*100)):0;
-    const cont=(estado)=>asist.filter(a=>calcularVigencia(a.guardia?.fecha_ultimo_examen).estado===estado).length;
-    app.innerHTML=`
+    /* =========================================================================
+       VISTA EMPRESA (solo lectura, por evento) — ?empresa=<slug>
+       ========================================================================= */
+    async function renderEmpresa(slug) {
+      app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
+      let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (e) { }
+      if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
+      const paint = async () => {
+        let asist = []; try { asist = await Data.listAsistencias(ev.id); } catch (e) { }
+        const total = ev.cantidad_esperada || 0;
+        const pct = total ? Math.min(100, Math.round(asist.length / total * 100)) : 0;
+        const cont = (estado) => asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === estado).length;
+        app.innerHTML = `
     <div class="min-h-screen p-3 md:p-6 max-w-4xl mx-auto">
       <div class="brand-bg rounded-2xl p-5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
         <img src="images/icon-192x192.png" class="w-14 h-14 rounded-full bg-white/90 p-1 flex-shrink-0" alt="OS10">
@@ -720,13 +864,13 @@ async function renderEmpresa(slug){
         <img src="images/aniversario1.webp" class="w-14 h-14 object-contain flex-shrink-0 hidden sm:block" alt="Centenario">
       </div>
       <div class="card p-4 mt-4">
-        <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total||"—"}</span></div></div>
+        <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
         <div class="grid grid-cols-4 gap-2 mt-4 text-center">
-          ${chip("Vigentes",cont("VIGENTE"),"verde")}
-          ${chip("Prórroga",cont("VENCIDO_CON_PRORROGA"),"amarillo")}
-          ${chip("Vencidos",cont("VENCIDO_SIN_PRORROGA"),"rojo")}
-          ${chip("Sin curso",cont("SIN_CURSO"),"gris")}
+          ${chip("Vigentes", cont("VIGENTE"), "verde")}
+          ${chip("Prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo")}
+          ${chip("Vencidos", cont("VENCIDO_SIN_PRORROGA"), "rojo")}
+          ${chip("Sin curso", cont("SIN_CURSO"), "gris")}
         </div>
       </div>
       <div class="card mt-4">
@@ -734,34 +878,35 @@ async function renderEmpresa(slug){
         <div class="p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
             <thead class="text-left text-slate-500 border-b border-slate-100"><tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th><th class="pr-2">Ingreso</th></tr></thead>
-            <tbody>${asist.length?asist.map((a,i)=>{const g=a.guardia||{};const v=calcularVigencia(g.fecha_ultimo_examen);return `<tr class="border-b border-slate-50"><td data-label="#" class="py-2 pr-2 text-slate-400">${i+1}</td><td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(((g.nombres||"")+" "+(g.apellidos||"")).trim()||"—")}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges==='OK'?'text-green-700':v.siges?'text-amber-700':'text-slate-400'}">${esc(v.siges||"—")}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`;}).join(""):`<tr><td colspan="6" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
+            <tbody>${asist.length ? asist.map((a, i) => { const g = a.guardia || {}; const v = calcularVigencia(g.fecha_ultimo_examen); return `<tr class="border-b border-slate-50"><td data-label="#" class="py-2 pr-2 text-slate-400">${i + 1}</td><td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`; }).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
           </table>
         </div>
       </div>
       <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/icon-192x192.png" class="w-5 h-5 opacity-60" alt="">Prefectura O.S.10 · Vista de solo lectura</p>
     </div>`;
-  };
-  await paint();
-  Data.onChange(paint);
-}
+      };
+      await paint();
+      Data.onChange(paint);
+    }
 
-/* ===== Semilla de demo (solo la primera vez en modo demo) ===== */
-async function seedDemo(){
-  if(USING_SUPABASE) return;
-  if(localStorage.getItem("os10_seeded")) return;
-  localStorage.setItem("os10_seeded","1");
-  const e1=await Local.createEvento({nombre_evento:"Pampilla La Serena",empresa:"MAGATY",cantidad_esperada:100,fecha_evento:"2026-09-18",slug:makeSlug("Pampilla La Serena","MAGATY")});
-  const e2=await Local.createEvento({nombre_evento:"Combo",empresa:"FONQUI",cantidad_esperada:30,fecha_evento:"2026-09-19",slug:makeSlug("Combo","FONQUI")});
-  const demo=[
-    {rut:"21280241-7",nombres:"ANDRÉS ALEXANDER",apellidos:"DONOSO BASTIAS",telefono:"936760873",fecha_ultimo_examen:"2020-03-19"},
-    {rut:"21473516-4",nombres:"FELIPE IGNACIO",apellidos:"CASANGA ARAYA",telefono:"56946376278",fecha_ultimo_examen:"2024-08-30"},
-    {rut:"12425572-4",nombres:"CHRISTIAN ALFONSO",apellidos:"ROSA SALAZAR",telefono:"951937115",fecha_ultimo_examen:"2022-12-07"},
-  ];
-  for(const g of demo){ await Local.upsertGuardia(g); await Local.createAsistencia(e1.id,g.rut); }
-}
+    /* ===== Semilla de demo (solo la primera vez en modo demo) ===== */
+    async function seedDemo() {
+      if (USING_SUPABASE) return;
+      if (localStorage.getItem("os10_seeded")) return;
+      localStorage.setItem("os10_seeded", "1");
+      const e1 = await Local.createEvento({ nombre_evento: "Pampilla La Serena", empresa: "MAGATY", cantidad_esperada: 100, fecha_evento: "2026-09-18", slug: makeSlug("Pampilla La Serena", "MAGATY") });
+      const e2 = await Local.createEvento({ nombre_evento: "Combo", empresa: "FONQUI", cantidad_esperada: 30, fecha_evento: "2026-09-19", slug: makeSlug("Combo", "FONQUI") });
+      const demo = [
+        { rut: "21280241-7", nombres: "ANDRÉS ALEXANDER", apellidos: "DONOSO BASTIAS", telefono: "936760873", fecha_ultimo_examen: "2020-03-19" },
+        { rut: "21473516-4", nombres: "FELIPE IGNACIO", apellidos: "CASANGA ARAYA", telefono: "56946376278", fecha_ultimo_examen: "2024-08-30" },
+        { rut: "12425572-4", nombres: "CHRISTIAN ALFONSO", apellidos: "ROSA SALAZAR", telefono: "951937115", fecha_ultimo_examen: "2022-12-07" },
+      ];
+      for (const g of demo) { await Local.upsertGuardia(g); await Local.createAsistencia(e1.id, g.rut); }
+    }
 
-/* ===== Arranque ===== */
-(async()=>{ await seedDemo(); route(); })();
-</script>
+    /* ===== Arranque ===== */
+    (async () => { await seedDemo(); route(); })();
+  </script>
 </body>
+
 </html>
