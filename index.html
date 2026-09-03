@@ -989,7 +989,11 @@
           const ar = (logo.naturalHeight && logo.naturalWidth) ? logo.naturalHeight / logo.naturalWidth : 1;
           const lw = box, lh = Math.round(box * ar);
           const cx = px / 2, cy = px / 2;              // centro exacto del QR
-          // Sin recuadro/contorno blanco: se dibuja el logo directamente sobre el QR
+          // Fondo blanco CIRCULAR que sigue la forma del emblema (el logo es transparente):
+          // devuelve el blanco interior del logo y deja solo una orilla mínima, sin recuadro cuadrado.
+          const r = Math.max(lw, lh) / 2 + 1.5 * SCALE;
+          ctx.fillStyle = "#fff";
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
           ctx.imageSmoothingEnabled = true;                 // logo suavizado (nítido, no pixelado)
           ctx.imageSmoothingQuality = "high";
           ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
