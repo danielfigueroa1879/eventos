@@ -63,6 +63,20 @@ create policy "acceso_guardias"    on guardias_central for all using (true) with
 create policy "acceso_asistencias" on asistencias      for all using (true) with check (true);
 
 -- ---------- TIEMPO REAL ----------
-alter publication supabase_realtime add table eventos;
-alter publication supabase_realtime add table guardias_central;
-alter publication supabase_realtime add table asistencias;
+-- Se agregan al realtime solo si no estaban ya (evita el error 42710
+-- "relation ... is already member of publication" al re-ejecutar este archivo).
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'eventos') then
+    alter publication supabase_realtime add table eventos;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'guardias_central') then
+    alter publication supabase_realtime add table guardias_central;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'asistencias') then
+    alter publication supabase_realtime add table asistencias;
+  end if;
+end $$;
