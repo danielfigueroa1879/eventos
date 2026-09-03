@@ -10,10 +10,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-  :root{ --brand:#166534; --brand2:#15803d; }
+  :root{ --brand:#0c4a1f; --brand2:#13612b; }
   html,body{height:100%}
-  body{background:#f1f5f4;font-family:ui-sans-serif,system-ui,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
-  .brand-bg{background:linear-gradient(135deg,#166534,#22c55e)}
+  body{background:#eef2f0;font-family:ui-sans-serif,system-ui,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+  .brand-bg{background:linear-gradient(135deg,#0a3d18 0%,#0f5323 55%,#15662f 100%)}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:#c7d2ce;border-radius:8px}
   /* Tabla responsiva -> tarjetas en móvil */
@@ -70,7 +70,7 @@ const ENTRADA_VIGENCIA_LEY = new Date(2025, 10, 28);        // 28-nov-2025 (entr
 const FECHA_TOPE_PRORROGA  = new Date(2027, 4, 28, 23,59,59); // 28-may-2027 (tope prórroga)
 
 const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-const APP_VERSION = "v3.0";
+const APP_VERSION = "v3.1";
 // En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
 if(USING_SUPABASE){ try{ ["os10_eventos","os10_guardias","os10_asistencias","os10_seeded"].forEach(k=>localStorage.removeItem(k)); }catch(e){} }
 
@@ -254,12 +254,15 @@ async function renderGuard(slug){
   app.innerHTML=`
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
-      <div class="brand-bg rounded-2xl p-5 text-white text-center shadow relative overflow-hidden">
-        <img src="images/icon-192x192.png" alt="" class="absolute -right-3 -top-3 w-24 opacity-20 pointer-events-none">
-        <img src="images/poli.webp" alt="OS10" class="w-24 h-24 mx-auto rounded-full bg-white/25 p-1 mb-2 relative">
-        <div class="text-xs uppercase tracking-wide opacity-90">Control de acceso · Prefectura O.S.10</div>
-        <h1 class="text-xl font-bold mt-1 relative">${esc(ev.nombre_evento)}</h1>
-        <div class="text-sm opacity-90 relative">Empresa: ${esc(ev.empresa)}</div>
+      <div class="brand-bg rounded-2xl px-4 pt-4 pb-5 text-white text-center shadow-lg relative overflow-hidden border border-white/10">
+        <div class="flex items-center justify-between mb-1">
+          <img src="images/aniversario1.webp" alt="Centenario" class="w-16 h-16 object-contain drop-shadow">
+          <img src="images/poli.webp" alt="" class="w-20 h-20 rounded-full bg-white/20 p-1 ring-2 ring-white/40 -mt-1">
+          <img src="images/icon-192x192.png" alt="OS10" class="w-16 h-16 object-contain drop-shadow rounded-full bg-white/90 p-1">
+        </div>
+        <div class="text-[11px] uppercase tracking-widest opacity-90 font-semibold">Prefectura Seguridad Privada · O.S.10 Coquimbo</div>
+        <h1 class="text-xl font-bold mt-1">${esc(ev.nombre_evento)}</h1>
+        <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
       </div>
 
       <div class="card p-5 mt-4 space-y-4">
@@ -416,10 +419,11 @@ async function renderAdmin(){
     <aside id="sidebar" class="bg-white border-r border-slate-200 w-full md:w-72 md:min-h-screen md:block ${'hidden'}">
       <div class="brand-bg text-white p-4 hidden md:flex items-center gap-3">
         <img src="images/icon-192x192.png" class="w-11 h-11 rounded-full bg-white/90 p-1" alt="OS10">
-        <div>
+        <div class="flex-1">
           <div class="font-bold text-lg leading-tight">Control Guardias</div>
-          <div class="text-xs opacity-80">Eventos Fiestas Patrias · O.S.10</div>
+          <div class="text-xs opacity-80">Fiestas Patrias · O.S.10 Coquimbo</div>
         </div>
+        <img src="images/aniversario1.webp" class="w-11 h-11 object-contain" alt="Centenario">
       </div>
       <div class="p-3">
         <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
@@ -706,13 +710,14 @@ async function renderEmpresa(slug){
     const cont=(estado)=>asist.filter(a=>calcularVigencia(a.guardia?.fecha_ultimo_examen).estado===estado).length;
     app.innerHTML=`
     <div class="min-h-screen p-3 md:p-6 max-w-4xl mx-auto">
-      <div class="brand-bg rounded-2xl p-5 text-white shadow flex items-center gap-4 relative overflow-hidden">
+      <div class="brand-bg rounded-2xl p-5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
         <img src="images/icon-192x192.png" class="w-14 h-14 rounded-full bg-white/90 p-1 flex-shrink-0" alt="OS10">
         <div class="flex-1 min-w-0">
-          <div class="text-xs uppercase opacity-90">Vista de empresa · solo lectura</div>
+          <div class="text-xs uppercase tracking-widest opacity-90 font-semibold">Vista de empresa · solo lectura</div>
           <h1 class="text-xl font-bold leading-tight">${esc(ev.nombre_evento)}</h1>
           <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
         </div>
+        <img src="images/aniversario1.webp" class="w-14 h-14 object-contain flex-shrink-0 hidden sm:block" alt="Centenario">
       </div>
       <div class="card p-4 mt-4">
         <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total||"—"}</span></div></div>
