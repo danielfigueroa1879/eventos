@@ -279,8 +279,14 @@
     function fmtHM(d) { return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
 
     // Devuelve el turno al que corresponde una hora de ingreso (ISO) dentro de un evento.
+    // ¿El evento usa turnos? Los partidos nunca; los eventos según lo elija el admin.
+    // (Compatibilidad: eventos antiguos sin el campo usa_turnos se consideran CON turnos.)
+    function eventoUsaTurnos(ev) { return !!ev && ev.tipo !== "partido" && ev.usa_turnos !== false; }
+    function esPartido(ev) { return !!ev && ev.tipo === "partido"; }
+
     function calcularTurno(iso, ev) {
       if (!iso) return null;
+      if (!eventoUsaTurnos(ev)) return null;              // sin turnos / partido: no se agrupa por turno
       const t = new Date(iso);
       if (isNaN(t.getTime())) return null;
 
@@ -325,6 +331,17 @@
       let H = parseFloat(ev && ev.turno_horas); if (!(H > 0)) H = TURNO_HORAS_DEFAULT;
       const ini = (ev && ev.turno_inicio) || TURNO_INICIO_DEFAULT;
       return `Turnos de ${H} h desde ${ini}` + (H === 12 ? " (día/noche)" : "");
+    }
+
+    // Línea de info del evento (ícono + texto) según su tipo y turnos. Devuelve HTML.
+    function eventoInfoHTML(ev) {
+      if (esPartido(ev)) return `<span class="text-emerald-600">⚽ Partido${ev.partido ? ": " + esc(ev.partido) : ""}</span>`;
+      if (!eventoUsaTurnos(ev)) return `<span class="text-slate-500">🎫 Sin turnos</span>`;
+      return `<span class="text-indigo-600">🕑 ${esc(turnoConfigTexto(ev))}</span>`;
+    }
+    function eventoTipoTexto(ev) {
+      if (esPartido(ev)) return "Partido" + (ev.partido ? ": " + ev.partido : "");
+      return eventoUsaTurnos(ev) ? turnoConfigTexto(ev) : "Sin turnos";
     }
 
     /* =========================================================================
@@ -727,6 +744,7 @@
       const asist = await Data.listAsistencias(ev.id);
       const total = ev.cantidad_esperada || 0;
       const pct = total ? Math.min(100, Math.round(asist.length / total * 100)) : 0;
+      const usaT = eventoUsaTurnos(ev);
 
       // detectar duplicados (rut o nombre completo repetidos)
       const rutCount = {}, nomCount = {};
@@ -757,9 +775,12 @@
       <div>
         <h1 class="text-xl md:text-2xl font-bold text-slate-800">${esc(ev.nombre_evento)}</h1>
         <div class="text-slate-500 text-sm">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(ev.fecha_evento)}` : ""}</div>
-        <div class="text-indigo-600 text-xs font-medium mt-0.5">🕑 ${esc(turnoConfigTexto(ev))}</div>
+        <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-2 flex-wrap">
+        <button id="expExcel" class="btn btn-ghost text-sm">⬇ Excel</button>
+        <button id="expPDF" class="btn btn-ghost text-sm">⬇ PDF</button>
+        <button id="compartir" class="btn btn-ghost text-sm">📤 Compartir</button>
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
         <button id="editEv" class="btn btn-ghost text-sm">✎ Editar evento</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
@@ -796,14 +817,14 @@
         <div class="font-semibold text-slate-700">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
         <input id="buscar" class="fld max-w-xs py-2 text-sm" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
       </div>
-      <div class="px-3 pt-3">${turnosBar}</div>
+      ${usaT ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
       <div class="p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left text-slate-500 border-b border-slate-100">
-            <tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre completo</th><th class="pr-2">Teléfono</th><th class="pr-2">Examen</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th><th class="pr-2">Turno</th><th class="pr-2">Ingreso</th><th></th></tr>
+            <tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre completo</th><th class="pr-2">Teléfono</th><th class="pr-2">Examen</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th>${usaT ? '<th class="pr-2">Turno</th>' : ""}<th class="pr-2">Ingreso</th><th></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">${asist.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asist.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -833,6 +854,9 @@
       };
       statsBtn.addEventListener("click", () => { ADMIN_STATE.showStats = !ADMIN_STATE.showStats; pintarStats(); });
       pintarStats();
+      $("#expExcel").addEventListener("click", () => descargarExcel(ev, asist));
+      $("#expPDF").addEventListener("click", () => descargarPDF(ev, asist));
+      $("#compartir").addEventListener("click", () => modalCompartir(ev, asist));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
@@ -932,7 +956,7 @@
         </div>
       </div>`;
     }
-    function fila(a, i, ev, rutCount, nomCount) {
+    function fila(a, i, ev, rutCount, nomCount, usaT) {
       const g = a.guardia || {};
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const tn = calcularTurno(a.hora_ingreso, ev);
@@ -946,7 +970,7 @@
     <td data-label="Examen" class="pr-2">${esc(g.fecha_ultimo_examen || "—")}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td>
-    <td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>
+    ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
     <td class="acciones whitespace-nowrap">
       <button data-edit="${a.id}" class="text-slate-500 hover:text-green-700 px-1" title="Editar">✎</button>
@@ -1024,6 +1048,136 @@
    <script>window.onload=()=>{window.print()}<\/script></body></html>`); w.document.close();
     }
 
+    /* =========================================================================
+       EXPORTAR (Excel / PDF) y COMPARTIR (WhatsApp / correo)
+       ========================================================================= */
+    // Columnas y filas del listado (respeta si el evento usa turnos)
+    function listadoColumnas(ev) {
+      const cols = ["#", "RUT", "Nombre completo", "Teléfono", "Fecha examen", "Vigencia", "SIGES"];
+      if (eventoUsaTurnos(ev)) cols.push("Turno");
+      cols.push("Ingreso");
+      return cols;
+    }
+    function listadoFilas(ev, asist) {
+      const usaT = eventoUsaTurnos(ev);
+      return asist.map((a, i) => {
+        const g = a.guardia || {};
+        const v = calcularVigencia(g.fecha_ultimo_examen);
+        const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
+        const row = [i + 1, a.rut, nom || "—", g.telefono || "—", g.fecha_ultimo_examen || "—", v.vigencia, v.siges || "—"];
+        if (usaT) { const tn = calcularTurno(a.hora_ingreso, ev); row.push(tn ? `${tn.fecha} ${tn.etiqueta}` : "—"); }
+        row.push(horaFmt(a.hora_ingreso));
+        return row;
+      });
+    }
+    function tituloListado(ev) { return `${esPartido(ev) ? "Partido" : "Evento"}: ${ev.nombre_evento}`; }
+
+    // --- Excel (CSV compatible con Excel es-CL: separador ; y BOM) ---
+    function descargarExcel(ev, asist) {
+      if (!asist.length) { toast("No hay guardias para exportar", false); return; }
+      const cell = v => { const s = String(v ?? ""); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+      const cols = listadoColumnas(ev), filas = listadoFilas(ev, asist);
+      const meta = [
+        [tituloListado(ev)], ["Empresa", ev.empresa], ["Fecha", ev.fecha_evento || "—"],
+        [esPartido(ev) ? "Tipo" : "Turnos", eventoTipoTexto(ev)],
+        ["Total guardias", asist.length + (ev.cantidad_esperada ? " / " + ev.cantidad_esperada : "")],
+        ["Generado", new Date().toLocaleString("es-CL")], []
+      ];
+      const lineas = [...meta.map(r => r.map(cell).join(";")), cols.map(cell).join(";"), ...filas.map(r => r.map(cell).join(";"))];
+      const blob = new Blob(["﻿" + lineas.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Listado-${ev.slug}.csv`; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }
+
+    // --- PDF (ventana de impresión → Guardar como PDF) ---
+    function listadoPrintHTML(ev, asist) {
+      const cols = listadoColumnas(ev), filas = listadoFilas(ev, asist);
+      const th = cols.map(c => `<th>${esc(c)}</th>`).join("");
+      const tr = filas.map(r => `<tr>${r.map(c => `<td>${esc(String(c))}</td>`).join("")}</tr>`).join("");
+      return `<html><head><meta charset="utf-8"><title>${esc(tituloListado(ev))}</title>
+      <style>
+        *{font-family:Arial,Helvetica,sans-serif}
+        body{padding:24px;color:#111}
+        h1{font-size:18px;margin:0 0 2px} .sub{color:#555;font-size:12px;margin:2px 0}
+        table{border-collapse:collapse;width:100%;margin-top:12px;font-size:11px}
+        th,td{border:1px solid #ccc;padding:5px 6px;text-align:left}
+        thead th{background:#0f5323;color:#fff}
+        tr:nth-child(even) td{background:#f4f7f5}
+        .foot{margin-top:16px;color:#888;font-size:10px}
+      </style></head><body>
+        <h1>${esc(tituloListado(ev))}</h1>
+        <div class="sub">Empresa: <b>${esc(ev.empresa)}</b>${ev.fecha_evento ? " · Fecha: " + esc(ev.fecha_evento) : ""} · ${esc(eventoTipoTexto(ev))}</div>
+        <div class="sub">Total: <b>${asist.length}</b>${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL"))}</div>
+        <table><thead><tr>${th}</tr></thead><tbody>${tr || `<tr><td colspan="${cols.length}">Sin guardias registrados.</td></tr>`}</tbody></table>
+        <div class="foot">Prefectura O.S.10 Coquimbo · Documento generado desde el sistema de control de guardias.</div>
+        <script>window.onload=()=>{window.print()}<\/script>
+      </body></html>`;
+    }
+    function descargarPDF(ev, asist) {
+      if (!asist.length) { toast("No hay guardias para exportar", false); return; }
+      const w = window.open("", "_blank");
+      if (!w) { toast("Permite las ventanas emergentes para generar el PDF", false); return; }
+      w.document.write(listadoPrintHTML(ev, asist)); w.document.close();
+    }
+
+    // --- Texto resumen para WhatsApp / correo ---
+    function listadoTexto(ev, asist) {
+      const L = [];
+      L.push(tituloListado(ev));
+      L.push(`Empresa: ${ev.empresa}`);
+      if (ev.fecha_evento) L.push(`Fecha: ${ev.fecha_evento}`);
+      L.push(eventoTipoTexto(ev));
+      L.push(`Total: ${asist.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias`);
+      L.push("");
+      asist.forEach((a, i) => {
+        const g = a.guardia || {};
+        const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+        const v = calcularVigencia(g.fecha_ultimo_examen);
+        L.push(`${i + 1}. ${a.rut} — ${nom} — ${v.vigencia} — ${horaFmt(a.hora_ingreso)}`);
+      });
+      return L.join("\n");
+    }
+
+    async function compartirArchivo(ev, asist) {
+      try {
+        const cell = v => { const s = String(v ?? ""); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+        const cols = listadoColumnas(ev), filas = listadoFilas(ev, asist);
+        const csv = "﻿" + [cols.map(cell).join(";"), ...filas.map(r => r.map(cell).join(";"))].join("\r\n");
+        const file = new File([csv], `Listado-${ev.slug}.csv`, { type: "text/csv" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: tituloListado(ev), text: `Listado de guardias — ${ev.nombre_evento}` });
+          return true;
+        }
+      } catch (e) { /* cancelado o no soportado */ }
+      return false;
+    }
+
+    function modalCompartir(ev, asist) {
+      if (!asist.length) { toast("No hay guardias para compartir", false); return; }
+      const texto = listadoTexto(ev, asist);
+      const wa = "https://wa.me/?text=" + encodeURIComponent(texto);
+      const mail = "mailto:?subject=" + encodeURIComponent(tituloListado(ev)) +
+        "&body=" + encodeURIComponent(texto);
+      const puedeArchivo = !!(navigator.canShare && navigator.share);
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📤 Compartir listado</h2>
+    <p class="text-sm text-slate-500 mb-3">Comparte el detalle de <b>${esc(ev.nombre_evento)}</b> (${asist.length} guardias).</p>
+    <div class="space-y-2">
+      <a href="${esc(wa)}" target="_blank" rel="noopener" class="btn btn-p w-full">📲 Enviar por WhatsApp (texto)</a>
+      <a href="${esc(mail)}" class="btn btn-ghost w-full">✉ Enviar por correo (texto)</a>
+      ${puedeArchivo ? `<button id="sh_file" class="btn btn-ghost w-full">📎 Compartir archivo Excel…</button>` : ""}
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button id="sh_xls" class="btn btn-ghost">⬇ Excel</button>
+        <button id="sh_pdf" class="btn btn-ghost">⬇ PDF</button>
+      </div>
+    </div>
+    <p class="text-[11px] text-slate-400 mt-3">WhatsApp y correo envían el detalle como texto. Para adjuntar el archivo (Excel/PDF), descárgalo y adjúntalo, o usa "Compartir archivo" en el celular.</p>
+    <div class="mt-3"><button id="sh_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
+      const fb = $("#sh_file"); if (fb) fb.addEventListener("click", async () => { const ok = await compartirArchivo(ev, asist); if (!ok) toast("No se pudo compartir el archivo en este dispositivo", false); });
+      $("#sh_xls").addEventListener("click", () => descargarExcel(ev, asist));
+      $("#sh_pdf").addEventListener("click", () => descargarPDF(ev, asist));
+      $("#sh_close").addEventListener("click", closeModal);
+    }
+
     /* ---- Modales evento ---- */
     function modalNuevoEvento(ev) {
       if (ev instanceof Event) ev = undefined;           // proteger: nunca tratar un click como edición
@@ -1031,12 +1185,27 @@
       openModal(`
     <h2 class="font-bold text-lg text-slate-800 mb-3">${edit ? "Editar evento" : "Nuevo evento"}</h2>
     <div class="space-y-3">
-      <div><label class="text-sm font-semibold text-slate-700">Nombre del evento</label><input id="m_nom" class="fld" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Tipo</label>
+        <select id="m_tipo" class="fld">
+          <option value="evento">Evento</option>
+          <option value="partido">Partido</option>
+        </select>
+      </div>
+      <div id="m_nom_wrap"><label class="text-sm font-semibold text-slate-700">Nombre del evento</label><input id="m_nom" class="fld" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
+      <div id="m_partido_wrap" hidden><label class="text-sm font-semibold text-slate-700">Partido (equipos)</label><input id="m_partido" class="fld" placeholder="La Serena vs Huachipato" value="${edit ? esc(ev.partido || "") : ""}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Empresa de seguridad</label><input id="m_emp" class="fld" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Fecha del evento (opcional)</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
-      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
-        <div class="text-sm font-semibold text-slate-700">🕑 Turnos</div>
+      <div><label class="text-sm font-semibold text-slate-700">Fecha ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
+      <div id="m_turnos_mode_wrap">
+        <label class="text-sm font-semibold text-slate-700">¿Usar turnos?</label>
+        <select id="m_turnos_mode" class="fld">
+          <option value="con">Con turnos</option>
+          <option value="sin">Sin turnos (evento corto)</option>
+        </select>
+      </div>
+      <div id="m_turnos_block" class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+        <div class="text-sm font-semibold text-slate-700">🕑 Configuración de turnos</div>
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="text-xs font-semibold text-slate-600">Duración del turno</label>
@@ -1078,19 +1247,48 @@
         if (isCustom && !customInput.value) customInput.focus();
       });
 
+      // Tipo (Evento/Partido) y modo de turnos (Con/Sin)
+      const selTipo = $("#m_tipo"), nomWrap = $("#m_nom_wrap"), partidoWrap = $("#m_partido_wrap"),
+        turnosModeWrap = $("#m_turnos_mode_wrap"), selTurnosMode = $("#m_turnos_mode"), turnosBlock = $("#m_turnos_block");
+      if (edit) {
+        selTipo.value = esPartido(ev) ? "partido" : "evento";
+        selTurnosMode.value = (ev.usa_turnos === false) ? "sin" : "con";
+      }
+      const aplicarTipo = () => {
+        const esPart = selTipo.value === "partido";
+        partidoWrap.hidden = !esPart;
+        nomWrap.hidden = esPart;                    // en partido el nombre es el "equipos"
+        turnosModeWrap.hidden = esPart;             // los partidos no llevan turnos
+        // El bloque de configuración de turnos solo si es evento CON turnos
+        turnosBlock.hidden = esPart || selTurnosMode.value === "sin";
+      };
+      selTipo.addEventListener("change", aplicarTipo);
+      selTurnosMode.addEventListener("change", aplicarTipo);
+      aplicarTipo();
+
       $("#m_cancel").addEventListener("click", closeModal);
       $("#m_save").addEventListener("click", async () => {
-        const nombre = $("#m_nom").value.trim(), empresa = $("#m_emp").value.trim(), cant = parseInt($("#m_cant").value) || 0, fecha = $("#m_fecha").value || null;
-        if (!nombre || !empresa) { toast("Nombre y empresa son obligatorios", false); return; }
+        const esPart = selTipo.value === "partido";
+        const partidoTxt = ($("#m_partido")?.value || "").trim();
+        const nombre = esPart ? partidoTxt : $("#m_nom").value.trim();
+        const empresa = $("#m_emp").value.trim(), cant = parseInt($("#m_cant").value) || 0, fecha = $("#m_fecha").value || null;
+        if (!nombre) { toast(esPart ? "Escribe el partido (ej: La Serena vs Huachipato)" : "El nombre es obligatorio", false); return; }
+        if (!empresa) { toast("La empresa es obligatoria", false); return; }
         if (edit && !ev.id) { toast("Este evento no tiene ID válido (dato viejo). Recarga la página (Ctrl+Shift+R) y créalo de nuevo.", false); return; }
-        // Configuración de turnos
+        // Turnos: partido => sin turnos; evento => según selector
+        const usaTurnos = !esPart && selTurnosMode.value === "con";
         let turnoHoras = selTurno.value === "custom" ? parseInt(customInput.value) : parseInt(selTurno.value);
         if (!(turnoHoras > 0)) turnoHoras = TURNO_HORAS_DEFAULT;
         turnoHoras = Math.min(24, Math.max(1, turnoHoras));
         const turnoInicio = ($("#m_tini").value || TURNO_INICIO_DEFAULT);
+        const campos = {
+          nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha,
+          tipo: esPart ? "partido" : "evento", partido: esPart ? partidoTxt : null,
+          usa_turnos: usaTurnos, turno_horas: turnoHoras, turno_inicio: turnoInicio
+        };
         try {
-          if (edit) { await Data.updateEvento(ev.id, { nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha, turno_horas: turnoHoras, turno_inicio: turnoInicio }); }
-          else { const nuevo = await Data.createEvento({ nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha, slug: makeSlug(nombre, empresa), turno_horas: turnoHoras, turno_inicio: turnoInicio }); ADMIN_STATE.selected = nuevo.id; }
+          if (edit) { await Data.updateEvento(ev.id, campos); }
+          else { const nuevo = await Data.createEvento({ ...campos, slug: makeSlug(nombre, empresa) }); ADMIN_STATE.selected = nuevo.id; }
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
@@ -1215,7 +1413,7 @@
       <div class="card mt-4">
         <div class="p-3 border-b border-slate-100 font-semibold text-slate-700 flex items-center justify-between flex-wrap gap-2">
           <span>Listado (${asist.length})</span>
-          <span class="text-xs font-normal text-indigo-600">🕑 ${esc(turnoConfigTexto(ev))}</span>
+          <span class="text-xs font-normal">${eventoInfoHTML(ev)}</span>
         </div>
         ${turnosArrE.length ? `<div class="px-3 pt-3 flex gap-2 overflow-x-auto pb-1"><span class="badge b-gris" style="background:#e0e7ff;color:#3730a3">Total: ${asist.length}</span>${turnosArrE.map(t => `<span class="badge b-gris whitespace-nowrap" style="background:#e0e7ff;color:#3730a3" title="${esc(t.rango)}">${esc(t.fecha)} · ${esc(t.etiqueta)}: ${t.count}</span>`).join("")}</div>` : ""}
         <div class="p-3 overflow-x-auto">
@@ -1238,7 +1436,8 @@
       if (localStorage.getItem("os10_seeded")) return;
       localStorage.setItem("os10_seeded", "1");
       const e1 = await Local.createEvento({ nombre_evento: "Pampilla La Serena", empresa: "MAGATY", cantidad_esperada: 100, fecha_evento: "2026-09-18", slug: makeSlug("Pampilla La Serena", "MAGATY"), turno_horas: 12, turno_inicio: "08:00" });
-      const e2 = await Local.createEvento({ nombre_evento: "Combo", empresa: "FONQUI", cantidad_esperada: 30, fecha_evento: "2026-09-19", slug: makeSlug("Combo", "FONQUI"), turno_horas: 8, turno_inicio: "07:00" });
+      const e2 = await Local.createEvento({ nombre_evento: "Combo", empresa: "FONQUI", cantidad_esperada: 30, fecha_evento: "2026-09-19", slug: makeSlug("Combo", "FONQUI"), usa_turnos: false, turno_horas: 8, turno_inicio: "07:00" });
+      await Local.createEvento({ nombre_evento: "La Serena vs Huachipato", empresa: "MAGATY", cantidad_esperada: 40, fecha_evento: "2026-09-20", slug: makeSlug("La Serena vs Huachipato", "MAGATY"), tipo: "partido", partido: "La Serena vs Huachipato", usa_turnos: false });
       const demo = [
         { rut: "21280241-7", nombres: "ANDRÉS ALEXANDER", apellidos: "DONOSO BASTIAS", telefono: "936760873", fecha_ultimo_examen: "2020-03-19" },
         { rut: "21473516-4", nombres: "FELIPE IGNACIO", apellidos: "CASANGA ARAYA", telefono: "56946376278", fecha_ultimo_examen: "2024-08-30" },

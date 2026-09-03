@@ -12,14 +12,20 @@ create table if not exists eventos (
   fecha_evento      date,
   slug              text unique not null,
   activo            boolean default true,
+  tipo              text default 'evento',     -- 'evento' o 'partido'
+  partido           text,                       -- si es partido: equipos (ej: La Serena vs Huachipato)
+  usa_turnos        boolean default true,       -- false = evento corto sin turnos (los partidos siempre false)
   turno_horas       integer default 12,        -- duración del turno en horas (ej: 12 = día/noche)
   turno_inicio      text default '08:00',      -- hora de inicio del 1er turno (HH:MM)
   created_at        timestamptz default now()
 );
 
--- Migración para bases ya existentes (agrega las columnas de turno si faltan):
+-- Migración para bases ya existentes (agrega las columnas si faltan):
 alter table eventos add column if not exists turno_horas  integer default 12;
 alter table eventos add column if not exists turno_inicio text    default '08:00';
+alter table eventos add column if not exists tipo         text    default 'evento';
+alter table eventos add column if not exists partido      text;
+alter table eventos add column if not exists usa_turnos   boolean default true;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9
