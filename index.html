@@ -1039,14 +1039,24 @@
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
       return `<button data-detail="${a.id}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
-      <span class="text-[11px] text-slate-400 w-6 flex-shrink-0">#${i + 1}</span>
+      <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-slate-800 text-sm truncate">${esc(nomLista)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
-        <span class="block text-[11px] text-slate-500 truncate"><span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(g.fecha_ultimo_examen || "—")}</span>
+        <span class="block font-semibold text-slate-900 text-sm truncate">${esc(nomLista)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
+        <span class="block text-[11px] text-slate-600 truncate"><span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(g.fecha_ultimo_examen || "—")}</span>
       </span>
       ${vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
     </button>`;
+    }
+    // Normaliza un teléfono chileno para WhatsApp (wa.me) y para llamar (tel:)
+    function normalizarTelefono(t) {
+      let d = (t || "").replace(/\D/g, "");
+      if (!d) return null;
+      if (d.startsWith("56")) { /* ya trae código país */ }
+      else if (d.length === 9 && d.startsWith("9")) d = "56" + d;   // celular chileno
+      else if (d.length === 8) d = "569" + d;                        // celular sin el 9
+      else if (!d.startsWith("56")) d = "56" + d;                    // fallback: anteponer país
+      return { wa: d, tel: "+" + d, display: t };
     }
     function detalleFila(icon, label, valueHTML) {
       return `<div class="flex items-start justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
@@ -1072,7 +1082,20 @@
     </div>
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
-      ${detalleFila("📞", "Teléfono", esc(g.telefono || "—"))}
+      ${(() => {
+          const tf = normalizarTelefono(g.telefono);
+          if (!tf) return detalleFila("📞", "Teléfono", "—");
+          return `<div class="py-2 border-b border-slate-100">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-slate-500 flex items-center gap-2 flex-shrink-0">📞 Teléfono</span>
+          <span class="text-slate-800 font-medium">${esc(tf.display)}</span>
+        </div>
+        <div class="flex gap-2 mt-2">
+          <a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm py-1.5" style="background:#25D366;border-color:#25D366">📱 WhatsApp</a>
+          <a href="tel:${esc(tf.tel)}" class="btn btn-ghost flex-1 text-sm py-1.5">📞 Llamar</a>
+        </div>
+      </div>`;
+        })()}
       ${detalleFila("📅", "Fecha de curso (examen)", esc(g.fecha_ultimo_examen || "—"))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
