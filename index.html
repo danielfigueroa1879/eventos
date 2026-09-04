@@ -666,7 +666,7 @@
     /* =========================================================================
        PANEL ADMIN
        ========================================================================= */
-    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false };
+    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false };
 
     async function renderAdmin() {
       app.innerHTML = `
@@ -776,45 +776,54 @@
         ${turnosArr.map(t => `<button data-turno="${t.clave}" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === String(t.clave) ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)} (${t.count})</button>`).join("")}
       </div>`;
 
+      const nV = asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VIGENTE").length;
+      const nP = asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
+      const nX = asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
+      const nS = asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length;
+
       main.innerHTML = `
-    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-      <div>
-        <h1 class="text-xl md:text-2xl font-bold text-slate-800">${esc(ev.nombre_evento)}</h1>
-        <div class="text-slate-500 text-sm">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(ev.fecha_evento)}` : ""}</div>
+    <div class="flex items-start justify-between gap-2 mb-3">
+      <div class="min-w-0">
+        <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</h1>
+        <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(ev.fecha_evento)}` : ""}</div>
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
-      <div class="flex gap-2 flex-wrap">
-        <button id="expExcel" class="btn btn-ghost text-sm">⬇ Excel</button>
-        <button id="expPDF" class="btn btn-ghost text-sm">⬇ PDF</button>
-        <button id="compartir" class="btn btn-ghost text-sm">📤 Compartir</button>
-        <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
-        <button id="editEv" class="btn btn-ghost text-sm">✎ Editar evento</button>
-        <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
+      <div class="flex gap-1.5 flex-shrink-0">
+        <button id="expExcel" class="btn btn-ghost text-xs px-2.5" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
+        <button id="expPDF" class="btn btn-ghost text-xs px-2.5" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
+        <button id="compartir" class="btn btn-ghost text-sm px-2.5" title="Compartir">📤</button>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
-      <div class="card p-3 lg:col-span-2">
-        <div class="flex items-center justify-between mb-1.5">
-          <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia</div>
-          <div class="text-xl font-bold text-green-700">${asist.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
-        </div>
-        <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
-        <div class="grid grid-cols-4 gap-2 mt-3 text-center">
-          ${chip("Vigentes", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VIGENTE").length, "verde")}
-          ${chip("Prórroga", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length, "amarillo")}
-          ${chip("Vencidos", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length, "rojo")}
-          ${chip("Sin curso", asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length, "gris")}
-        </div>
+    <div class="grid grid-cols-4 gap-2 mb-3 text-center">
+      ${chip("Vigentes", nV, "verde")}
+      ${chip("Prórroga", nP, "amarillo")}
+      ${chip("Vencidos", nX, "rojo")}
+      ${chip("Sin curso", nS, "gris")}
+    </div>
+
+    <button id="toggleQR" class="card w-full px-3 py-2.5 mb-3 flex items-center justify-between text-sm font-semibold text-slate-700">
+      <span>🔳 QR y estado del evento <span class="text-slate-400 font-normal">· ${asist.length}${total ? " / " + total : ""} guardias · ${pct}%</span></span>
+      <span id="qrChevron" class="text-slate-400 transition-transform" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}">▾</span>
+    </button>
+    <div id="qrPanel" class="card p-3 mb-3" ${ADMIN_STATE.showQR ? "" : "hidden"}>
+      <div class="flex items-center justify-between mb-1.5">
+        <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia</div>
+        <div class="text-xl font-bold text-green-700">${asist.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
       </div>
-      <div class="card p-3 flex flex-col items-center">
-        <div class="font-semibold text-slate-700 text-sm mb-1.5 self-start">Código QR del evento</div>
+      <div class="w-full bg-slate-100 rounded-full h-2.5 mb-3"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
+      <div class="flex flex-col items-center">
         <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
-        <div class="flex gap-2 mt-2 w-full">
+        <div class="flex gap-2 mt-2 w-full max-w-xs">
           <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
           <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
           <button id="qrCp" class="btn btn-ghost text-xs flex-1">🔗 Link</button>
         </div>
+      </div>
+      <div class="flex gap-2 mt-3 flex-wrap justify-center">
+        <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
+        <button id="editEv" class="btn btn-ghost text-sm">✎ Editar evento</button>
+        <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
       </div>
     </div>
 
@@ -824,7 +833,14 @@
         <input id="buscar" class="fld max-w-xs py-2 text-sm" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
       </div>
       ${usaT ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
-      <div class="p-3 overflow-x-auto">
+
+      <!-- Móvil: listado compacto con detalle en ventana -->
+      <div class="md:hidden divide-y divide-slate-100">
+        ${filas.length ? filas.map((a, i) => filaMovil(a, i, ev, rutCount, nomCount)).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${asist.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</div>`}
+      </div>
+
+      <!-- Escritorio: tabla completa -->
+      <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left text-slate-500 border-b border-slate-100">
             <tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre completo</th><th class="pr-2">Teléfono</th><th class="pr-2">Examen</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th>${usaT ? '<th class="pr-2">Turno</th>' : ""}<th class="pr-2">Ingreso</th><th></th></tr>
@@ -840,6 +856,14 @@
       <button id="toggleStats" class="btn btn-ghost text-sm">📊 Ver estadísticas y gráficas</button>
       <div id="statsBox" hidden></div>
     </div>`;
+
+      // QR / estado (panel colapsable)
+      const qrPanel = $("#qrPanel"), qrChevron = $("#qrChevron");
+      $("#toggleQR").addEventListener("click", () => {
+        ADMIN_STATE.showQR = !ADMIN_STATE.showQR;
+        qrPanel.hidden = !ADMIN_STATE.showQR;
+        qrChevron.style.transform = ADMIN_STATE.showQR ? "rotate(180deg)" : "";
+      });
 
       // QR (con logo O.S.10 al centro y margen blanco)
       renderQRConLogo($("#qrbox"), guardLink(ev.slug));
@@ -868,6 +892,7 @@
       $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
       const b = $("#buscar"); b.addEventListener("input", () => { ADMIN_STATE.search = b.value; const pos = b.selectionStart; renderMain().then(() => { const nb = $("#buscar"); if (nb) { nb.focus(); try { nb.setSelectionRange(pos, pos); } catch { } } }); });
       main.querySelectorAll(".turnoChip").forEach(c => c.addEventListener("click", () => { ADMIN_STATE.turnoFiltro = c.dataset.turno; renderMain(); }));
+      main.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev)));
       main.querySelectorAll("[data-edit]").forEach(x => x.addEventListener("click", () => modalEditarGuardia(asist.find(a => a.id === x.dataset.edit), ev)));
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
     }
@@ -983,6 +1008,78 @@
       <button data-del="${a.id}" class="text-slate-500 hover:text-red-600 px-1" title="Quitar">🗑</button>
     </td>
   </tr>`;
+    }
+
+    /* ---- Listado compacto para celular + detalle en ventana ---- */
+    const VIG_COLOR = { VIGENTE: "#16a34a", VENCIDO_CON_PRORROGA: "#d97706", VENCIDO_SIN_PRORROGA: "#dc2626", SIN_CURSO: "#94a3b8" };
+    function inicialGuardia(g) { const s = ((g.nombres || "") + (g.apellidos || "")).trim(); return (s ? s[0] : "?").toUpperCase(); }
+    function nombreCorto(g) {
+      const nom = (g.nombres || "").trim(), ape = (g.apellidos || "").trim();
+      if (nom && ape) return nom.split(/\s+/)[0][0] + ". " + ape;
+      return (nom + " " + ape).trim() || "—";
+    }
+    function vigenciaPill(v) {
+      const txt = v.estado === "VIGENTE" ? "VIGENTE" : v.estado === "VENCIDO_CON_PRORROGA" ? "PRÓRROGA" : v.estado === "SIN_CURSO" ? "SIN CURSO" : "NO VIGENTE";
+      const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
+      return `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0" style="background:${c}1a;color:${c}">${txt}</span>`;
+    }
+    function filaMovil(a, i, ev, rutCount, nomCount) {
+      const g = a.guardia || {};
+      const v = calcularVigencia(g.fecha_ultimo_examen);
+      const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
+      const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
+      const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
+      return `<button data-detail="${a.id}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
+      <span class="text-[11px] text-slate-400 w-6 flex-shrink-0">#${i + 1}</span>
+      <span class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style="background:${c}">${esc(inicialGuardia(g))}</span>
+      <span class="flex-1 min-w-0">
+        <span class="block font-semibold text-slate-800 text-sm truncate">${esc(nombreCorto(g))}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
+        <span class="block text-[11px] text-slate-400 font-mono truncate">${esc(a.rut)}</span>
+      </span>
+      ${vigenciaPill(v)}
+      <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
+    </button>`;
+    }
+    function detalleFila(icon, label, valueHTML) {
+      return `<div class="flex items-start justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
+      <span class="text-slate-500 flex items-center gap-2 flex-shrink-0">${icon} ${esc(label)}</span>
+      <span class="text-slate-800 font-medium text-right">${valueHTML}</span>
+    </div>`;
+    }
+    function modalDetalleGuardia(a, ev) {
+      if (!a) return;
+      const g = a.guardia || {};
+      const v = calcularVigencia(g.fecha_ultimo_examen);
+      const tn = calcularTurno(a.hora_ingreso, ev);
+      const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
+      const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+      openModal(`
+    <div class="flex items-center justify-between mb-3 -mt-1">
+      <h2 class="font-bold text-slate-800 text-sm tracking-wide">DETALLE DE GUARDIA</h2>
+      <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+    </div>
+    <div class="text-center mb-3">
+      <div class="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-white text-3xl font-bold" style="background:${c}">${esc(inicialGuardia(g))}</div>
+      <div class="font-bold text-lg text-slate-800 mt-2 leading-tight">${esc(nomFull)}</div>
+    </div>
+    <div class="text-sm">
+      ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
+      ${detalleFila("📞", "Teléfono", esc(g.telefono || "—"))}
+      ${detalleFila("📅", "Fecha de curso (examen)", esc(g.fecha_ultimo_examen || "—"))}
+      ${detalleFila("⏱️", "Vigencia", badge(v))}
+      ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
+      ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
+      ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
+    </div>
+    <div class="flex justify-center gap-8 mt-4 mb-1">
+      <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
+      <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
+    </div>
+    <button id="dg_close" class="btn btn-ghost w-full mt-2">Cerrar</button>`);
+      $("#dg_x").addEventListener("click", closeModal);
+      $("#dg_close").addEventListener("click", closeModal);
+      $("#dg_edit").addEventListener("click", () => modalEditarGuardia(a, ev));
+      $("#dg_del").addEventListener("click", () => confirmar(`¿Quitar a ${g.nombres || a.rut} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }));
     }
 
     /* ---- QR con logo O.S.10 + margen blanco ---- */
