@@ -1771,9 +1771,9 @@
       const btnStyle = "background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)";
       const btnCls = "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full md:w-auto hover:bg-white/20 transition-colors border";
       const svgShare = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`;
+      const btnShareHTML = readonly ? "" : `<button id="dist_share" class="flex items-center justify-center w-8 h-8 rounded-full border hover:bg-white/20 transition-colors flex-shrink-0" style="${btnStyle}" aria-label="Compartir" title="Compartir">${svgShare}</button>`;
       const acciones = `
           ${readonly ? "" : `<button id="dist_add" class="${btnCls}" style="${btnStyle}">➕ Agregar puesto</button>`}
-          ${readonly ? "" : `<button id="dist_share" class="flex items-center justify-center w-8 h-8 rounded-full border hover:bg-white/20 transition-colors flex-shrink-0 self-center md:self-auto" style="${btnStyle}" aria-label="Compartir" title="Compartir">${svgShare}</button>`}
           <button id="dist_pdf" class="${btnCls}" style="${btnStyle}">📄 PDF</button>
           <button id="dist_panel" class="${btnCls}" style="${btnStyle}">📋 Listados</button>
           <div class="h-px bg-white/20 my-1 md:hidden"></div>
@@ -1781,6 +1781,7 @@
       ov.innerHTML = `
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0 relative">
           <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ ${esc(ev.nombre_evento)}${readonly ? ' <span class="opacity-80 font-normal">· solo lectura</span>' : ""}</div>
+          ${btnShareHTML}
           <div id="dist_actions" class="hidden md:flex flex-col md:flex-row absolute md:static right-2 top-[48px] z-[600] md:z-auto bg-[#0f5323] md:bg-transparent rounded-xl md:rounded-none shadow-2xl md:shadow-none p-3 md:p-0 gap-2 min-w-[160px] md:min-w-0">${acciones}</div>
           <button id="dist_menu" class="md:hidden btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
         </div>
