@@ -47,20 +47,52 @@ create table if not exists asistencias (
 create index if not exists idx_asist_evento on asistencias(evento_id);
 create index if not exists idx_asist_rut    on asistencias(rut);
 
+-- ---------- HISTORIAL DE PARTIDOS ----------
+-- Cada vez que se "cierra y archiva" un partido, se guarda una foto (snapshot) de los
+-- guardias que asistieron. Así el mismo evento-partido se reutiliza (se cambia el nombre
+-- de los equipos) y quedan guardados los partidos anteriores para consultarlos después.
+create table if not exists partidos_historial (
+  id         uuid primary key default gen_random_uuid(),
+  evento_id  uuid references eventos(id) on delete cascade,
+  partido    text,                                   -- equipos (ej: La Serena vs Coquimbo)
+  fecha      date,
+  total      integer default 0,
+  cerrado_at timestamptz default now()
+);
+create table if not exists partidos_historial_asist (
+  id                  uuid primary key default gen_random_uuid(),
+  historial_id        uuid references partidos_historial(id) on delete cascade,
+  rut                 text,
+  nombres             text,
+  apellidos           text,
+  telefono            text,
+  fecha_ultimo_examen date,
+  vigencia            text,
+  hora_ingreso        timestamptz
+);
+create index if not exists idx_hist_evento on partidos_historial(evento_id);
+create index if not exists idx_hista_hist  on partidos_historial_asist(historial_id);
+
 -- ---------- SEGURIDAD (RLS) ----------
 -- El formulario del guardia y el panel usan la ANON KEY pública.
 -- Estas políticas permiten leer/registrar. (Ver nota de seguridad en INSTRUCCIONES.md)
-alter table eventos          enable row level security;
-alter table guardias_central enable row level security;
-alter table asistencias      enable row level security;
+alter table eventos                  enable row level security;
+alter table guardias_central         enable row level security;
+alter table asistencias              enable row level security;
+alter table partidos_historial       enable row level security;
+alter table partidos_historial_asist enable row level security;
 
-drop policy if exists "acceso_eventos"     on eventos;
-drop policy if exists "acceso_guardias"    on guardias_central;
-drop policy if exists "acceso_asistencias" on asistencias;
+drop policy if exists "acceso_eventos"       on eventos;
+drop policy if exists "acceso_guardias"      on guardias_central;
+drop policy if exists "acceso_asistencias"   on asistencias;
+drop policy if exists "acceso_historial"     on partidos_historial;
+drop policy if exists "acceso_historial_as"  on partidos_historial_asist;
 
-create policy "acceso_eventos"     on eventos          for all using (true) with check (true);
-create policy "acceso_guardias"    on guardias_central for all using (true) with check (true);
-create policy "acceso_asistencias" on asistencias      for all using (true) with check (true);
+create policy "acceso_eventos"       on eventos                  for all using (true) with check (true);
+create policy "acceso_guardias"      on guardias_central         for all using (true) with check (true);
+create policy "acceso_asistencias"   on asistencias              for all using (true) with check (true);
+create policy "acceso_historial"     on partidos_historial       for all using (true) with check (true);
+create policy "acceso_historial_as"  on partidos_historial_asist for all using (true) with check (true);
 
 -- ---------- TIEMPO REAL ----------
 -- Se agregan al realtime solo si no estaban ya (evita el error 42710
@@ -78,5 +110,13 @@ begin
   if not exists (select 1 from pg_publication_tables
                  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'asistencias') then
     alter publication supabase_realtime add table asistencias;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'partidos_historial') then
+    alter publication supabase_realtime add table partidos_historial;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'partidos_historial_asist') then
+    alter publication supabase_realtime add table partidos_historial_asist;
   end if;
 end $$;
