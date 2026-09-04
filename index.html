@@ -1027,13 +1027,13 @@
       const g = a.guardia || {};
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
+      const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
+      const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
-      const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
       return `<button data-detail="${a.id}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
       <span class="text-[11px] text-slate-400 w-6 flex-shrink-0">#${i + 1}</span>
-      <span class="w-1.5 h-8 rounded-full flex-shrink-0" style="background:${c}"></span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-slate-800 text-sm truncate">${esc(nomFull || "—")}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
+        <span class="block font-semibold text-slate-800 text-sm truncate">${esc(nomLista)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
         <span class="block text-[11px] text-slate-500 truncate"><span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(g.fecha_ultimo_examen || "—")}</span>
       </span>
       ${vigenciaPill(v)}
