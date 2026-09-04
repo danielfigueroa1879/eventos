@@ -268,7 +268,7 @@
       const estabaVigenteAlEntrarLey = vence.getTime() >= ENTRADA_VIGENCIA_LEY.getTime();
       const dentroDelTope = h.getTime() <= FECHA_TOPE_PRORROGA.getTime();
       if (estabaVigenteAlEntrarLey && dentroDelTope)
-        return { estado: "VENCIDO_CON_PRORROGA", vigencia: "NO VIGENTE", siges: "LEY 21.825", color: "amarillo", puedeTrabajar: true, vence };
+        return { estado: "VENCIDO_CON_PRORROGA", vigencia: "PRÓRROGA", siges: "LEY 21.825", color: "amarillo", puedeTrabajar: true, vence };
       return { estado: "VENCIDO_SIN_PRORROGA", vigencia: "NO VIGENTE", siges: "", color: "rojo", puedeTrabajar: false, vence };
     }
 
@@ -863,8 +863,8 @@
       <!-- Escritorio: tabla completa -->
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
-          <thead class="text-left text-slate-500 border-b border-slate-100">
-            <tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre completo</th><th class="pr-2">Teléfono</th><th class="pr-2">Examen</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th>${usaT ? '<th class="pr-2">Turno</th>' : ""}<th class="pr-2">Ingreso</th><th></th></tr>
+          <thead class="text-left">
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
             ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asist.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
