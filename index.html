@@ -679,11 +679,32 @@
       const params = new URLSearchParams(location.search);
       const e = params.get("e");
       if (e) return renderGuard(e);
+      const dist = params.get("dist");
+      if (dist) return renderDistPublica(dist);
       const emp = params.get("empresa");
       if (emp) return renderEmpresa(emp);
       return renderAdminGate();
     }
     function empresaLink(slug) { return location.origin + location.pathname.replace(/index\.html$/, "") + "?empresa=" + encodeURIComponent(slug); }
+    function distLink(slug) { return location.origin + location.pathname.replace(/index\.html$/, "") + "?dist=" + encodeURIComponent(slug); }
+
+    // Vista pública SOLO LECTURA de la distribución (para compartir)
+    async function renderDistPublica(slug) {
+      app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando distribución…</div>`;
+      let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (e) { }
+      if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Distribución no encontrada</h1></div></div>`; return; }
+      app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6 text-center">
+        <div class="card p-6 max-w-sm">
+          <div class="text-3xl mb-2">🗺️</div>
+          <h1 class="font-bold text-slate-800">Distribución de facciones</h1>
+          <p class="text-slate-500 text-sm mt-1">Vista solo lectura · <b>${esc(ev.nombre_evento)}</b></p>
+          <button id="reopenDist" class="btn btn-p w-full mt-4">Abrir mapa</button>
+        </div>
+      </div>`;
+      const abrir = () => abrirDistribucion(ev, { readonly: true });
+      document.getElementById("reopenDist").addEventListener("click", abrir);
+      abrir();
+    }
 
     /* ---- Utilidades de importación CSV ---- */
     function fechaISO(f) { f = (f || "").trim(); let m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(f); if (m) return `${m[3]}-${String(+m[2]).padStart(2, "0")}-${String(+m[1]).padStart(2, "0")}`; m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f); return m ? f : null; }
@@ -2200,6 +2221,27 @@
       $("#le_close").addEventListener("click", closeModal);
     }
 
+    function modalCompartirDistribucion(ev) {
+      const link = distLink(ev.slug);
+      const puedeCompartir = !!(navigator.canShare && navigator.share);
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📤 Compartir distribución</h2>
+    <p class="text-sm text-slate-500 mb-3">Este enlace permite ver el mapa de facciones de "<b>${esc(ev.nombre_evento)}</b>" en <b>modo solo lectura</b>. Al pasar el mouse sobre cada puesto se ven los guardias asignados.</p>
+    <input id="ld_url" class="fld text-xs" readonly value="${esc(link)}">
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button id="ld_copy" class="btn btn-p col-span-2">🔗 Copiar link</button>
+      <a href="https://wa.me/?text=${encodeURIComponent("Distribución de facciones — " + ev.nombre_evento + ": " + link)}" target="_blank" rel="noopener" class="btn btn-ghost flex items-center justify-center gap-1">📲 WhatsApp</a>
+      ${puedeCompartir ? `<button id="ld_share" class="btn btn-ghost">📤 Compartir…</button>` : `<button id="ld_close" class="btn btn-ghost">Cerrar</button>`}
+    </div>
+    ${puedeCompartir ? `<div class="mt-2"><button id="ld_close" class="btn btn-ghost w-full">Cerrar</button></div>` : ""}`);
+      $("#ld_copy").addEventListener("click", () => { const i = $("#ld_url"); i.select(); navigator.clipboard.writeText(link).then(() => toast("Link copiado")); });
+      $("#ld_close").addEventListener("click", closeModal);
+      const sh = $("#ld_share");
+      if (sh) sh.addEventListener("click", async () => {
+        try { await navigator.share({ title: "Distribución de facciones — " + ev.nombre_evento, text: "Mapa de facciones (solo lectura)", url: link }); }
+        catch (e) { /* cancelado */ }
+      });
+    }
+
     /* ---- Modal: importar guardias desde CSV ---- */
     function modalImportar() {
       openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📥 Importar guardias</h2>
@@ -2265,7 +2307,7 @@
         </div>
         <img src="images/aniversario1.webp" class="w-20 h-20 object-contain flex-shrink-0 hidden sm:block relative" alt="Centenario">
       </div>
-      ${esPartido(ev) ? `<div class="mt-3"><button id="empDist" class="btn btn-p w-full flex items-center justify-center gap-2">🗺️ Ver distribución de facciones en el mapa</button></div>` : ""}
+      ${esPartido(ev) ? `<div class="mt-3 flex gap-2"><button id="empDist" class="btn btn-p flex-1 flex items-center justify-center gap-2">🗺️ Distribución de facciones</button><button id="empDistShare" class="btn btn-ghost px-3 flex items-center justify-center" aria-label="Compartir mapa solo lectura" title="Compartir mapa (solo lectura)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button></div>` : ""}
       <div class="card px-4 py-3 mt-4">
         <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
@@ -2299,7 +2341,9 @@
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
-        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev, { readonly: true }));
+        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev));
+        const empDistShare = document.getElementById("empDistShare");
+        if (empDistShare) empDistShare.addEventListener("click", () => modalCompartirDistribucion(ev));
       };
       await paint();
       Data.onChange(paint);
