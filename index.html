@@ -1309,7 +1309,7 @@
     function vigenciaPill(v) {
       const txt = v.estado === "VIGENTE" ? "VIGENTE" : v.estado === "VENCIDO_CON_PRORROGA" ? "PRÓRROGA" : v.estado === "SIN_CURSO" ? "SIN CURSO" : "NO VIGENTE";
       const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
-      return `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0" style="background:${c}1a;color:${c}">${txt}</span>`;
+      return `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c}1a;color:${c};display:inline-flex;align-items:center;justify-content:center;min-width:84px">${txt}</span>`;
     }
     function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
@@ -1678,11 +1678,11 @@
     <p class="text-sm text-slate-500 mb-3">Comparte el detalle de <b>${esc(ev.nombre_evento)}</b> (${asist.length} guardias).</p>
     <div class="space-y-2">
       <div class="grid grid-cols-2 gap-2">
-        <button id="sh_pdf" class="btn btn-p flex items-center justify-center gap-1" style="background:#b91c1c;border-color:#b91c1c">📄 ${accion} PDF</button>
-        <button id="sh_xls" class="btn btn-p flex items-center justify-center gap-1" style="background:#15803d;border-color:#15803d">📊 ${accion} Excel</button>
+        <button id="sh_pdf" class="btn btn-p text-sm py-2 flex items-center justify-center gap-1" style="background:#b91c1c;border-color:#b91c1c">📄 PDF</button>
+        <button id="sh_xls" class="btn btn-p text-sm py-2 flex items-center justify-center gap-1" style="background:#15803d;border-color:#15803d">📊 Excel</button>
       </div>
-      <a href="${esc(wa)}" target="_blank" rel="noopener" class="btn btn-ghost w-full flex items-center justify-center gap-1">📲 WhatsApp (texto)</a>
-      <a href="${esc(mail)}" class="btn btn-ghost w-full flex items-center justify-center gap-1">✉ Correo (texto)</a>
+      <a href="${esc(wa)}" target="_blank" rel="noopener" class="btn btn-ghost text-sm py-2 w-full flex items-center justify-center gap-1">📲 WhatsApp (texto)</a>
+      <a href="${esc(mail)}" class="btn btn-ghost text-sm py-2 w-full flex items-center justify-center gap-1">✉ Correo (texto)</a>
     </div>
     <p class="text-[11px] text-slate-400 mt-3">${puedeCompartir ? "En el celular se abre el menú para compartir el archivo (PDF o Excel) por WhatsApp, correo, etc." : "Se descargará el archivo (PDF o Excel) para que lo adjuntes."}</p>
     <div class="mt-3"><button id="sh_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
@@ -2317,7 +2317,7 @@
         </div>
         <img src="images/aniversario1.webp" class="w-20 h-20 object-contain flex-shrink-0 hidden sm:block relative" alt="Centenario">
       </div>
-      ${esPartido(ev) ? `<div class="mt-3 flex gap-2"><button id="empDist" class="btn btn-p flex-1 flex items-center justify-center gap-2">🗺️ Distribución de facciones</button><button id="empDistShare" class="btn btn-ghost px-3 flex items-center justify-center" aria-label="Compartir mapa solo lectura" title="Compartir mapa (solo lectura)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button></div>` : ""}
+      ${esPartido(ev) ? `<div class="mt-3"><button id="empDist" class="btn btn-p w-full flex items-center justify-center gap-2">🗺️ Distribución de facciones</button></div>` : ""}
       <div class="card px-4 py-3 mt-4">
         <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
@@ -2352,8 +2352,6 @@
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
         if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev));
-        const empDistShare = document.getElementById("empDistShare");
-        if (empDistShare) empDistShare.addEventListener("click", () => modalCompartirDistribucion(ev));
       };
       await paint();
       Data.onChange(paint);
