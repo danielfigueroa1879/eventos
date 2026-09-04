@@ -1033,8 +1033,8 @@
       <span class="text-[11px] text-slate-400 w-6 flex-shrink-0">#${i + 1}</span>
       <span class="w-1.5 h-8 rounded-full flex-shrink-0" style="background:${c}"></span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-slate-800 text-sm truncate">${esc(nombreCorto(g))}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
-        <span class="block text-[11px] text-slate-400 font-mono truncate">${esc(a.rut)}</span>
+        <span class="block font-semibold text-slate-800 text-sm truncate">${esc(nomFull || "—")}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
+        <span class="block text-[11px] text-slate-500 truncate"><span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(g.fecha_ultimo_examen || "—")}</span>
       </span>
       ${vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
