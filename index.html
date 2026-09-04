@@ -10,6 +10,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script>try { if (localStorage.getItem('os10_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) { }</script>
   <style>
     :root {
@@ -707,6 +709,8 @@
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
       </div>
 
+      <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-3 flex items-center justify-center gap-2">🌐 Ir a os10coquimbo.cl</a>
+
       <p class="text-center text-xs text-slate-400 mt-4">Sistema de fiscalización OS10 · ${USING_SUPABASE ? '' : 'MODO DEMO'}</p>
     </div>
   </div>`;
@@ -968,9 +972,9 @@
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0">
-        <button id="expExcel" class="btn btn-ghost text-xs px-2.5" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
-        <button id="expPDF" class="btn btn-ghost text-xs px-2.5" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
-        <button id="compartir" class="btn btn-ghost text-sm px-2.5" title="Compartir">📤</button>
+        <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
+        <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
+        <button id="compartir" class="btn btn-ghost text-base px-3" title="Compartir (PDF o Excel)">📤</button>
       </div>
     </div>
 
@@ -1405,9 +1409,17 @@
       });
     }
 
+    // Descarga genérica de un File/Blob
+    function descargarArchivo(file, nombre) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(file);
+      a.download = nombre || file.name || "archivo";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }
+
     // --- Excel real (.xls con formato: encabezado verde, texto centrado, columnas autoajustadas) ---
-    function descargarExcel(ev, asist) {
-      if (!asist.length) { toast("No hay guardias para exportar", false); return; }
+    function xlsFile(ev, asist) {
       const cols = listadoColumnas(ev), rows = detalleRows(ev, asist);
       const thS = `background:${VERDE_PAGINA};color:#ffffff;font-weight:bold;text-align:center;border:1px solid #0a3d18;padding:6px 10px;white-space:nowrap;`;
       const tdS = `text-align:center;border:1px solid #cbd5e1;padding:5px 10px;white-space:nowrap;mso-number-format:'\\@';`;
@@ -1425,9 +1437,11 @@
         <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${esc(ev.nombre_evento).slice(0, 28)}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
         <style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}</style></head>
         <body><table>${meta}${header}${body}</table></body></html>`;
-      const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Listado-${ev.slug}.xls`; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      return new File(["﻿" + html], `Listado-${ev.slug}.xls`, { type: "application/vnd.ms-excel;charset=utf-8;" });
+    }
+    function descargarExcel(ev, asist) {
+      if (!asist.length) { toast("No hay guardias para exportar", false); return; }
+      descargarArchivo(xlsFile(ev, asist));
     }
 
     // --- PDF (ventana de impresión → Guardar como PDF), con colores de la tabla ---
@@ -1458,8 +1472,61 @@
         <script>window.onload=()=>{window.print()}<\/script>
       </body></html>`;
     }
+    function hexToRgb(h) {
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h || "");
+      return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
+    }
+    // --- PDF real y ordenado (jsPDF + autoTable); se ve bien al compartir en celular ---
+    function construirPDF(ev, asist) {
+      const JsPDF = window.jspdf && window.jspdf.jsPDF;
+      if (!JsPDF) return null;
+      const cols = listadoColumnas(ev), rows = detalleRows(ev, asist);
+      const landscape = cols.length > 8;
+      const doc = new JsPDF({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
+      if (typeof doc.autoTable !== "function") return null;
+      const W = doc.internal.pageSize.getWidth();
+      doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(15, 83, 35);
+      doc.text(tituloListado(ev), W / 2, 34, { align: "center" });
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+      const sub1 = `Empresa: ${ev.empresa}${ev.fecha_evento ? " · Fecha: " + fechaFmt(ev.fecha_evento) : ""} · ${eventoTipoTexto(ev)}`;
+      const sub2 = `Total: ${asist.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`;
+      doc.text(sub1, W / 2, 50, { align: "center" });
+      doc.text(sub2, W / 2, 63, { align: "center" });
+      doc.autoTable({
+        startY: 76,
+        head: [cols],
+        body: rows.map(r => r.cells),
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 4, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+        headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+        alternateRowStyles: { fillColor: [244, 247, 245] },
+        columnStyles: { 0: { cellWidth: landscape ? 26 : 22 } },
+        margin: { left: 28, right: 28, bottom: 40 },
+        didParseCell: (d) => {
+          if (d.section === "body") {
+            const r = rows[d.row.index];
+            if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; }
+          }
+        },
+        didDrawPage: () => {
+          const H = doc.internal.pageSize.getHeight();
+          doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+          doc.text("O.S.10 Coquimbo · Sistema de control de guardias", W / 2, H - 18, { align: "center" });
+          doc.text("Pág. " + doc.internal.getNumberOfPages(), W - 28, H - 18, { align: "right" });
+        }
+      });
+      return doc;
+    }
+    function pdfFile(ev, asist) {
+      const doc = construirPDF(ev, asist);
+      if (!doc) return null;
+      return new File([doc.output("blob")], `Listado-${ev.slug}.pdf`, { type: "application/pdf" });
+    }
     function descargarPDF(ev, asist) {
       if (!asist.length) { toast("No hay guardias para exportar", false); return; }
+      const doc = construirPDF(ev, asist);
+      if (doc) { doc.save(`Listado-${ev.slug}.pdf`); return; }
+      // Respaldo: ventana de impresión → Guardar como PDF
       const w = window.open("", "_blank");
       if (!w) { toast("Permite las ventanas emergentes para generar el PDF", false); return; }
       w.document.write(listadoPrintHTML(ev, asist)); w.document.close();
@@ -1483,18 +1550,21 @@
       return L.join("\n");
     }
 
-    async function compartirArchivo(ev, asist) {
-      try {
-        const cell = v => { const s = String(v ?? ""); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-        const cols = listadoColumnas(ev), filas = listadoFilas(ev, asist);
-        const csv = "﻿" + [cols.map(cell).join(";"), ...filas.map(r => r.map(cell).join(";"))].join("\r\n");
-        const file = new File([csv], `Listado-${ev.slug}.csv`, { type: "text/csv" });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    // Comparte (o descarga como respaldo) el listado como PDF o Excel
+    async function compartirComo(ev, asist, tipo) {
+      if (!asist.length) { toast("No hay guardias para compartir", false); return; }
+      const file = tipo === "pdf" ? pdfFile(ev, asist) : xlsFile(ev, asist);
+      if (!file) { // jsPDF no disponible → respaldo
+        if (tipo === "pdf") descargarPDF(ev, asist); else descargarExcel(ev, asist);
+        return;
+      }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
           await navigator.share({ files: [file], title: tituloListado(ev), text: `Listado de guardias — ${ev.nombre_evento}` });
-          return true;
-        }
-      } catch (e) { /* cancelado o no soportado */ }
-      return false;
+          return;
+        } catch (e) { if (e && e.name === "AbortError") return; /* si falla, descargamos */ }
+      }
+      descargarArchivo(file);
     }
 
     function modalCompartir(ev, asist) {
@@ -1503,23 +1573,22 @@
       const wa = "https://wa.me/?text=" + encodeURIComponent(texto);
       const mail = "mailto:?subject=" + encodeURIComponent(tituloListado(ev)) +
         "&body=" + encodeURIComponent(texto);
-      const puedeArchivo = !!(navigator.canShare && navigator.share);
+      const puedeCompartir = !!(navigator.canShare && navigator.share);
+      const accion = puedeCompartir ? "Compartir" : "Descargar";
       openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📤 Compartir listado</h2>
     <p class="text-sm text-slate-500 mb-3">Comparte el detalle de <b>${esc(ev.nombre_evento)}</b> (${asist.length} guardias).</p>
     <div class="space-y-2">
-      <a href="${esc(wa)}" target="_blank" rel="noopener" class="btn btn-p w-full">📲 Enviar por WhatsApp (texto)</a>
-      <a href="${esc(mail)}" class="btn btn-ghost w-full">✉ Enviar por correo (texto)</a>
-      ${puedeArchivo ? `<button id="sh_file" class="btn btn-ghost w-full">📎 Compartir archivo Excel…</button>` : ""}
-      <div class="grid grid-cols-2 gap-2 pt-1">
-        <button id="sh_xls" class="btn btn-ghost">⬇ Excel</button>
-        <button id="sh_pdf" class="btn btn-ghost">⬇ PDF</button>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="sh_pdf" class="btn btn-p flex items-center justify-center gap-1" style="background:#b91c1c;border-color:#b91c1c">📄 ${accion} PDF</button>
+        <button id="sh_xls" class="btn btn-p flex items-center justify-center gap-1" style="background:#15803d;border-color:#15803d">📊 ${accion} Excel</button>
       </div>
+      <a href="${esc(wa)}" target="_blank" rel="noopener" class="btn btn-ghost w-full flex items-center justify-center gap-1">📲 WhatsApp (texto)</a>
+      <a href="${esc(mail)}" class="btn btn-ghost w-full flex items-center justify-center gap-1">✉ Correo (texto)</a>
     </div>
-    <p class="text-[11px] text-slate-400 mt-3">WhatsApp y correo envían el detalle como texto. Para adjuntar el archivo (Excel/PDF), descárgalo y adjúntalo, o usa "Compartir archivo" en el celular.</p>
+    <p class="text-[11px] text-slate-400 mt-3">${puedeCompartir ? "En el celular se abre el menú para compartir el archivo (PDF o Excel) por WhatsApp, correo, etc." : "Se descargará el archivo (PDF o Excel) para que lo adjuntes."}</p>
     <div class="mt-3"><button id="sh_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
-      const fb = $("#sh_file"); if (fb) fb.addEventListener("click", async () => { const ok = await compartirArchivo(ev, asist); if (!ok) toast("No se pudo compartir el archivo en este dispositivo", false); });
-      $("#sh_xls").addEventListener("click", () => descargarExcel(ev, asist));
-      $("#sh_pdf").addEventListener("click", () => descargarPDF(ev, asist));
+      $("#sh_pdf").addEventListener("click", () => compartirComo(ev, asist, "pdf"));
+      $("#sh_xls").addEventListener("click", () => compartirComo(ev, asist, "xls"));
       $("#sh_close").addEventListener("click", closeModal);
     }
 
