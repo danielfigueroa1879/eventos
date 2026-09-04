@@ -1770,8 +1770,8 @@
       ov.className = "fixed inset-0 z-[55] bg-white flex flex-col";
       if (!document.getElementById("distActionsStyle")) {
         const st = document.createElement("style"); st.id = "distActionsStyle";
-        st.textContent = `.dist-actions{display:none}.dist-actions.open{display:flex}
-          @media(min-width:768px){.dist-actions{display:flex!important;position:static!important;flex-direction:row!important;background:transparent!important;box-shadow:none!important;padding:0!important}.dist-menu-btn{display:none!important}}`;
+        // Siempre se usa el menú hamburguesa (móvil y PC).
+        st.textContent = `.dist-actions{display:none}.dist-actions.open{display:flex}`;
         document.head.appendChild(st);
       }
       const btnStyle = "background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)";
@@ -1779,13 +1779,13 @@
           ${readonly ? "" : `<button id="dist_add" class="btn text-xs justify-start" style="${btnStyle}">➕ Agregar puesto</button>`}
           ${readonly ? "" : `<button id="dist_share" class="btn text-xs justify-start" style="${btnStyle}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:4px"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg> Compartir</button>`}
           <button id="dist_pdf" class="btn text-xs justify-start" style="${btnStyle}">📄 PDF</button>
-          <button id="dist_panel" class="btn text-xs justify-start" style="${btnStyle}">📋 Listados</button>`;
+          <button id="dist_panel" class="btn text-xs justify-start" style="${btnStyle}">📋 Listados</button>
+          <button id="dist_close" class="btn text-xs justify-start" style="background:#b91c1c;color:#fff;border-color:#b91c1c">✕ Cerrar</button>`;
       ov.innerHTML = `
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0 relative">
           <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ ${esc(ev.nombre_evento)}${readonly ? ' <span class="opacity-80 font-normal">· solo lectura</span>' : ""}</div>
-          <div id="dist_actions" class="dist-actions absolute right-2 top-[48px] z-[600] flex-col gap-1 bg-[#0f5323] rounded-xl shadow-2xl p-2 md:flex-row md:gap-2">${acciones}</div>
+          <div id="dist_actions" class="dist-actions absolute right-2 top-[48px] z-[600] flex-col gap-1 bg-[#0f5323] rounded-xl shadow-2xl p-2 min-w-[180px]">${acciones}</div>
           <button id="dist_menu" class="dist-menu-btn btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
-          <button id="dist_close" class="btn text-xs px-3" style="${btnStyle}" aria-label="Cerrar">✕</button>
         </div>
         <div class="relative flex-1 min-h-0">
           <div id="distMap" class="absolute inset-0" style="background:#e5e7eb"></div>
