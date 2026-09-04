@@ -1782,23 +1782,21 @@
       function iconFor(p) {
         const c = colorAnillo(p.anillo), n = asignados(p.id), plan = p.guardias_plan || 0;
         const total = Math.max(n, plan);
-        // Fila de mini-iconos guardia: N en color, resto (plan - n) en gris claro. Si son muchos, mostramos resumen numérico.
-        let cuerpo;
-        if (total === 0) {
-          cuerpo = `<div style="font-weight:700">0👤 · ${p.paletas || 0}🔍</div>`;
-        } else if (total <= 12) {
-          const src = "images/guardia.webp";
+        // Recuadro con nombre y contador
+        const box = `<div style="background:${c};color:#fff;border:2px solid #fff;border-radius:10px;padding:3px 7px 4px;font:600 11px system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);text-align:center;line-height:1.15;white-space:nowrap"><div>${esc(p.nombre)}</div><div style="font-weight:700">${n}/${plan}👤 · ${p.paletas || 0}🔍</div></div>`;
+        // Fila de mini-iconos guardia, DEBAJO del recuadro (fuera). Si son muchos, resumen con un icono.
+        let iconos = "";
+        if (total > 0 && total <= 12) {
           let chips = "";
           for (let i = 0; i < total; i++) {
             const on = i < n;
-            chips += `<img src="${src}" alt="" width="14" height="14" style="display:block;width:14px;height:14px;object-fit:contain;${on ? "" : "opacity:.35;filter:grayscale(1)"}"/>`;
+            chips += `<img src="images/guardia.webp" alt="" width="16" height="16" style="display:block;width:16px;height:16px;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));${on ? "" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
           }
-          cuerpo = `<div style="display:flex;flex-wrap:wrap;gap:1px 2px;justify-content:center;max-width:112px;margin:2px auto 1px">${chips}</div>
-                    <div style="font-weight:700">${n}/${plan} · ${p.paletas || 0}🔍</div>`;
-        } else {
-          cuerpo = `<div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-top:1px"><img src="images/guardia.webp" alt="" width="16" height="16" style="width:16px;height:16px;object-fit:contain"/><span style="font-weight:700">${n}/${plan}</span><span>· ${p.paletas || 0}🔍</span></div>`;
+          iconos = `<div style="display:flex;flex-wrap:wrap;gap:1px 3px;justify-content:center;max-width:140px;margin:3px auto 0">${chips}</div>`;
+        } else if (total > 12) {
+          iconos = `<div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-top:3px;font:700 11px system-ui,sans-serif;color:#111;text-shadow:0 1px 2px rgba(255,255,255,.8)"><img src="images/guardia.webp" alt="" width="18" height="18" style="width:18px;height:18px;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))"/><span>${n}/${plan}</span></div>`;
         }
-        return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);background:${c};color:#fff;border:2px solid #fff;border-radius:10px;padding:3px 7px 4px;font:600 11px system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);text-align:center;line-height:1.15"><div style="white-space:nowrap">${esc(p.nombre)}</div>${cuerpo}</div>` });
+        return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
       }
       function addMarker(p) {
         if (p.lat == null || p.lng == null) return;
