@@ -1037,18 +1037,22 @@
       const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
       return `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0" style="background:${c}1a;color:${c}">${txt}</span>`;
     }
-    function filaMovil(a, i, ev, rutCount, nomCount) {
+    function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
+      // La empresa no ve la fecha del examen; en su lugar muestra la hora de ingreso
+      const segunda = modo === "empresa"
+        ? `<span class="font-mono">${esc(a.rut)}</span> · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`
+        : `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-slate-900 text-sm truncate">${esc(nomLista)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
-        <span class="block text-[11px] text-slate-600 truncate"><span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>
+        <span class="block text-[11px] text-slate-600 truncate">${segunda}</span>
       </span>
       ${vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
@@ -1070,13 +1074,27 @@
       <span class="text-slate-800 font-medium text-right">${valueHTML}</span>
     </div>`;
     }
-    function modalDetalleGuardia(a, ev) {
+    function modalDetalleGuardia(a, ev, opts) {
       if (!a) return;
+      const empresa = !!(opts && opts.empresa);           // vista de empresa = solo lectura, sin datos privados
       const g = a.guardia || {};
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const tn = calcularTurno(a.hora_ingreso, ev);
-      const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+      const telHTML = (() => {
+        const tf = normalizarTelefono(g.telefono);
+        if (!tf) return detalleFila("📞", "Teléfono", "—");
+        return `<div class="py-2 border-b border-slate-100">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-slate-500 flex items-center gap-2 flex-shrink-0">📞 Teléfono</span>
+          <span class="text-slate-800 font-medium">${esc(tf.display)}</span>
+        </div>
+        <div class="flex gap-2 mt-2">
+          <a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm py-1.5" style="background:#25D366;border-color:#25D366">📱 WhatsApp</a>
+          <a href="tel:${esc(tf.tel)}" class="btn btn-ghost flex-1 text-sm py-1.5">📞 Llamar</a>
+        </div>
+      </div>`;
+      })();
       openModal(`
     <div class="flex items-center justify-between mb-3 -mt-1">
       <h2 class="font-bold text-slate-800 text-sm tracking-wide">DETALLE DE GUARDIA</h2>
@@ -1088,35 +1106,24 @@
     </div>
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
-      ${(() => {
-          const tf = normalizarTelefono(g.telefono);
-          if (!tf) return detalleFila("📞", "Teléfono", "—");
-          return `<div class="py-2 border-b border-slate-100">
-        <div class="flex items-center justify-between gap-3">
-          <span class="text-slate-500 flex items-center gap-2 flex-shrink-0">📞 Teléfono</span>
-          <span class="text-slate-800 font-medium">${esc(tf.display)}</span>
-        </div>
-        <div class="flex gap-2 mt-2">
-          <a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm py-1.5" style="background:#25D366;border-color:#25D366">📱 WhatsApp</a>
-          <a href="tel:${esc(tf.tel)}" class="btn btn-ghost flex-1 text-sm py-1.5">📞 Llamar</a>
-        </div>
-      </div>`;
-        })()}
-      ${detalleFila("📅", "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
+      ${empresa ? "" : telHTML}
+      ${empresa ? "" : detalleFila("📅", "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
-    <div class="flex justify-center gap-8 mt-4 mb-1">
+    ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
       <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
-    </div>
-    <button id="dg_close" class="btn btn-ghost w-full mt-2">Cerrar</button>`);
+    </div>`}
+    <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
-      $("#dg_edit").addEventListener("click", () => modalEditarGuardia(a, ev));
-      $("#dg_del").addEventListener("click", () => confirmar(`¿Quitar a ${g.nombres || a.rut} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }));
+      if (!empresa) {
+        $("#dg_edit").addEventListener("click", () => modalEditarGuardia(a, ev));
+        $("#dg_del").addEventListener("click", () => confirmar(`¿Quitar a ${g.nombres || a.rut} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }));
+      }
     }
 
     /* ---- QR con logo O.S.10 + margen blanco ---- */
@@ -1526,6 +1533,8 @@
         const total = ev.cantidad_esperada || 0;
         const pct = total ? Math.min(100, Math.round(asist.length / total * 100)) : 0;
         const cont = (estado) => asist.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === estado).length;
+        const rutCountE = {}, nomCountE = {};
+        asist.forEach(a => { rutCountE[a.rut] = (rutCountE[a.rut] || 0) + 1; const n = ((a.guardia?.nombres || "") + " " + (a.guardia?.apellidos || "")).trim(); if (n) nomCountE[n] = (nomCountE[n] || 0) + 1; });
         const turnosMapE = {};
         asist.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMapE[tn.clave]) turnosMapE[tn.clave] = { ...tn, count: 0 }; turnosMapE[tn.clave].count++; } });
         const turnosArrE = Object.values(turnosMapE).sort((x, y) => x.clave - y.clave);
@@ -1556,7 +1565,12 @@
           <span class="text-xs font-normal">${eventoInfoHTML(ev)}</span>
         </div>
         ${turnosArrE.length ? `<div class="px-3 pt-3 flex gap-2 overflow-x-auto pb-1"><span class="badge b-gris" style="background:#e0e7ff;color:#3730a3">Total: ${asist.length}</span>${turnosArrE.map(t => `<span class="badge b-gris whitespace-nowrap" style="background:#e0e7ff;color:#3730a3" title="${esc(t.rango)}">${esc(t.fecha)} · ${esc(t.etiqueta)}: ${t.count}</span>`).join("")}</div>` : ""}
-        <div class="p-3 overflow-x-auto">
+        <!-- Móvil: listado compacto con detalle en ventana (solo lectura) -->
+        <div class="md:hidden divide-y divide-slate-100">
+          ${asist.length ? asist.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">Aún no hay guardias registrados.</div>`}
+        </div>
+        <!-- Escritorio: tabla completa -->
+        <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
             <thead class="text-left text-slate-500 border-b border-slate-100"><tr><th class="py-2 pr-2">#</th><th class="pr-2">RUT</th><th class="pr-2">Nombre</th><th class="pr-2">Vigencia</th><th class="pr-2">SIGES</th><th class="pr-2">Turno</th><th class="pr-2">Ingreso</th></tr></thead>
             <tbody>${asist.length ? asist.map((a, i) => { const g = a.guardia || {}; const v = calcularVigencia(g.fecha_ultimo_examen); const tn = calcularTurno(a.hora_ingreso, ev); return `<tr class="border-b border-slate-50"><td data-label="#" class="py-2 pr-2 text-slate-400">${i + 1}</td><td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td><td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`; }).join("") : `<tr><td colspan="7" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
@@ -1565,6 +1579,8 @@
       </div>
       <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" class="w-5 h-5 opacity-60" alt="">Prefectura O.S.10 · Vista de solo lectura</p>
     </div>`;
+        // Detalle del guardia (solo lectura) al tocar una fila en celular
+        app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
       };
       await paint();
       Data.onChange(paint);
