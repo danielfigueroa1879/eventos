@@ -1,0 +1,16 @@
+{
+  "name": "Control de Guardias — O.S.10 Coquimbo",
+  "short_name": "Guardias OS10",
+  "description": "Control y fiscalización de guardias de seguridad privada · O.S.10 Coquimbo.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f5323",
+  "theme_color": "#0f5323",
+  "icons": [
+    { "src": "images/icon-app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "images/icon-app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "images/icon-app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
