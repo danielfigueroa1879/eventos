@@ -309,7 +309,19 @@
 
     html[data-theme="dark"] .bg-green-50,
     html[data-theme="dark"] .bg-green-100 {
-      background: #1f3326 !important
+      background: #223a2a !important
+    }
+
+    /* Verdes legibles sobre fondo oscuro (evento seleccionado, teléfonos, contadores) */
+    html[data-theme="dark"] .text-green-900,
+    html[data-theme="dark"] .text-green-800,
+    html[data-theme="dark"] .text-green-800\/70 {
+      color: #86e0a2 !important
+    }
+
+    html[data-theme="dark"] .text-green-700,
+    html[data-theme="dark"] .text-green-700\/70 {
+      color: #6fd08d !important
     }
 
     html[data-theme="dark"] .border-slate-50,
@@ -1249,8 +1261,8 @@
           <span class="text-slate-800 font-medium">${esc(tf.display)}</span>
         </div>
         <div class="flex gap-2 mt-2">
-          <a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm py-1.5" style="background:#25D366;border-color:#25D366">📱 WhatsApp</a>
-          <a href="tel:${esc(tf.tel)}" class="btn btn-ghost flex-1 text-sm py-1.5">📞 Llamar</a>
+          <a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-xs py-1.5 flex items-center justify-center gap-1" style="background:#25D366;border-color:#25D366">📱 WhatsApp</a>
+          <a href="tel:${esc(tf.tel)}" class="btn btn-ghost flex-1 text-xs py-1.5 flex items-center justify-center gap-1">📞 Llamar</a>
         </div>
       </div>`;
       })();
@@ -1763,7 +1775,7 @@
           </table>
         </div>
       </div>
-      <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" class="w-5 h-5 opacity-60" alt="">Prefectura O.S.10 · Vista de solo lectura</p>
+      <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" class="w-5 h-5 opacity-60" alt="">O.S.10 Coquimbo · Vista de solo lectura</p>
     </div>`;
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
