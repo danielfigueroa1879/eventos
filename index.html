@@ -1852,10 +1852,10 @@
         toast("Generando PDF…");
         try {
           const mapEl = document.getElementById("distMap");
-          const canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 2, logging: false });
+          const canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 1, logging: false });
           const imgData = canvas.toDataURL("image/jpeg", 0.92);
 
-          const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+          const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
           const W = doc.internal.pageSize.getWidth();
           const H = doc.internal.pageSize.getHeight();
           const marginX = 28;
