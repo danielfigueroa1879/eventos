@@ -10,6 +10,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>try { if (localStorage.getItem('os10_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) { }</script>
   <style>
     :root {
       --brand: #0c4a1f;
@@ -202,6 +203,133 @@
         border-color: #dbe2e0 !important
       }
     }
+
+    /* =========================================================================
+       MODO OSCURO — tonos grises (no negro puro), para PC y celular
+       ========================================================================= */
+    #themeToggle {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 70;
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      cursor: pointer;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
+      transition: transform .15s ease
+    }
+
+    #themeToggle:active {
+      transform: scale(.92)
+    }
+
+    html[data-theme="dark"] body {
+      background: #1b1e23;
+      color: #dfe3e8
+    }
+
+    html[data-theme="dark"] #themeToggle {
+      background: #2f343b;
+      border-color: #4a515b;
+      color: #ffd479
+    }
+
+    html[data-theme="dark"] .brand-bg {
+      background: linear-gradient(135deg, #0a2e12 0%, #0e401b 55%, #114f24 100%)
+    }
+
+    html[data-theme="dark"] #main {
+      background: #1b1e23 !important
+    }
+
+    html[data-theme="dark"] .card,
+    html[data-theme="dark"] #modalBox {
+      background: #262a30;
+      border-color: #3a4048;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .45)
+    }
+
+    html[data-theme="dark"] .bg-white {
+      background: #262a30 !important
+    }
+
+    html[data-theme="dark"] aside#sidebar {
+      background: #21252b !important;
+      border-color: #3a4048 !important
+    }
+
+    html[data-theme="dark"] .fld {
+      background: #2f343b;
+      border-color: #4a515b;
+      color: #e6e8eb
+    }
+
+    html[data-theme="dark"] .fld::placeholder {
+      color: #7b828c
+    }
+
+    html[data-theme="dark"] .btn-ghost {
+      background: #2f343b;
+      border-color: #4a515b;
+      color: #dfe3e8
+    }
+
+    html[data-theme="dark"] .text-slate-900,
+    html[data-theme="dark"] .text-slate-800,
+    html[data-theme="dark"] .text-slate-700 {
+      color: #e6e8eb !important
+    }
+
+    html[data-theme="dark"] .text-slate-600,
+    html[data-theme="dark"] .text-slate-500 {
+      color: #aeb5be !important
+    }
+
+    html[data-theme="dark"] .text-slate-400,
+    html[data-theme="dark"] .text-slate-300 {
+      color: #868d97 !important
+    }
+
+    html[data-theme="dark"] .bg-slate-50,
+    html[data-theme="dark"] .bg-slate-100 {
+      background: #2f343b !important
+    }
+
+    html[data-theme="dark"] .bg-indigo-50 {
+      background: #2a2f3d !important
+    }
+
+    html[data-theme="dark"] .bg-green-50,
+    html[data-theme="dark"] .bg-green-100 {
+      background: #1f3326 !important
+    }
+
+    html[data-theme="dark"] .border-slate-50,
+    html[data-theme="dark"] .border-slate-100,
+    html[data-theme="dark"] .border-slate-200 {
+      border-color: #3a4048 !important
+    }
+
+    html[data-theme="dark"] .divide-slate-100>*+* {
+      border-color: #3a4048 !important
+    }
+
+    html[data-theme="dark"] .hover\:bg-slate-50:hover,
+    html[data-theme="dark"] .active\:bg-slate-50:active {
+      background: #2f343b !important
+    }
+
+    html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+      background: #4a515b
+    }
   </style>
 </head>
 
@@ -213,6 +341,7 @@
     <div class="card w-full max-w-md p-5 max-h-[90vh] overflow-auto" id="modalBox"></div>
   </div>
   <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50" style="display:none"></div>
+  <button id="themeToggle" type="button" aria-label="Cambiar modo claro/oscuro" title="Modo claro/oscuro">🌙</button>
 
   <script>
     /* =========================================================================
@@ -453,6 +582,23 @@
        ========================================================================= */
     const $ = (s, r = document) => r.querySelector(s);
     const app = $("#app");
+
+    /* ---- Modo claro/oscuro (disponible en todas las vistas) ---- */
+    (function initTheme() {
+      const btn = $("#themeToggle");
+      if (!btn) return;
+      const isDark = () => document.documentElement.getAttribute("data-theme") === "dark";
+      const paint = () => { btn.textContent = isDark() ? "☀️" : "🌙"; };
+      btn.addEventListener("click", () => {
+        const dark = !isDark();
+        if (dark) document.documentElement.setAttribute("data-theme", "dark");
+        else document.documentElement.removeAttribute("data-theme");
+        try { localStorage.setItem("os10_theme", dark ? "dark" : "light"); } catch (e) { }
+        paint();
+      });
+      paint();
+    })();
+
     function toast(msg, ok = true) {
       const t = $("#toast"); t.innerHTML = `<div class="card px-4 py-3 text-sm font-medium ${ok ? 'text-green-800' : 'text-red-700'}" style="border-left:4px solid ${ok ? '#16a34a' : '#dc2626'}">${esc(msg)}</div>`;
       t.style.display = "block"; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", 2600);
@@ -461,7 +607,7 @@
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     function badge(v) { return `<span class="badge b-${v.color}">${esc(v.vigencia)}</span>`; }
-    function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+    function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }); }
     // Fecha en formato día/mes/año (acepta 'YYYY-MM-DD' o 'YYYY-MM-DDT...')
     function fechaFmt(s) { if (!s) return "—"; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s)); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s); }
     function guardLink(slug) { return location.origin + location.pathname + "?e=" + encodeURIComponent(slug); }
@@ -849,7 +995,7 @@
     </div>
 
     <div class="card">
-      <div class="flex flex-wrap items-center justify-between gap-2 p-3 border-b border-slate-100">
+      <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-slate-100">
         <div class="font-semibold text-slate-700">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
         <input id="buscar" class="fld max-w-xs py-2 text-sm" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
       </div>
@@ -1021,7 +1167,7 @@
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50">
-    <td data-label="#" class="py-2 pr-2 text-slate-400">${i + 1}</td>
+    <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
     <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
@@ -1061,7 +1207,7 @@
       const segunda = modo === "empresa"
         ? `<span class="font-mono">${esc(a.rut)}</span> · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`
         : `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
-      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
+      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50">
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-slate-900 text-sm truncate">${esc(nomLista)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
@@ -1261,7 +1407,7 @@
       const meta = `
         <tr><td colspan="${cols.length}" style="font-weight:bold;font-size:14px;text-align:center;padding:6px;">${esc(tituloListado(ev))}</td></tr>
         <tr><td colspan="${cols.length}" style="text-align:center;padding:2px;">Empresa: ${esc(ev.empresa)}${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</td></tr>
-        <tr><td colspan="${cols.length}" style="text-align:center;padding:2px;">Total: ${asist.length}${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL"))}</td></tr>
+        <tr><td colspan="${cols.length}" style="text-align:center;padding:2px;">Total: ${asist.length}${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</td></tr>
         <tr><td colspan="${cols.length}" style="padding:2px;"></td></tr>`;
       const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
         <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${esc(ev.nombre_evento).slice(0, 28)}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
@@ -1294,7 +1440,7 @@
       </style></head><body>
         <h1>${esc(tituloListado(ev))}</h1>
         <div class="sub">Empresa: <b>${esc(ev.empresa)}</b>${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</div>
-        <div class="sub">Total: <b>${asist.length}</b>${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL"))}</div>
+        <div class="sub">Total: <b>${asist.length}</b>${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</div>
         <table><thead><tr>${th}</tr></thead><tbody>${tr || `<tr><td colspan="${cols.length}">Sin guardias registrados.</td></tr>`}</tbody></table>
         <div class="foot">Prefectura O.S.10 Coquimbo · Documento generado desde el sistema de control de guardias.</div>
         <script>window.onload=()=>{window.print()}<\/script>
@@ -1589,7 +1735,7 @@
         </div>
         <img src="images/aniversario1.webp" class="w-14 h-14 object-contain flex-shrink-0 hidden sm:block" alt="Centenario">
       </div>
-      <div class="card p-4 mt-4">
+      <div class="card px-4 py-3 mt-4">
         <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
         <div class="grid grid-cols-4 gap-2 mt-4 text-center">
@@ -1600,7 +1746,7 @@
         </div>
       </div>
       <div class="card mt-4">
-        <div class="p-3 border-b border-slate-100 font-semibold text-slate-700 flex items-center justify-between flex-wrap gap-2">
+        <div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center justify-between flex-wrap gap-2">
           <span>Listado (${asist.length})</span>
           <span class="text-xs font-normal">${eventoInfoHTML(ev)}</span>
         </div>
@@ -1613,7 +1759,7 @@
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
             <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${asist.length ? asist.map((a, i) => { const g = a.guardia || {}; const v = calcularVigencia(g.fecha_ultimo_examen); const tn = calcularTurno(a.hora_ingreso, ev); const tf = normalizarTelefono(g.telefono); const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—"; return `<tr class="border-b border-slate-50"><td data-label="#" class="py-2 pr-2 text-slate-400">${i + 1}</td><td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800 md:whitespace-nowrap">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</td><td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td><td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`; }).join("") : `<tr><td colspan="8" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
+            <tbody>${asist.length ? asist.map((a, i) => { const g = a.guardia || {}; const v = calcularVigencia(g.fecha_ultimo_examen); const tn = calcularTurno(a.hora_ingreso, ev); const tf = normalizarTelefono(g.telefono); const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—"; return `<tr class="border-b border-slate-50"><td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800 md:whitespace-nowrap">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</td><td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td><td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`; }).join("") : `<tr><td colspan="8" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
           </table>
         </div>
       </div>
