@@ -19,6 +19,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>try { if (localStorage.getItem('os10_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) { }</script>
   <style>
     :root {
@@ -1738,7 +1739,7 @@
        DISTRIBUCIÓN GRÁFICA DE GUARDIAS (mapa real — Leaflet / OpenStreetMap)
        ========================================================================= */
     const ANILLOS = ["Anillo 1", "Anillo 2", "Interior", "Exterior", "Otro"];
-    function colorAnillo(a) { return ({ "Anillo 1": "#eab308", "Anillo 2": "#eab308", "Interior": "#16a34a", "Exterior": "#dc2626", "Otro": "#ea580c" })[a] || "#0f5323"; }
+    function colorAnillo(a) { return ({ "Anillo 1": "#dc2626", "Anillo 2": "#dc2626", "Interior": "#16a34a", "Exterior": "#dc2626", "Otro": "#ea580c" })[a] || "#0f5323"; }
 
     async function abrirDistribucion(ev) {
       const prev = document.getElementById("distOverlay"); if (prev) prev.remove();
@@ -1749,6 +1750,7 @@
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0">
           <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ Distribución — ${esc(ev.nombre_evento)}</div>
           <button id="dist_add" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">➕ Puesto</button>
+          <button id="dist_pdf" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)" title="Descargar relación con captura del mapa">📄 PDF</button>
           <button id="dist_panel" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">📋 Listados</button>
           <button id="dist_close" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">✕</button>
         </div>
@@ -1769,7 +1771,7 @@
 
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
       const conCoord = state.puestos.filter(p => p.lat != null && p.lng != null);
       if (conCoord.length) map.fitBounds(conCoord.map(p => [p.lat, p.lng]), { padding: [50, 50], maxZoom: 17 });
       else {
@@ -1779,12 +1781,19 @@
       setTimeout(() => map.invalidateSize(), 250);
 
       const asignados = pid => state.asist.filter(a => a.puesto_id === pid).length;
+      function guardiasDePuesto(pid) {
+        return state.asist.filter(a => a.puesto_id === pid).map(a => {
+          const g = a.guardia || {};
+          const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
+          return nom || a.rut;
+        });
+      }
       function iconFor(p) {
         const c = colorAnillo(p.anillo), n = asignados(p.id), plan = p.guardias_plan || 0;
         const total = Math.max(n, plan);
-        // Recuadro con nombre y contador
-        const box = `<div style="background:${c};color:#fff;border:2px solid #fff;border-radius:10px;padding:3px 7px 4px;font:600 11px system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);text-align:center;line-height:1.15;white-space:nowrap"><div>${esc(p.nombre)}</div><div style="font-weight:700">${n}/${plan}👤 · ${p.paletas || 0}🔍</div></div>`;
-        // Fila de mini-iconos guardia, DEBAJO del recuadro (fuera). Máx 5 iconos: si son más, se agrupan y se muestra "+N".
+        // Recuadro con solo nombre y N/M (sin 👤 ni 🔍)
+        const box = `<div style="background:${c};color:#fff;border:2px solid #fff;border-radius:10px;padding:3px 7px 4px;font:600 11px system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);text-align:center;line-height:1.15;white-space:nowrap"><div>${esc(p.nombre)}</div><div style="font-weight:700">${n}/${plan}</div></div>`;
+        // Fila de mini-iconos guardia, DEBAJO del recuadro (fuera). Máx 5 iconos con "+N" si sobran, todos pegados (sin separación).
         let iconos = "";
         if (total > 0) {
           const MAX = 5;
@@ -1795,15 +1804,23 @@
             chips += `<img src="images/guardia.webp" alt="" width="16" height="16" style="display:block;width:16px;height:16px;object-fit:contain;${on ? "filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
           }
           const extra = total > MAX
-            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;padding:0 4px;margin-left:1px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4)">+${total - MAX}</span>`
+            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;padding:0 4px;margin-left:2px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4)">+${total - MAX}</span>`
             : "";
-          iconos = `<div style="display:inline-flex;flex-wrap:nowrap;gap:2px;justify-content:center;align-items:center;margin:3px auto 0">${chips}${extra}</div>`;
+          iconos = `<div style="display:inline-flex;flex-wrap:nowrap;gap:0;justify-content:center;align-items:center;margin:3px auto 0">${chips}${extra}</div>`;
         }
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
+      }
+      function tooltipFor(p) {
+        const nombres = guardiasDePuesto(p.id);
+        const listaHTML = nombres.length
+          ? nombres.map((n, i) => `<div style="padding:1px 0">${i + 1}. ${esc(n)}</div>`).join("")
+          : `<div style="color:#94a3b8;padding:2px 0">Sin guardias asignados</div>`;
+        return `<div style="font:600 11px system-ui,sans-serif;color:#111;max-width:220px"><div style="font-weight:800;color:${colorAnillo(p.anillo)};margin-bottom:3px">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div><div style="font-weight:500;color:#334155">${listaHTML}</div></div>`;
       }
       function addMarker(p) {
         if (p.lat == null || p.lng == null) return;
         const m = L.marker([p.lat, p.lng], { draggable: true, icon: iconFor(p) }).addTo(map);
+        m.bindTooltip(tooltipFor(p), { direction: "top", offset: [0, -40], opacity: 0.95, sticky: true });
         m.on("dragend", async () => { const ll = m.getLatLng(); p.lat = ll.lat; p.lng = ll.lng; try { await Data.updatePuesto(p.id, { lat: ll.lat, lng: ll.lng }); } catch (e) { } });
         m.on("click", () => modalPuesto(p));
         state.markers[p.id] = m;
@@ -1822,6 +1839,62 @@
         const hint = $("#distHint", ov); hint.hidden = false;
         map.getContainer().style.cursor = "crosshair";
         map.once("click", (e) => { hint.hidden = true; map.getContainer().style.cursor = ""; formPuesto(null, e.latlng); });
+      });
+
+      // --- Descargar relación de facciones con captura del mapa (PDF) ---
+      $("#dist_pdf", ov).addEventListener("click", async () => {
+        if (!state.puestos.length) { toast("Aún no hay puestos para exportar", false); return; }
+        if (typeof html2canvas !== "function") { toast("No se pudo cargar html2canvas", false); return; }
+        const JsPDF = window.jspdf && window.jspdf.jsPDF;
+        if (!JsPDF) { toast("No se pudo cargar jsPDF", false); return; }
+        toast("Generando PDF…");
+        try {
+          const mapEl = document.getElementById("distMap");
+          const canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 1.5, logging: false });
+          const imgData = canvas.toDataURL("image/jpeg", 0.9);
+
+          const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+          const W = doc.internal.pageSize.getWidth();
+          const H = doc.internal.pageSize.getHeight();
+          doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(15, 83, 35);
+          doc.text(`Relación de facciones — ${ev.nombre_evento}`, W / 2, 34, { align: "center" });
+          doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+          const sub = `Empresa: ${ev.empresa}${ev.fecha_evento ? " · Fecha: " + fechaFmt(ev.fecha_evento) : ""} · Puestos: ${state.puestos.length} · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`;
+          doc.text(sub, W / 2, 50, { align: "center" });
+
+          // Captura del mapa (ancho útil, alto proporcional)
+          const marginX = 28, imgW = W - marginX * 2;
+          const imgH = Math.min(canvas.height * imgW / canvas.width, H * 0.42);
+          doc.addImage(imgData, "JPEG", marginX, 62, imgW, imgH);
+
+          // Tabla con las facciones
+          const rows = state.puestos.map((p, i) => {
+            const nombres = guardiasDePuesto(p.id);
+            const n = nombres.length, plan = p.guardias_plan || 0;
+            return [String(i + 1), p.nombre, p.anillo || "—", `${n}/${plan}`, String(p.paletas || 0), nombres.length ? nombres.join(", ") : "—"];
+          });
+          doc.autoTable({
+            startY: 62 + imgH + 14,
+            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Asignados"]],
+            body: rows,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 4, valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+            headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+            alternateRowStyles: { fillColor: [244, 247, 245] },
+            columnStyles: { 0: { cellWidth: 22, halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" } },
+            margin: { left: marginX, right: marginX, bottom: 34 },
+            didDrawPage: () => {
+              doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+              doc.text("O.S.10 Coquimbo · Distribución de facciones", W / 2, H - 16, { align: "center" });
+              doc.text("Pág. " + doc.internal.getNumberOfPages(), W - marginX, H - 16, { align: "right" });
+            }
+          });
+
+          const slug = (ev.slug || "facciones").replace(/[^a-z0-9\-]+/gi, "-");
+          doc.save(`Facciones-${slug}.pdf`);
+        } catch (e) {
+          toast("No se pudo generar el PDF: " + (e.message || e), false);
+        }
       });
 
       // --- Formulario crear/editar puesto ---
