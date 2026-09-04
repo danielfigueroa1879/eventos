@@ -642,8 +642,12 @@
         ${!v.puedeTrabajar ? `<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>` : ""}
         <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt(nowISO())}</p>
         <button id="otroRegistro" class="btn btn-p w-full mt-5">➕ Ingresar otro registro</button>
+        <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">7</span> s…</p>
       </div></div>`;
-          const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", () => renderGuard(ev.slug));
+          let restante = 7, tmpAuto = null;
+          const irOtro = () => { if (tmpAuto) clearInterval(tmpAuto); renderGuard(ev.slug); };
+          const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", irOtro);
+          tmpAuto = setInterval(() => { restante--; const c = $("#otroCount"); if (c) c.textContent = restante; if (restante <= 0) irOtro(); }, 1000);
         } catch (err) { console.error(err); toast("Error al registrar: " + (err.message || err), false); submit.disabled = false; }
       });
     }
