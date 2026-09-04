@@ -895,7 +895,7 @@
       if (sessionStorage.getItem("os10_admin") === "1") return renderAdmin();
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6">
     <div class="card p-6 w-full max-w-sm text-center">
-      <div class="text-4xl mb-2">🛡️</div>
+      <img src="images/logo-os10-original.webp" alt="OS10" class="w-12 h-12 mx-auto mb-3 rounded-full shadow-sm border border-slate-100">
       <h1 class="font-bold text-lg text-slate-800">Panel de Control de Guardias</h1>
       <p class="text-slate-500 text-sm mb-4">Ingresa el PIN de administrador</p>
       <input id="pin" type="password" inputmode="numeric" class="fld text-center tracking-widest text-lg" placeholder="••••"/>
@@ -1067,7 +1067,7 @@
 
     <button id="toggleQR" class="card w-full px-3 py-2.5 mb-3 flex items-center justify-between text-sm font-semibold text-slate-700">
       <span>🔳 QR y estado del evento <span class="text-slate-400 font-normal">· ${asist.length}${total ? " / " + total : ""} guardias · ${pct}%</span></span>
-      <span id="qrChevron" class="text-slate-400 transition-transform" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}">▾</span>
+      <span id="qrChevron" class="text-slate-400 transition-transform" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
     </button>
     <div id="qrPanel" class="card p-3 mb-3" ${ADMIN_STATE.showQR ? "" : "hidden"}>
       <div class="flex items-center justify-between mb-1.5">
@@ -1775,13 +1775,15 @@
         document.head.appendChild(st);
       }
       const btnStyle = "background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)";
+      const btnCls = "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full md:w-auto hover:bg-white/20 transition-colors border";
+      const svgShare = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`;
       const acciones = `
-          ${readonly ? "" : `<button id="dist_add" class="btn text-xs justify-start w-full md:w-auto" style="${btnStyle}">➕ Agregar puesto</button>`}
-          ${readonly ? "" : `<button id="dist_share" class="btn text-xs justify-start w-full md:w-auto" style="${btnStyle}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:4px"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg> Compartir</button>`}
-          <button id="dist_pdf" class="btn text-xs justify-start w-full md:w-auto" style="${btnStyle}">📄 PDF</button>
-          <button id="dist_panel" class="btn text-xs justify-start w-full md:w-auto" style="${btnStyle}">📋 Listados</button>
+          ${readonly ? "" : `<button id="dist_add" class="${btnCls}" style="${btnStyle}">➕ Agregar puesto</button>`}
+          ${readonly ? "" : `<button id="dist_share" class="flex items-center justify-center w-8 h-8 rounded-full border hover:bg-white/20 transition-colors flex-shrink-0 self-center md:self-auto" style="${btnStyle}" aria-label="Compartir" title="Compartir">${svgShare}</button>`}
+          <button id="dist_pdf" class="${btnCls}" style="${btnStyle}">📄 PDF</button>
+          <button id="dist_panel" class="${btnCls}" style="${btnStyle}">📋 Listados</button>
           <div class="h-px bg-white/20 my-1 md:hidden"></div>
-          <button id="dist_close" class="btn text-xs justify-start w-full md:w-auto bg-red-600 hover:bg-red-700 text-white border-red-700">✕ Cerrar mapa</button>`;
+          <button id="dist_close" class="${btnCls.replace('hover:bg-white/20', 'hover:bg-red-700').replace('border', 'border-red-600 bg-red-600 text-white')}">✕ Cerrar mapa</button>`;
       ov.innerHTML = `
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0 relative">
           <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ ${esc(ev.nombre_evento)}${readonly ? ' <span class="opacity-80 font-normal">· solo lectura</span>' : ""}</div>
