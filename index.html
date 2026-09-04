@@ -1231,39 +1231,66 @@
       });
     }
     function tituloListado(ev) { return `${esPartido(ev) ? "Partido" : "Evento"}: ${ev.nombre_evento}`; }
+    const VERDE_PAGINA = "#0f5323";
+    // Detalle por fila con el color de vigencia, para dar formato en Excel/PDF
+    function detalleRows(ev, asist) {
+      const usaT = eventoUsaTurnos(ev);
+      return asist.map((a, i) => {
+        const g = a.guardia || {};
+        const v = calcularVigencia(g.fecha_ultimo_examen);
+        const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+        const tn = usaT ? calcularTurno(a.hora_ingreso, ev) : null;
+        const cells = [String(i + 1), a.rut, nom, g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), v.vigencia, v.siges || "—"];
+        if (usaT) cells.push(tn ? `${tn.fecha} ${tn.etiqueta}` : "—");
+        cells.push(horaFmt(a.hora_ingreso));
+        return { cells, vigIdx: 5, vigColor: VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO };
+      });
+    }
 
-    // --- Excel (CSV compatible con Excel es-CL: separador ; y BOM) ---
+    // --- Excel real (.xls con formato: encabezado verde, texto centrado, columnas autoajustadas) ---
     function descargarExcel(ev, asist) {
       if (!asist.length) { toast("No hay guardias para exportar", false); return; }
-      const cell = v => { const s = String(v ?? ""); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-      const cols = listadoColumnas(ev), filas = listadoFilas(ev, asist);
-      const meta = [
-        [tituloListado(ev)], ["Empresa", ev.empresa], ["Fecha", fechaFmt(ev.fecha_evento)],
-        [esPartido(ev) ? "Tipo" : "Turnos", eventoTipoTexto(ev)],
-        ["Total guardias", asist.length + (ev.cantidad_esperada ? " / " + ev.cantidad_esperada : "")],
-        ["Generado", new Date().toLocaleString("es-CL")], []
-      ];
-      const lineas = [...meta.map(r => r.map(cell).join(";")), cols.map(cell).join(";"), ...filas.map(r => r.map(cell).join(";"))];
-      const blob = new Blob(["﻿" + lineas.join("\r\n")], { type: "text/csv;charset=utf-8;" });
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Listado-${ev.slug}.csv`; a.click();
+      const cols = listadoColumnas(ev), rows = detalleRows(ev, asist);
+      const thS = `background:${VERDE_PAGINA};color:#ffffff;font-weight:bold;text-align:center;border:1px solid #0a3d18;padding:6px 10px;white-space:nowrap;`;
+      const tdS = `text-align:center;border:1px solid #cbd5e1;padding:5px 10px;white-space:nowrap;mso-number-format:'\\@';`;
+      const header = `<tr>${cols.map(c => `<th style="${thS}">${esc(c)}</th>`).join("")}</tr>`;
+      const body = rows.map(r => `<tr>${r.cells.map((c, j) => {
+        const extra = j === r.vigIdx ? `background:${r.vigColor}22;color:${r.vigColor};font-weight:bold;` : "";
+        return `<td style="${tdS}${extra}">${esc(String(c))}</td>`;
+      }).join("")}</tr>`).join("");
+      const meta = `
+        <tr><td colspan="${cols.length}" style="font-weight:bold;font-size:14px;text-align:center;padding:6px;">${esc(tituloListado(ev))}</td></tr>
+        <tr><td colspan="${cols.length}" style="text-align:center;padding:2px;">Empresa: ${esc(ev.empresa)}${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</td></tr>
+        <tr><td colspan="${cols.length}" style="text-align:center;padding:2px;">Total: ${asist.length}${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL"))}</td></tr>
+        <tr><td colspan="${cols.length}" style="padding:2px;"></td></tr>`;
+      const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
+        <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${esc(ev.nombre_evento).slice(0, 28)}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+        <style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}</style></head>
+        <body><table>${meta}${header}${body}</table></body></html>`;
+      const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Listado-${ev.slug}.xls`; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     }
 
-    // --- PDF (ventana de impresión → Guardar como PDF) ---
+    // --- PDF (ventana de impresión → Guardar como PDF), con colores de la tabla ---
     function listadoPrintHTML(ev, asist) {
-      const cols = listadoColumnas(ev), filas = listadoFilas(ev, asist);
+      const cols = listadoColumnas(ev), rows = detalleRows(ev, asist);
       const th = cols.map(c => `<th>${esc(c)}</th>`).join("");
-      const tr = filas.map(r => `<tr>${r.map(c => `<td>${esc(String(c))}</td>`).join("")}</tr>`).join("");
+      const tr = rows.map(r => `<tr>${r.cells.map((c, j) => {
+        const st = j === r.vigIdx ? ` style="background:${r.vigColor}22;color:${r.vigColor};font-weight:bold"` : "";
+        return `<td${st}>${esc(String(c))}</td>`;
+      }).join("")}</tr>`).join("");
       return `<html><head><meta charset="utf-8"><title>${esc(tituloListado(ev))}</title>
       <style>
         *{font-family:Arial,Helvetica,sans-serif}
+        html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
         body{padding:24px;color:#111}
-        h1{font-size:18px;margin:0 0 2px} .sub{color:#555;font-size:12px;margin:2px 0}
+        h1{font-size:18px;margin:0 0 2px;text-align:center} .sub{color:#555;font-size:12px;margin:2px 0;text-align:center}
         table{border-collapse:collapse;width:100%;margin-top:12px;font-size:11px}
-        th,td{border:1px solid #ccc;padding:5px 6px;text-align:left}
-        thead th{background:#0f5323;color:#fff}
-        tr:nth-child(even) td{background:#f4f7f5}
-        .foot{margin-top:16px;color:#888;font-size:10px}
+        th,td{border:1px solid #cbd5e1;padding:5px 6px;text-align:center}
+        thead th{background:${VERDE_PAGINA};color:#fff;font-weight:bold}
+        tbody tr:nth-child(even) td{background:#f4f7f5}
+        .foot{margin-top:16px;color:#888;font-size:10px;text-align:center}
       </style></head><body>
         <h1>${esc(tituloListado(ev))}</h1>
         <div class="sub">Empresa: <b>${esc(ev.empresa)}</b>${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</div>
