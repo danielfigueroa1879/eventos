@@ -542,7 +542,7 @@
 
     /* ---- Adaptador LocalStorage (DEMO) ---- */
     const Local = (() => {
-      const K = { ev: "os10_eventos", gu: "os10_guardias", as: "os10_asistencias" };
+      const K = { ev: "os10_eventos", gu: "os10_guardias", as: "os10_asistencias", hp: "os10_hist_partidos", hpa: "os10_hist_asist" };
       const get = (k) => { try { return JSON.parse(localStorage.getItem(k) || "[]") } catch { return [] } };
       const set = (k, v) => { localStorage.setItem(k, JSON.stringify(v)); };
       let listeners = [];
@@ -553,7 +553,7 @@
         async listEventos() { return get(K.ev).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)); },
         async createEvento(e) { const ev = { ...e, id: uid(), created_at: nowISO(), activo: true }; const a = get(K.ev); a.push(ev); set(K.ev, a); ping(); return ev; },
         async updateEvento(id, patch) { const a = get(K.ev).map(x => x.id === id ? { ...x, ...patch } : x); set(K.ev, a); ping(); },
-        async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); ping(); },
+        async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); const his = get(K.hp).filter(h => h.evento_id === id).map(h => h.id); set(K.hp, get(K.hp).filter(h => h.evento_id !== id)); set(K.hpa, get(K.hpa).filter(x => !his.includes(x.historial_id))); ping(); },
         async getEventoBySlug(slug) { return get(K.ev).find(x => x.slug === slug) || null; },
         async getGuardia(rut) { return get(K.gu).find(x => x.rut === rut) || null; },
         async upsertGuardia(g) { const a = get(K.gu); const i = a.findIndex(x => x.rut === g.rut); const rec = { ...g, updated_at: nowISO() }; if (i >= 0) a[i] = { ...a[i], ...rec }; else a.push(rec); set(K.gu, a); ping(); return rec; },
@@ -566,6 +566,18 @@
         async yaRegistrado(evId, rut) { return get(K.as).find(x => x.evento_id === evId && x.rut === rut) || null; },
         async createAsistencia(evId, rut) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO() }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
         async deleteAsistencia(id) { set(K.as, get(K.as).filter(x => x.id !== id)); ping(); },
+        async cerrarPartido(ev, asist) {
+          const hid = uid();
+          const hp = get(K.hp); hp.push({ id: hid, evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length, cerrado_at: nowISO() }); set(K.hp, hp);
+          const hpa = get(K.hpa);
+          asist.forEach(a => { const g = a.guardia || {}; hpa.push({ id: uid(), historial_id: hid, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso }); });
+          set(K.hpa, hpa);
+          set(K.as, get(K.as).filter(x => x.evento_id !== ev.id));
+          ping(); return hid;
+        },
+        async listHistorial(evId) { return get(K.hp).filter(x => x.evento_id === evId).sort((a, b) => (a.cerrado_at < b.cerrado_at ? 1 : -1)); },
+        async listHistorialAsist(hid) { return get(K.hpa).filter(x => x.historial_id === hid).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1)); },
+        async deleteHistorial(hid) { set(K.hp, get(K.hp).filter(x => x.id !== hid)); set(K.hpa, get(K.hpa).filter(x => x.historial_id !== hid)); ping(); },
       };
     })();
 
@@ -597,6 +609,16 @@
         async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).limit(1)); return d[0] || null; },
         async createAsistencia(evId, rut) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO() }).select().single()); },
         async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
+        async cerrarPartido(ev, asist) {
+          const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
+          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso }; });
+          if (rows.length) ok(await sb.from("partidos_historial_asist").insert(rows));
+          ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
+          return hp.id;
+        },
+        async listHistorial(evId) { return ok(await sb.from("partidos_historial").select("*").eq("evento_id", evId).order("cerrado_at", { ascending: false })); },
+        async listHistorialAsist(hid) { return ok(await sb.from("partidos_historial_asist").select("*").eq("historial_id", hid).order("hora_ingreso", { ascending: true })); },
+        async deleteHistorial(hid) { ok(await sb.from("partidos_historial").delete().eq("id", hid)); },
       };
     })();
 
@@ -944,6 +966,19 @@
       const ev = ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected);
       if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>Crea un evento para comenzar.</div>`; return; }
       const asist = await Data.listAsistencias(ev.id);
+
+      // Partidos: cierre automático 12 h después del último ingreso (se archiva y la lista queda limpia)
+      if (esPartido(ev) && asist.length && !ADMIN_STATE._cerrando) {
+        const ultimo = Math.max(...asist.map(a => new Date(a.hora_ingreso).getTime()).filter(t => !isNaN(t)));
+        if (isFinite(ultimo) && (Date.now() - ultimo) >= 12 * 3600 * 1000) {
+          ADMIN_STATE._cerrando = true;
+          try { await Data.cerrarPartido(ev, asist); toast("Partido archivado automáticamente (12 h desde el último ingreso). Cambia los equipos para el próximo."); }
+          catch (e) { toast("No se pudo archivar el partido: " + (e.message || e), false); }
+          ADMIN_STATE._cerrando = false;
+          return renderMain();
+        }
+      }
+
       const total = ev.cantidad_esperada || 0;
       const pct = total ? Math.min(100, Math.round(asist.length / total * 100)) : 0;
       const usaT = eventoUsaTurnos(ev);
@@ -1015,8 +1050,10 @@
         </div>
       </div>
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
+        ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
+        <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
-        <button id="editEv" class="btn btn-ghost text-sm">✎ Editar evento</button>
+        <button id="editEv" class="btn btn-ghost text-sm">${esPartido(ev) ? "✎ Cambiar equipos" : "✎ Editar evento"}</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
       </div>
     </div>
@@ -1081,6 +1118,21 @@
       $("#expExcel").addEventListener("click", () => descargarExcel(ev, asist));
       $("#expPDF").addEventListener("click", () => descargarPDF(ev, asist));
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asist));
+      const btnCerrar = $("#cerrarPartido");
+      if (btnCerrar) btnCerrar.addEventListener("click", () => {
+        if (!asist.length) { toast("No hay guardias en este partido para archivar", false); return; }
+        confirmar(`¿Cerrar y archivar el partido "${ev.partido || ev.nombre_evento}" con ${asist.length} guardia(s)? La lista se guardará en el historial y quedará limpia para el próximo partido.`, async () => {
+          try {
+            await Data.cerrarPartido(ev, asist);
+            closeModal();
+            toast("Partido archivado. Cambia los equipos para el próximo partido.");
+            await refreshAdmin();
+            modalNuevoEvento(ADMIN_STATE.eventos.find(e => e.id === ev.id) || ev);
+          } catch (e) { toast("Error al archivar: " + (e.message || e), false); }
+        });
+      });
+      const btnHist = $("#histPartidos");
+      if (btnHist) btnHist.addEventListener("click", () => modalHistorialPartidos(ev));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
@@ -1601,6 +1653,71 @@
       $("#sh_pdf").addEventListener("click", () => compartirComo(ev, asist, "pdf"));
       $("#sh_xls").addEventListener("click", () => compartirComo(ev, asist, "xls"));
       $("#sh_close").addEventListener("click", closeModal);
+    }
+
+    /* ---- Historial de partidos archivados ---- */
+    // Convierte filas del snapshot al formato de "asistencia" que usan los exports
+    function histRowsToAsist(rows) {
+      return rows.map(r => ({ rut: r.rut, hora_ingreso: r.hora_ingreso, guardia: { nombres: r.nombres, apellidos: r.apellidos, telefono: r.telefono, fecha_ultimo_examen: r.fecha_ultimo_examen } }));
+    }
+    function histEvPseudo(ev, h) {
+      return { nombre_evento: `${h.partido || ev.nombre_evento} (${fechaFmt(h.fecha || h.cerrado_at)})`, empresa: ev.empresa, fecha_evento: h.fecha, tipo: "partido", partido: h.partido, usa_turnos: false, slug: `${ev.slug}-${String(h.fecha || "").replace(/-/g, "") || Date.now()}` };
+    }
+    async function modalHistorialPartidos(ev) {
+      openModal(`<div class="text-center text-slate-400 py-6 text-sm">Cargando historial…</div>`);
+      let lista = [];
+      try { lista = await Data.listHistorial(ev.id); } catch (e) { openModal(`<p class="text-red-600 text-sm">Error al cargar el historial: ${esc(e.message || String(e))}</p><div class="mt-3"><button id="h_close" class="btn btn-ghost w-full">Cerrar</button></div>`); $("#h_close").addEventListener("click", closeModal); return; }
+      const cuerpo = lista.length ? lista.map(h => `
+        <div class="border border-slate-200 rounded-xl p-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-800 truncate">${esc(h.partido || ev.nombre_evento)}</div>
+              <div class="text-xs text-slate-500">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${h.total || 0} guardia(s)</div>
+            </div>
+            <span class="text-[11px] text-slate-400 whitespace-nowrap">${esc(horaFmt(h.cerrado_at))}</span>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-2">
+            <button data-ver="${h.id}" class="btn btn-ghost text-xs">👁 Ver guardias</button>
+            <button data-xls="${h.id}" class="btn btn-ghost text-xs">📊 Excel</button>
+            <button data-pdf="${h.id}" class="btn btn-ghost text-xs">📄 PDF</button>
+            <button data-delh="${h.id}" class="btn btn-ghost text-xs text-red-600">🗑</button>
+          </div>
+        </div>`).join("") : `<p class="text-sm text-slate-400 text-center py-6">Aún no hay partidos archivados. Usa "Cerrar y archivar partido" al terminar cada partido.</p>`;
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📁 Historial de partidos</h2>
+        <p class="text-sm text-slate-500 mb-3">Partidos anteriores de "<b>${esc(ev.nombre_evento)}</b>" con los guardias que asistieron.</p>
+        <div class="space-y-2">${cuerpo}</div>
+        <div class="mt-3"><button id="h_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
+      $("#h_close").addEventListener("click", closeModal);
+      const conRows = async (hid, fn) => { try { const rows = await Data.listHistorialAsist(hid); fn(rows, lista.find(h => h.id === hid)); } catch (e) { toast("Error: " + (e.message || e), false); } };
+      document.querySelectorAll("[data-ver]").forEach(b => b.addEventListener("click", () => conRows(b.dataset.ver, (rows, h) => modalHistorialGuardias(ev, h, rows))));
+      document.querySelectorAll("[data-xls]").forEach(b => b.addEventListener("click", () => conRows(b.dataset.xls, (rows, h) => descargarExcel(histEvPseudo(ev, h), histRowsToAsist(rows)))));
+      document.querySelectorAll("[data-pdf]").forEach(b => b.addEventListener("click", () => conRows(b.dataset.pdf, (rows, h) => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)))));
+      document.querySelectorAll("[data-delh]").forEach(b => b.addEventListener("click", () => { const h = lista.find(x => x.id === b.dataset.delh); confirmar(`¿Eliminar del historial el partido "${h?.partido || ""}" (${fechaFmt(h?.fecha || h?.cerrado_at)})? Esta acción no se puede deshacer.`, async () => { try { await Data.deleteHistorial(b.dataset.delh); toast("Registro eliminado del historial."); modalHistorialPartidos(ev); } catch (e) { toast("Error: " + (e.message || e), false); } }); }));
+    }
+    function modalHistorialGuardias(ev, h, rows) {
+      const filas = rows.length ? rows.map((r, i) => {
+        const v = calcularVigencia(r.fecha_ultimo_examen);
+        const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
+      }).join("") : `<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
+      openModal(`<div class="flex items-center justify-between mb-1">
+          <h2 class="font-bold text-slate-800">${esc(h.partido || ev.nombre_evento)}</h2>
+          <button id="hg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.length} guardia(s)</p>
+        <div class="overflow-x-auto"><table class="w-full text-sm">
+          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table></div>
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <button id="hg_xls" class="btn btn-ghost text-sm">📊 Excel</button>
+          <button id="hg_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
+        </div>
+        <div class="mt-2"><button id="hg_back" class="btn btn-ghost w-full">← Volver al historial</button></div>`);
+      $("#hg_x").addEventListener("click", closeModal);
+      $("#hg_back").addEventListener("click", () => modalHistorialPartidos(ev));
+      $("#hg_xls").addEventListener("click", () => descargarExcel(histEvPseudo(ev, h), histRowsToAsist(rows)));
+      $("#hg_pdf").addEventListener("click", () => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)));
     }
 
     /* ---- Modales evento ---- */
