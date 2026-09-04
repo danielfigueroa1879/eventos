@@ -1741,15 +1741,16 @@
     const ANILLOS = ["Anillo 1", "Anillo 2", "Interior", "Exterior", "Otro"];
     function colorAnillo(a) { return ({ "Anillo 1": "#dc2626", "Anillo 2": "#dc2626", "Interior": "#16a34a", "Exterior": "#dc2626", "Otro": "#ea580c" })[a] || "#0f5323"; }
 
-    async function abrirDistribucion(ev) {
+    async function abrirDistribucion(ev, opts = {}) {
+      const readonly = !!opts.readonly;
       const prev = document.getElementById("distOverlay"); if (prev) prev.remove();
       const ov = document.createElement("div");
       ov.id = "distOverlay";
       ov.className = "fixed inset-0 z-[55] bg-white flex flex-col";
       ov.innerHTML = `
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0">
-          <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ Distribución — ${esc(ev.nombre_evento)}</div>
-          <button id="dist_add" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">➕ Puesto</button>
+          <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ Distribución — ${esc(ev.nombre_evento)}${readonly ? ' <span class="opacity-80 font-normal">· solo lectura</span>' : ""}</div>
+          ${readonly ? "" : `<button id="dist_add" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">➕ Puesto</button>`}
           <button id="dist_pdf" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)" title="Descargar relación con captura del mapa">📄 PDF</button>
           <button id="dist_panel" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">📋 Listados</button>
           <button id="dist_close" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">✕</button>
@@ -1819,9 +1820,9 @@
       }
       function addMarker(p) {
         if (p.lat == null || p.lng == null) return;
-        const m = L.marker([p.lat, p.lng], { draggable: true, icon: iconFor(p) }).addTo(map);
+        const m = L.marker([p.lat, p.lng], { draggable: !readonly, icon: iconFor(p) }).addTo(map);
         m.bindTooltip(tooltipFor(p), { direction: "top", offset: [0, -40], opacity: 0.95, sticky: true });
-        m.on("dragend", async () => { const ll = m.getLatLng(); p.lat = ll.lat; p.lng = ll.lng; try { await Data.updatePuesto(p.id, { lat: ll.lat, lng: ll.lng }); } catch (e) { } });
+        if (!readonly) m.on("dragend", async () => { const ll = m.getLatLng(); p.lat = ll.lat; p.lng = ll.lng; try { await Data.updatePuesto(p.id, { lat: ll.lat, lng: ll.lng }); } catch (e) { } });
         m.on("click", () => modalPuesto(p));
         state.markers[p.id] = m;
       }
@@ -1834,8 +1835,9 @@
         refreshMarkers(); if (state.panelOpen) renderPanel();
       }
 
-      // --- Agregar puesto: modo colocar ---
-      $("#dist_add", ov).addEventListener("click", () => {
+      // --- Agregar puesto: modo colocar (solo cuando no es readonly) ---
+      const distAddBtn = $("#dist_add", ov);
+      if (distAddBtn) distAddBtn.addEventListener("click", () => {
         const hint = $("#distHint", ov); hint.hidden = false;
         map.getContainer().style.cursor = "crosshair";
         map.once("click", (e) => { hint.hidden = true; map.getContainer().style.cursor = ""; formPuesto(null, e.latlng); });
@@ -1928,22 +1930,25 @@
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
         const lista = asig.length ? asig.map(a => { const g = a.guardia || {}; return `<div class="text-sm text-slate-700 py-1 border-b border-slate-50">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut)} <span class="text-slate-400 font-mono text-xs">${esc(a.rut)}</span></div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        const acciones = readonly ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
+            <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
+            <button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
+            <button id="pp_del" class="btn btn-ghost text-red-600">🗑 Eliminar</button>
+          </div>`;
         openModal(`<div class="flex items-center justify-between mb-1">
             <h2 class="font-bold text-slate-800">${esc(p.nombre)}</h2>
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-full" style="background:${colorAnillo(p.anillo)}1a;color:${colorAnillo(p.anillo)}">${esc(p.anillo || "—")}</span>
           </div>
           <div class="text-sm text-slate-600 mb-2">👤 ${asig.length}/${p.guardias_plan || 0} guardias · 🔍 ${p.paletas || 0} paletas${p.notas ? `<div class="text-xs text-slate-500 mt-1">📍 ${esc(p.notas)}</div>` : ""}</div>
           <div class="max-h-48 overflow-auto border border-slate-100 rounded-lg px-2">${lista}</div>
-          <div class="grid grid-cols-2 gap-2 mt-3">
-            <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
-            <button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
-            <button id="pp_del" class="btn btn-ghost text-red-600">🗑 Eliminar</button>
-          </div>
+          ${acciones}
           <div class="mt-2"><button id="pp_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
         $("#pp_close").addEventListener("click", closeModal);
-        $("#pp_edit").addEventListener("click", () => formPuesto(p));
-        $("#pp_asig").addEventListener("click", () => modalAsignar(p));
-        $("#pp_del").addEventListener("click", () => confirmar(`¿Eliminar el puesto "${p.nombre}"? Los guardias asignados quedarán sin puesto.`, async () => { try { await Data.deletePuesto(p.id); closeModal(); await recargar(); } catch (e) { toast("Error: " + (e.message || e), false); } }));
+        if (!readonly) {
+          $("#pp_edit").addEventListener("click", () => formPuesto(p));
+          $("#pp_asig").addEventListener("click", () => modalAsignar(p));
+          $("#pp_del").addEventListener("click", () => confirmar(`¿Eliminar el puesto "${p.nombre}"? Los guardias asignados quedarán sin puesto.`, async () => { try { await Data.deletePuesto(p.id); closeModal(); await recargar(); } catch (e) { toast("Error: " + (e.message || e), false); } }));
+        }
       }
 
       // --- Asignar guardias registrados a un puesto ---
@@ -2242,6 +2247,7 @@
         </div>
         <img src="images/aniversario1.webp" class="w-20 h-20 object-contain flex-shrink-0 hidden sm:block relative" alt="Centenario">
       </div>
+      ${esPartido(ev) ? `<div class="mt-3"><button id="empDist" class="btn btn-p w-full flex items-center justify-center gap-2">🗺️ Ver distribución de facciones en el mapa</button></div>` : ""}
       <div class="card px-4 py-3 mt-4">
         <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
@@ -2274,6 +2280,8 @@
     </div>`;
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
+        const empDist = document.getElementById("empDist");
+        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev, { readonly: true }));
       };
       await paint();
       Data.onChange(paint);
