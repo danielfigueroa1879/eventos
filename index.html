@@ -17,6 +17,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script>try { if (localStorage.getItem('os10_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) { }</script>
   <style>
     :root {
@@ -542,7 +544,7 @@
 
     /* ---- Adaptador LocalStorage (DEMO) ---- */
     const Local = (() => {
-      const K = { ev: "os10_eventos", gu: "os10_guardias", as: "os10_asistencias", hp: "os10_hist_partidos", hpa: "os10_hist_asist" };
+      const K = { ev: "os10_eventos", gu: "os10_guardias", as: "os10_asistencias", hp: "os10_hist_partidos", hpa: "os10_hist_asist", pu: "os10_puestos" };
       const get = (k) => { try { return JSON.parse(localStorage.getItem(k) || "[]") } catch { return [] } };
       const set = (k, v) => { localStorage.setItem(k, JSON.stringify(v)); };
       let listeners = [];
@@ -553,7 +555,7 @@
         async listEventos() { return get(K.ev).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)); },
         async createEvento(e) { const ev = { ...e, id: uid(), created_at: nowISO(), activo: true }; const a = get(K.ev); a.push(ev); set(K.ev, a); ping(); return ev; },
         async updateEvento(id, patch) { const a = get(K.ev).map(x => x.id === id ? { ...x, ...patch } : x); set(K.ev, a); ping(); },
-        async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); const his = get(K.hp).filter(h => h.evento_id === id).map(h => h.id); set(K.hp, get(K.hp).filter(h => h.evento_id !== id)); set(K.hpa, get(K.hpa).filter(x => !his.includes(x.historial_id))); ping(); },
+        async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); set(K.pu, get(K.pu).filter(x => x.evento_id !== id)); const his = get(K.hp).filter(h => h.evento_id === id).map(h => h.id); set(K.hp, get(K.hp).filter(h => h.evento_id !== id)); set(K.hpa, get(K.hpa).filter(x => !his.includes(x.historial_id))); ping(); },
         async getEventoBySlug(slug) { return get(K.ev).find(x => x.slug === slug) || null; },
         async getGuardia(rut) { return get(K.gu).find(x => x.rut === rut) || null; },
         async upsertGuardia(g) { const a = get(K.gu); const i = a.findIndex(x => x.rut === g.rut); const rec = { ...g, updated_at: nowISO() }; if (i >= 0) a[i] = { ...a[i], ...rec }; else a.push(rec); set(K.gu, a); ping(); return rec; },
@@ -578,6 +580,11 @@
         async listHistorial(evId) { return get(K.hp).filter(x => x.evento_id === evId).sort((a, b) => (a.cerrado_at < b.cerrado_at ? 1 : -1)); },
         async listHistorialAsist(hid) { return get(K.hpa).filter(x => x.historial_id === hid).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1)); },
         async deleteHistorial(hid) { set(K.hp, get(K.hp).filter(x => x.id !== hid)); set(K.hpa, get(K.hpa).filter(x => x.historial_id !== hid)); ping(); },
+        async listPuestos(evId) { return get(K.pu).filter(x => x.evento_id === evId).sort((a, b) => (a.orden || 0) - (b.orden || 0)); },
+        async createPuesto(p) { const rec = { ...p, id: uid(), created_at: nowISO() }; const a = get(K.pu); a.push(rec); set(K.pu, a); ping(); return rec; },
+        async updatePuesto(id, patch) { set(K.pu, get(K.pu).map(x => x.id === id ? { ...x, ...patch } : x)); ping(); },
+        async deletePuesto(id) { set(K.pu, get(K.pu).filter(x => x.id !== id)); set(K.as, get(K.as).map(x => x.puesto_id === id ? { ...x, puesto_id: null } : x)); ping(); },
+        async asignarPuesto(asistenciaId, puestoId) { set(K.as, get(K.as).map(x => x.id === asistenciaId ? { ...x, puesto_id: puestoId } : x)); ping(); },
       };
     })();
 
@@ -619,6 +626,11 @@
         async listHistorial(evId) { return ok(await sb.from("partidos_historial").select("*").eq("evento_id", evId).order("cerrado_at", { ascending: false })); },
         async listHistorialAsist(hid) { return ok(await sb.from("partidos_historial_asist").select("*").eq("historial_id", hid).order("hora_ingreso", { ascending: true })); },
         async deleteHistorial(hid) { ok(await sb.from("partidos_historial").delete().eq("id", hid)); },
+        async listPuestos(evId) { return ok(await sb.from("puestos").select("*").eq("evento_id", evId).order("orden", { ascending: true })); },
+        async createPuesto(p) { return ok(await sb.from("puestos").insert(p).select().single()); },
+        async updatePuesto(id, patch) { ok(await sb.from("puestos").update(patch).eq("id", id)); },
+        async deletePuesto(id) { ok(await sb.from("puestos").delete().eq("id", id)); },
+        async asignarPuesto(asistenciaId, puestoId) { ok(await sb.from("asistencias").update({ puesto_id: puestoId }).eq("id", asistenciaId)); },
       };
     })();
 
@@ -1052,6 +1064,7 @@
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
+        <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
         <button id="editEv" class="btn btn-ghost text-sm">${esPartido(ev) ? "✎ Cambiar equipos" : "✎ Editar evento"}</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
@@ -1133,6 +1146,7 @@
       });
       const btnHist = $("#histPartidos");
       if (btnHist) btnHist.addEventListener("click", () => modalHistorialPartidos(ev));
+      $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
@@ -1718,6 +1732,195 @@
       $("#hg_back").addEventListener("click", () => modalHistorialPartidos(ev));
       $("#hg_xls").addEventListener("click", () => descargarExcel(histEvPseudo(ev, h), histRowsToAsist(rows)));
       $("#hg_pdf").addEventListener("click", () => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)));
+    }
+
+    /* =========================================================================
+       DISTRIBUCIÓN GRÁFICA DE GUARDIAS (mapa real — Leaflet / OpenStreetMap)
+       ========================================================================= */
+    const ANILLOS = ["Anillo 1", "Anillo 2", "Interior", "Exterior", "Otro"];
+    function colorAnillo(a) { return ({ "Anillo 1": "#16a34a", "Anillo 2": "#2563eb", "Interior": "#7c3aed", "Exterior": "#ea580c" })[a] || "#0f5323"; }
+
+    async function abrirDistribucion(ev) {
+      const prev = document.getElementById("distOverlay"); if (prev) prev.remove();
+      const ov = document.createElement("div");
+      ov.id = "distOverlay";
+      ov.className = "fixed inset-0 z-[55] bg-white flex flex-col";
+      ov.innerHTML = `
+        <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0">
+          <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ Distribución — ${esc(ev.nombre_evento)}</div>
+          <button id="dist_add" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">➕ Puesto</button>
+          <button id="dist_panel" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">📋 Listados</button>
+          <button id="dist_close" class="btn text-xs" style="background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)">✕</button>
+        </div>
+        <div class="relative flex-1 min-h-0">
+          <div id="distMap" class="absolute inset-0" style="background:#e5e7eb"></div>
+          <div id="distHint" class="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/85 text-white text-xs px-3 py-1.5 rounded-full shadow" hidden>👆 Toca el mapa para ubicar el puesto</div>
+          <div id="distPanel" class="absolute top-0 right-0 h-full w-80 max-w-[90%] bg-white shadow-2xl border-l border-slate-200 overflow-y-auto z-[500] translate-x-full transition-transform"></div>
+        </div>`;
+      document.body.appendChild(ov);
+
+      const state = { ev, puestos: [], asist: [], map: null, markers: {}, panelOpen: false };
+      const cerrar = () => { try { state.map && state.map.remove(); } catch (e) { } ov.remove(); };
+      $("#dist_close", ov).addEventListener("click", cerrar);
+
+      try { state.puestos = await Data.listPuestos(ev.id); }
+      catch (e) { toast("Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
+      try { state.asist = await Data.listAsistencias(ev.id); } catch (e) { }
+
+      const map = L.map("distMap", { zoomControl: true });
+      state.map = map;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+      const conCoord = state.puestos.filter(p => p.lat != null && p.lng != null);
+      if (conCoord.length) map.fitBounds(conCoord.map(p => [p.lat, p.lng]), { padding: [50, 50], maxZoom: 17 });
+      else {
+        map.setView([-29.9427, -71.2530], 15);
+        if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => { if (!state.puestos.some(p => p.lat != null)) map.setView([pos.coords.latitude, pos.coords.longitude], 16); }, () => { }, { timeout: 5000 });
+      }
+      setTimeout(() => map.invalidateSize(), 250);
+
+      const asignados = pid => state.asist.filter(a => a.puesto_id === pid).length;
+      function iconFor(p) {
+        const c = colorAnillo(p.anillo), n = asignados(p.id), plan = p.guardias_plan || 0;
+        return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);background:${c};color:#fff;border:2px solid #fff;border-radius:10px;padding:2px 7px;font:600 11px system-ui,sans-serif;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.4);text-align:center;line-height:1.15"><div>${esc(p.nombre)}</div><div style="font-weight:700">${n}/${plan}👤 · ${p.paletas || 0}🔍</div></div>` });
+      }
+      function addMarker(p) {
+        if (p.lat == null || p.lng == null) return;
+        const m = L.marker([p.lat, p.lng], { draggable: true, icon: iconFor(p) }).addTo(map);
+        m.on("dragend", async () => { const ll = m.getLatLng(); p.lat = ll.lat; p.lng = ll.lng; try { await Data.updatePuesto(p.id, { lat: ll.lat, lng: ll.lng }); } catch (e) { } });
+        m.on("click", () => modalPuesto(p));
+        state.markers[p.id] = m;
+      }
+      function refreshMarkers() { Object.values(state.markers).forEach(m => map.removeLayer(m)); state.markers = {}; state.puestos.forEach(addMarker); }
+      refreshMarkers();
+
+      async function recargar() {
+        try { state.puestos = await Data.listPuestos(ev.id); } catch (e) { }
+        try { state.asist = await Data.listAsistencias(ev.id); } catch (e) { }
+        refreshMarkers(); if (state.panelOpen) renderPanel();
+      }
+
+      // --- Agregar puesto: modo colocar ---
+      $("#dist_add", ov).addEventListener("click", () => {
+        const hint = $("#distHint", ov); hint.hidden = false;
+        map.getContainer().style.cursor = "crosshair";
+        map.once("click", (e) => { hint.hidden = true; map.getContainer().style.cursor = ""; formPuesto(null, e.latlng); });
+      });
+
+      // --- Formulario crear/editar puesto ---
+      function formPuesto(p, latlng) {
+        const edit = !!p;
+        openModal(`<h2 class="font-bold text-lg text-slate-800 mb-3">${edit ? "Editar puesto" : "Nuevo puesto"}</h2>
+        <div class="space-y-3">
+          <div><label class="text-sm font-semibold text-slate-700">Nombre / ubicación</label><input id="p_nom" class="fld" placeholder="Entrada lateral 1" value="${edit ? esc(p.nombre) : ""}"/></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="text-xs font-semibold text-slate-600">Guardias (cantidad)</label><input id="p_g" type="number" min="0" class="fld" value="${edit ? esc(p.guardias_plan || 0) : "0"}"/></div>
+            <div><label class="text-xs font-semibold text-slate-600">Paletas / detectores</label><input id="p_p" type="number" min="0" class="fld" value="${edit ? esc(p.paletas || 0) : "0"}"/></div>
+          </div>
+          <div><label class="text-xs font-semibold text-slate-600">Zona / anillo</label>
+            <select id="p_an" class="fld">${ANILLOS.map(a => `<option ${edit && p.anillo === a ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+          <div><label class="text-xs font-semibold text-slate-600">Notas (opcional)</label><input id="p_nt" class="fld" placeholder="Ej: esquina calle Santiago con..." value="${edit ? esc(p.notas || "") : ""}"/></div>
+        </div>
+        <div class="flex gap-2 mt-4"><button id="p_cancel" class="btn btn-ghost flex-1">Cancelar</button><button id="p_save" class="btn btn-p flex-1">${edit ? "Guardar" : "Crear puesto"}</button></div>`);
+        $("#p_cancel").addEventListener("click", closeModal);
+        $("#p_save").addEventListener("click", async () => {
+          const nombre = $("#p_nom").value.trim(); if (!nombre) { toast("Escribe el nombre del puesto", false); return; }
+          const datos = { nombre, guardias_plan: parseInt($("#p_g").value) || 0, paletas: parseInt($("#p_p").value) || 0, anillo: $("#p_an").value, notas: $("#p_nt").value.trim() || null };
+          try {
+            if (edit) { await Data.updatePuesto(p.id, datos); }
+            else { await Data.createPuesto({ evento_id: ev.id, lat: latlng.lat, lng: latlng.lng, orden: state.puestos.length, ...datos }); }
+            closeModal(); await recargar();
+          } catch (e) { toast("Error: " + (e.message || e), false); }
+        });
+      }
+
+      // --- Detalle/acciones de un puesto ---
+      function modalPuesto(p) {
+        const asig = state.asist.filter(a => a.puesto_id === p.id);
+        const lista = asig.length ? asig.map(a => { const g = a.guardia || {}; return `<div class="text-sm text-slate-700 py-1 border-b border-slate-50">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut)} <span class="text-slate-400 font-mono text-xs">${esc(a.rut)}</span></div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        openModal(`<div class="flex items-center justify-between mb-1">
+            <h2 class="font-bold text-slate-800">${esc(p.nombre)}</h2>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full" style="background:${colorAnillo(p.anillo)}1a;color:${colorAnillo(p.anillo)}">${esc(p.anillo || "—")}</span>
+          </div>
+          <div class="text-sm text-slate-600 mb-2">👤 ${asig.length}/${p.guardias_plan || 0} guardias · 🔍 ${p.paletas || 0} paletas${p.notas ? `<div class="text-xs text-slate-500 mt-1">📍 ${esc(p.notas)}</div>` : ""}</div>
+          <div class="max-h-48 overflow-auto border border-slate-100 rounded-lg px-2">${lista}</div>
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
+            <button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
+            <button id="pp_del" class="btn btn-ghost text-red-600">🗑 Eliminar</button>
+          </div>
+          <div class="mt-2"><button id="pp_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
+        $("#pp_close").addEventListener("click", closeModal);
+        $("#pp_edit").addEventListener("click", () => formPuesto(p));
+        $("#pp_asig").addEventListener("click", () => modalAsignar(p));
+        $("#pp_del").addEventListener("click", () => confirmar(`¿Eliminar el puesto "${p.nombre}"? Los guardias asignados quedarán sin puesto.`, async () => { try { await Data.deletePuesto(p.id); closeModal(); await recargar(); } catch (e) { toast("Error: " + (e.message || e), false); } }));
+      }
+
+      // --- Asignar guardias registrados a un puesto ---
+      function modalAsignar(p) {
+        const nombrePuesto = id => (state.puestos.find(x => x.id === id) || {}).nombre;
+        const filas = state.asist.length ? state.asist.map(a => {
+          const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
+          const aqui = a.puesto_id === p.id;
+          const enOtro = a.puesto_id && !aqui ? nombrePuesto(a.puesto_id) : "";
+          return `<label class="flex items-center gap-2 py-1.5 border-b border-slate-50 text-sm">
+            <input type="checkbox" data-aid="${a.id}" ${aqui ? "checked" : ""} class="w-4 h-4 flex-shrink-0">
+            <span class="flex-1 min-w-0"><span class="block truncate">${esc(nom)}</span><span class="block text-[11px] text-slate-400 font-mono">${esc(a.rut)}${enOtro ? ` · en ${esc(enOtro)}` : ""}</span></span>
+          </label>`;
+        }).join("") : `<div class="text-slate-400 text-sm py-3 text-center">No hay guardias registrados aún en este evento.</div>`;
+        openModal(`<h2 class="font-bold text-slate-800 mb-1">Asignar a "${esc(p.nombre)}"</h2>
+          <p class="text-xs text-slate-500 mb-2">Marca los guardias que van en este puesto (plan: ${p.guardias_plan || 0}).</p>
+          <div class="max-h-72 overflow-auto border border-slate-100 rounded-lg px-2">${filas}</div>
+          <div class="mt-3"><button id="as_close" class="btn btn-p w-full">Listo</button></div>`);
+        $("#as_close").addEventListener("click", async () => { closeModal(); await recargar(); });
+        document.querySelectorAll("[data-aid]").forEach(chk => chk.addEventListener("change", async () => {
+          const a = state.asist.find(x => x.id === chk.dataset.aid); if (!a) return;
+          const nuevo = chk.checked ? p.id : null;
+          try { await Data.asignarPuesto(a.id, nuevo); a.puesto_id = nuevo; } catch (e) { toast("Error: " + (e.message || e), false); chk.checked = !chk.checked; }
+        }));
+      }
+
+      // --- Panel lateral con mini-listados y totales ---
+      function renderPanel() {
+        const panel = $("#distPanel", ov);
+        const totPlan = state.puestos.reduce((s, p) => s + (p.guardias_plan || 0), 0);
+        const totPal = state.puestos.reduce((s, p) => s + (p.paletas || 0), 0);
+        const totAsig = state.asist.filter(a => a.puesto_id).length;
+        const sinAsig = state.asist.length - totAsig;
+        panel.innerHTML = `
+          <div class="p-3 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+            <div class="font-semibold text-slate-700 text-sm">Puestos (${state.puestos.length})</div>
+            <button id="pnl_close" class="text-slate-400 text-xl leading-none">✕</button>
+          </div>
+          <div class="p-3 grid grid-cols-2 gap-2 text-center border-b border-slate-100">
+            <div class="rounded-lg bg-slate-50 py-2"><div class="text-lg font-bold text-slate-800">${totAsig}/${totPlan}</div><div class="text-[11px] text-slate-500">Asignados / plan</div></div>
+            <div class="rounded-lg bg-slate-50 py-2"><div class="text-lg font-bold text-slate-800">${totPal}</div><div class="text-[11px] text-slate-500">Paletas</div></div>
+            <div class="rounded-lg bg-slate-50 py-2 col-span-2"><div class="text-sm font-semibold ${sinAsig > 0 ? "text-amber-600" : "text-green-700"}">${sinAsig} guardia(s) sin asignar</div></div>
+          </div>
+          <div class="p-2 space-y-2">
+            ${state.puestos.length ? state.puestos.map(p => `
+              <div class="border border-slate-200 rounded-xl p-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="font-semibold text-slate-800 text-sm truncate">${esc(p.nombre)}</div>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" style="background:${colorAnillo(p.anillo)}1a;color:${colorAnillo(p.anillo)}">${esc(p.anillo || "—")}</span>
+                </div>
+                <div class="text-xs text-slate-500 mt-0.5">👤 ${asignados(p.id)}/${p.guardias_plan || 0} · 🔍 ${p.paletas || 0} paletas${p.notas ? ` · 📍 ${esc(p.notas)}` : ""}</div>
+                <div class="flex gap-1.5 mt-2">
+                  <button data-pver="${p.id}" class="btn btn-ghost text-xs flex-1">Ubicar</button>
+                  <button data-pasig="${p.id}" class="btn btn-ghost text-xs flex-1">Asignar</button>
+                </div>
+              </div>`).join("") : `<div class="text-slate-400 text-sm text-center py-8">Aún no hay puestos. Usa "➕ Puesto" y toca el mapa donde ubicarlo.</div>`}
+          </div>`;
+        $("#pnl_close", panel).addEventListener("click", togglePanel);
+        panel.querySelectorAll("[data-pver]").forEach(b => b.addEventListener("click", () => { const p = state.puestos.find(x => x.id === b.dataset.pver); if (p && p.lat != null) { map.setView([p.lat, p.lng], 18); const m = state.markers[p.id]; } }));
+        panel.querySelectorAll("[data-pasig]").forEach(b => b.addEventListener("click", () => { const p = state.puestos.find(x => x.id === b.dataset.pasig); if (p) modalAsignar(p); }));
+      }
+      function togglePanel() {
+        const panel = $("#distPanel", ov);
+        state.panelOpen = !state.panelOpen;
+        if (state.panelOpen) { renderPanel(); panel.style.transform = "translateX(0)"; }
+        else panel.style.transform = "translateX(100%)";
+      }
+      $("#dist_panel", ov).addEventListener("click", togglePanel);
     }
 
     /* ---- Modales evento ---- */

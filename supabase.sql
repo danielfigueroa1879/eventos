@@ -47,6 +47,25 @@ create table if not exists asistencias (
 create index if not exists idx_asist_evento on asistencias(evento_id);
 create index if not exists idx_asist_rut    on asistencias(rut);
 
+-- ---------- DISTRIBUCIÓN GRÁFICA (puestos / facciones en el mapa) ----------
+create table if not exists puestos (
+  id            uuid primary key default gen_random_uuid(),
+  evento_id     uuid references eventos(id) on delete cascade,
+  nombre        text not null,                 -- ej: Entrada lateral 1
+  lat           double precision,
+  lng           double precision,
+  guardias_plan integer default 0,             -- guardias planificados en el puesto
+  paletas       integer default 0,             -- detectores de metales / paletas
+  anillo        text,                          -- Anillo 1 / Anillo 2 / Interior / Exterior
+  notas         text,
+  orden         integer default 0,
+  created_at    timestamptz default now()
+);
+create index if not exists idx_puestos_evento on puestos(evento_id);
+
+-- Asignación de un guardia (asistencia) a un puesto
+alter table asistencias add column if not exists puesto_id uuid references puestos(id) on delete set null;
+
 -- ---------- HISTORIAL DE PARTIDOS ----------
 -- Cada vez que se "cierra y archiva" un partido, se guarda una foto (snapshot) de los
 -- guardias que asistieron. Así el mismo evento-partido se reutiliza (se cambia el nombre
@@ -81,18 +100,21 @@ alter table guardias_central         enable row level security;
 alter table asistencias              enable row level security;
 alter table partidos_historial       enable row level security;
 alter table partidos_historial_asist enable row level security;
+alter table puestos                  enable row level security;
 
 drop policy if exists "acceso_eventos"       on eventos;
 drop policy if exists "acceso_guardias"      on guardias_central;
 drop policy if exists "acceso_asistencias"   on asistencias;
 drop policy if exists "acceso_historial"     on partidos_historial;
 drop policy if exists "acceso_historial_as"  on partidos_historial_asist;
+drop policy if exists "acceso_puestos"       on puestos;
 
 create policy "acceso_eventos"       on eventos                  for all using (true) with check (true);
 create policy "acceso_guardias"      on guardias_central         for all using (true) with check (true);
 create policy "acceso_asistencias"   on asistencias              for all using (true) with check (true);
 create policy "acceso_historial"     on partidos_historial       for all using (true) with check (true);
 create policy "acceso_historial_as"  on partidos_historial_asist for all using (true) with check (true);
+create policy "acceso_puestos"       on puestos                  for all using (true) with check (true);
 
 -- ---------- TIEMPO REAL ----------
 -- Se agregan al realtime solo si no estaban ya (evita el error 42710
@@ -118,5 +140,9 @@ begin
   if not exists (select 1 from pg_publication_tables
                  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'partidos_historial_asist') then
     alter publication supabase_realtime add table partidos_historial_asist;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'puestos') then
+    alter publication supabase_realtime add table puestos;
   end if;
 end $$;
