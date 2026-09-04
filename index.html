@@ -461,7 +461,9 @@
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     function badge(v) { return `<span class="badge b-${v.color}">${esc(v.vigencia)}</span>`; }
-    function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+    function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+    // Fecha en formato día/mes/año (acepta 'YYYY-MM-DD' o 'YYYY-MM-DDT...')
+    function fechaFmt(s) { if (!s) return "—"; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s)); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s); }
     function guardLink(slug) { return location.origin + location.pathname + "?e=" + encodeURIComponent(slug); }
 
     /* =========================================================================
@@ -770,12 +772,10 @@
       const turnosArr = Object.values(turnosMap).sort((x, y) => x.clave - y.clave);
       if (ADMIN_STATE.turnoFiltro !== "all" && !turnosMap[ADMIN_STATE.turnoFiltro]) ADMIN_STATE.turnoFiltro = "all";
 
-      const q = ADMIN_STATE.search.toLowerCase();
+      // Se renderizan todas las filas del turno; la búsqueda filtra en vivo el DOM (ver filtrarLista)
       const filas = asist.filter(a => {
         if (ADMIN_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); if (!tn || String(tn.clave) !== ADMIN_STATE.turnoFiltro) return false; }
-        if (!q) return true;
-        const g = a.guardia || {};
-        return (a.rut + " " + (g.nombres || "") + " " + (g.apellidos || "")).toLowerCase().includes(q);
+        return true;
       });
 
       const turnosBar = `
@@ -793,7 +793,7 @@
     <div class="flex items-start justify-between gap-2 mb-3">
       <div class="min-w-0">
         <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</h1>
-        <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(ev.fecha_evento)}` : ""}</div>
+        <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(fechaFmt(ev.fecha_evento))}` : ""}</div>
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0">
@@ -898,13 +898,19 @@
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
-      const b = $("#buscar"); b.addEventListener("input", () => { ADMIN_STATE.search = b.value; const pos = b.selectionStart; renderMain().then(() => { const nb = $("#buscar"); if (nb) { nb.focus(); try { nb.setSelectionRange(pos, pos); } catch { } } }); });
+      const b = $("#buscar"); if (b) b.addEventListener("input", () => { ADMIN_STATE.search = b.value; filtrarLista(); });
+      filtrarLista();
       main.querySelectorAll(".turnoChip").forEach(c => c.addEventListener("click", () => { ADMIN_STATE.turnoFiltro = c.dataset.turno; renderMain(); }));
       main.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev)));
       main.querySelectorAll("[data-edit]").forEach(x => x.addEventListener("click", () => modalEditarGuardia(asist.find(a => a.id === x.dataset.edit), ev)));
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
     }
     function chip(label, n, color) { return `<div class="rounded-lg py-2 b-${color}"><div class="text-lg font-bold">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
+    // Filtra en vivo el listado de guardias (móvil y escritorio) sin re-renderizar
+    function filtrarLista() {
+      const q = (ADMIN_STATE.search || "").toLowerCase().trim();
+      document.querySelectorAll("#main [data-search]").forEach(el => { el.hidden = !!q && !el.dataset.search.includes(q); });
+    }
 
     /* ---- Estadísticas y gráficas por evento ---- */
     function estadisticasHTML(ev, asist) {
@@ -1001,12 +1007,12 @@
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
-      return `<tr class="${dup ? 'row-dup' : ''} border-b border-slate-50">
+      return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50">
     <td data-label="#" class="py-2 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
     <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
-    <td data-label="Examen" class="pr-2">${esc(g.fecha_ultimo_examen || "—")}</td>
+    <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
@@ -1038,11 +1044,11 @@
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
-      return `<button data-detail="${a.id}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
+      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-slate-900 text-sm truncate">${esc(nomLista)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
-        <span class="block text-[11px] text-slate-600 truncate"><span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(g.fecha_ultimo_examen || "—")}</span>
+        <span class="block text-[11px] text-slate-600 truncate"><span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>
       </span>
       ${vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
@@ -1096,7 +1102,7 @@
         </div>
       </div>`;
         })()}
-      ${detalleFila("📅", "Fecha de curso (examen)", esc(g.fecha_ultimo_examen || "—"))}
+      ${detalleFila("📅", "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
@@ -1198,7 +1204,7 @@
         const g = a.guardia || {};
         const v = calcularVigencia(g.fecha_ultimo_examen);
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
-        const row = [i + 1, a.rut, nom || "—", g.telefono || "—", g.fecha_ultimo_examen || "—", v.vigencia, v.siges || "—"];
+        const row = [i + 1, a.rut, nom || "—", g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), v.vigencia, v.siges || "—"];
         if (usaT) { const tn = calcularTurno(a.hora_ingreso, ev); row.push(tn ? `${tn.fecha} ${tn.etiqueta}` : "—"); }
         row.push(horaFmt(a.hora_ingreso));
         return row;
@@ -1212,7 +1218,7 @@
       const cell = v => { const s = String(v ?? ""); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
       const cols = listadoColumnas(ev), filas = listadoFilas(ev, asist);
       const meta = [
-        [tituloListado(ev)], ["Empresa", ev.empresa], ["Fecha", ev.fecha_evento || "—"],
+        [tituloListado(ev)], ["Empresa", ev.empresa], ["Fecha", fechaFmt(ev.fecha_evento)],
         [esPartido(ev) ? "Tipo" : "Turnos", eventoTipoTexto(ev)],
         ["Total guardias", asist.length + (ev.cantidad_esperada ? " / " + ev.cantidad_esperada : "")],
         ["Generado", new Date().toLocaleString("es-CL")], []
@@ -1240,7 +1246,7 @@
         .foot{margin-top:16px;color:#888;font-size:10px}
       </style></head><body>
         <h1>${esc(tituloListado(ev))}</h1>
-        <div class="sub">Empresa: <b>${esc(ev.empresa)}</b>${ev.fecha_evento ? " · Fecha: " + esc(ev.fecha_evento) : ""} · ${esc(eventoTipoTexto(ev))}</div>
+        <div class="sub">Empresa: <b>${esc(ev.empresa)}</b>${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</div>
         <div class="sub">Total: <b>${asist.length}</b>${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL"))}</div>
         <table><thead><tr>${th}</tr></thead><tbody>${tr || `<tr><td colspan="${cols.length}">Sin guardias registrados.</td></tr>`}</tbody></table>
         <div class="foot">Prefectura O.S.10 Coquimbo · Documento generado desde el sistema de control de guardias.</div>
@@ -1259,7 +1265,7 @@
       const L = [];
       L.push(tituloListado(ev));
       L.push(`Empresa: ${ev.empresa}`);
-      if (ev.fecha_evento) L.push(`Fecha: ${ev.fecha_evento}`);
+      if (ev.fecha_evento) L.push(`Fecha: ${fechaFmt(ev.fecha_evento)}`);
       L.push(eventoTipoTexto(ev));
       L.push(`Total: ${asist.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias`);
       L.push("");
