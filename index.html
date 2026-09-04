@@ -641,7 +641,9 @@
         <div class="mt-3">${badge(v)} ${v.siges ? `<span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""}</div>
         ${!v.puedeTrabajar ? `<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>` : ""}
         <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt(nowISO())}</p>
+        <button id="otroRegistro" class="btn btn-p w-full mt-5">➕ Ingresar otro registro</button>
       </div></div>`;
+          const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", () => renderGuard(ev.slug));
         } catch (err) { console.error(err); toast("Error al registrar: " + (err.message || err), false); submit.disabled = false; }
       });
     }
