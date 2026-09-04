@@ -1031,7 +1031,7 @@
       const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
       return `<button data-detail="${a.id}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50">
       <span class="text-[11px] text-slate-400 w-6 flex-shrink-0">#${i + 1}</span>
-      <span class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style="background:${c}">${esc(inicialGuardia(g))}</span>
+      <span class="w-1.5 h-8 rounded-full flex-shrink-0" style="background:${c}"></span>
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-slate-800 text-sm truncate">${esc(nombreCorto(g))}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
         <span class="block text-[11px] text-slate-400 font-mono truncate">${esc(a.rut)}</span>
@@ -1059,8 +1059,8 @@
       <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
     </div>
     <div class="text-center mb-3">
-      <div class="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-white text-3xl font-bold" style="background:${c}">${esc(inicialGuardia(g))}</div>
-      <div class="font-bold text-lg text-slate-800 mt-2 leading-tight">${esc(nomFull)}</div>
+      <div class="font-bold text-lg text-slate-800 leading-tight">${esc(nomFull)}</div>
+      <div class="inline-block mt-1.5">${vigenciaPill(v)}</div>
     </div>
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
