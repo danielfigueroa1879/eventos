@@ -871,7 +871,7 @@
       </div>
       <div class="p-3">
         <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
-        <button id="importar" class="btn btn-ghost w-full mb-3 text-sm">📥 Importar guardias (CSV)</button>
+        <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
         <div class="flex items-center justify-between px-1 mb-1.5">
           <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
           <span id="evCount" class="text-[11px] font-medium text-slate-300"></span>
@@ -974,7 +974,7 @@
       <div class="flex gap-1.5 flex-shrink-0">
         <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
-        <button id="compartir" class="btn btn-ghost text-base px-3" title="Compartir (PDF o Excel)">📤</button>
+        <button id="compartir" class="btn btn-ghost px-3 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
       </div>
     </div>
 
