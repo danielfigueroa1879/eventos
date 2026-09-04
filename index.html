@@ -1768,29 +1768,21 @@
       const ov = document.createElement("div");
       ov.id = "distOverlay";
       ov.className = "fixed inset-0 z-[55] bg-white flex flex-col";
-      if (!document.getElementById("distActionsStyle")) {
-        const st = document.createElement("style"); st.id = "distActionsStyle";
-        // Siempre se usa el menú hamburguesa (móvil y PC).
-        st.textContent = `.dist-actions{display:none}.dist-actions.open{display:flex}`;
-        document.head.appendChild(st);
-      }
       const btnStyle = "background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)";
       const btnCls = "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full md:w-auto hover:bg-white/20 transition-colors border";
       const svgShare = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`;
-      // Todas las acciones van dentro del menú hamburguesa, apiladas y full-width.
-      const menuBtnCls = "flex items-center justify-start gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full hover:bg-white/20 transition-colors border";
       const acciones = `
-          ${readonly ? "" : `<button id="dist_add" class="${menuBtnCls}" style="${btnStyle}">➕ Agregar puesto</button>`}
-          ${readonly ? "" : `<button id="dist_share" class="${menuBtnCls}" style="${btnStyle}">${svgShare} Compartir</button>`}
-          <button id="dist_pdf" class="${menuBtnCls}" style="${btnStyle}">📄 PDF</button>
-          <button id="dist_panel" class="${menuBtnCls}" style="${btnStyle}">📋 Listados</button>
-          <div class="h-px bg-white/20 my-1"></div>
-          <button id="dist_close" class="flex items-center justify-start gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full border border-red-600 bg-red-600 text-white hover:bg-red-700 transition-colors">✕ Cerrar mapa</button>`;
+          ${readonly ? "" : `<button id="dist_add" class="${btnCls}" style="${btnStyle}">➕ Agregar puesto</button>`}
+          ${readonly ? "" : `<button id="dist_share" class="flex items-center justify-center w-8 h-8 rounded-full border hover:bg-white/20 transition-colors flex-shrink-0 self-center md:self-auto" style="${btnStyle}" aria-label="Compartir" title="Compartir">${svgShare}</button>`}
+          <button id="dist_pdf" class="${btnCls}" style="${btnStyle}">📄 PDF</button>
+          <button id="dist_panel" class="${btnCls}" style="${btnStyle}">📋 Listados</button>
+          <div class="h-px bg-white/20 my-1 md:hidden"></div>
+          <button id="dist_close" class="${btnCls.replace('hover:bg-white/20', 'hover:bg-red-700').replace('border', 'border-red-600 bg-red-600 text-white')}">✕ Cerrar mapa</button>`;
       ov.innerHTML = `
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0 relative">
           <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ ${esc(ev.nombre_evento)}${readonly ? ' <span class="opacity-80 font-normal">· solo lectura</span>' : ""}</div>
-          <div id="dist_actions" class="dist-actions absolute right-2 top-[48px] z-[600] flex-col gap-2 bg-[#0f5323] rounded-xl shadow-2xl p-3 min-w-[180px]">${acciones}</div>
-          <button id="dist_menu" class="dist-menu-btn btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
+          <div id="dist_actions" class="hidden md:flex flex-col md:flex-row absolute md:static right-2 top-[48px] z-[600] md:z-auto bg-[#0f5323] md:bg-transparent rounded-xl md:rounded-none shadow-2xl md:shadow-none p-3 md:p-0 gap-2 min-w-[160px] md:min-w-0">${acciones}</div>
+          <button id="dist_menu" class="md:hidden btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
         </div>
         <div class="relative flex-1 min-h-0">
           <div id="distMap" class="absolute inset-0" style="background:#e5e7eb"></div>
@@ -1804,10 +1796,17 @@
       $("#dist_close", ov).addEventListener("click", cerrar);
       // Menú hamburguesa (celular): abrir/cerrar el grupo de acciones
       const distActions = $("#dist_actions", ov), distMenu = $("#dist_menu", ov);
-      const closeMenu = () => distActions.classList.remove("open");
-      if (distMenu) distMenu.addEventListener("click", (e) => { e.stopPropagation(); distActions.classList.toggle("open"); });
+      const closeMenu = () => { distActions.classList.remove("flex"); distActions.classList.add("hidden"); };
+      if (distMenu) distMenu.addEventListener("click", (e) => { 
+        e.stopPropagation(); 
+        if (distActions.classList.contains("hidden")) {
+          distActions.classList.remove("hidden"); distActions.classList.add("flex");
+        } else {
+          closeMenu();
+        }
+      });
       distActions.querySelectorAll("button").forEach(b => b.addEventListener("click", closeMenu));
-      ov.addEventListener("click", (e) => { if (distActions.classList.contains("open") && !distActions.contains(e.target) && e.target !== distMenu) closeMenu(); });
+      ov.addEventListener("click", (e) => { if (distActions.classList.contains("flex") && !distActions.contains(e.target) && e.target !== distMenu) closeMenu(); });
 
       try { state.puestos = await Data.listPuestos(ev.id); }
       catch (e) { toast("Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
