@@ -895,7 +895,7 @@
       if (sessionStorage.getItem("os10_admin") === "1") return renderAdmin();
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6">
     <div class="card p-6 w-full max-w-sm text-center">
-      <div class="text-4xl mb-2">🛡️</div>
+      <img src="images/logo-os10-original.webp" alt="OS10" class="w-12 h-12 mx-auto mb-3 rounded-full shadow-sm border border-slate-100">
       <h1 class="font-bold text-lg text-slate-800">Panel de Control de Guardias</h1>
       <p class="text-slate-500 text-sm mb-4">Ingresa el PIN de administrador</p>
       <input id="pin" type="password" inputmode="numeric" class="fld text-center tracking-widest text-lg" placeholder="••••"/>
@@ -1067,7 +1067,7 @@
 
     <button id="toggleQR" class="card w-full px-3 py-2.5 mb-3 flex items-center justify-between text-sm font-semibold text-slate-700">
       <span>🔳 QR y estado del evento <span class="text-slate-400 font-normal">· ${asist.length}${total ? " / " + total : ""} guardias · ${pct}%</span></span>
-      <span id="qrChevron" class="text-slate-400 transition-transform" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}">▾</span>
+      <span id="qrChevron" class="text-slate-400 transition-transform" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
     </button>
     <div id="qrPanel" class="card p-3 mb-3" ${ADMIN_STATE.showQR ? "" : "hidden"}>
       <div class="flex items-center justify-between mb-1.5">
@@ -1775,16 +1775,21 @@
         document.head.appendChild(st);
       }
       const btnStyle = "background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.25)";
+      const btnCls = "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full md:w-auto hover:bg-white/20 transition-colors border";
+      const svgShare = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`;
+      // Todas las acciones van dentro del menú hamburguesa, apiladas y full-width.
+      const menuBtnCls = "flex items-center justify-start gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full hover:bg-white/20 transition-colors border";
       const acciones = `
-          ${readonly ? "" : `<button id="dist_add" class="btn text-xs justify-start" style="${btnStyle}">➕ Agregar puesto</button>`}
-          ${readonly ? "" : `<button id="dist_share" class="btn text-xs justify-start" style="${btnStyle}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:4px"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg> Compartir</button>`}
-          <button id="dist_pdf" class="btn text-xs justify-start" style="${btnStyle}">📄 PDF</button>
-          <button id="dist_panel" class="btn text-xs justify-start" style="${btnStyle}">📋 Listados</button>
-          <button id="dist_close" class="btn text-xs justify-start" style="background:#b91c1c;color:#fff;border-color:#b91c1c">✕ Cerrar</button>`;
+          ${readonly ? "" : `<button id="dist_add" class="${menuBtnCls}" style="${btnStyle}">➕ Agregar puesto</button>`}
+          ${readonly ? "" : `<button id="dist_share" class="${menuBtnCls}" style="${btnStyle}">${svgShare} Compartir</button>`}
+          <button id="dist_pdf" class="${menuBtnCls}" style="${btnStyle}">📄 PDF</button>
+          <button id="dist_panel" class="${menuBtnCls}" style="${btnStyle}">📋 Listados</button>
+          <div class="h-px bg-white/20 my-1"></div>
+          <button id="dist_close" class="flex items-center justify-start gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-full border border-red-600 bg-red-600 text-white hover:bg-red-700 transition-colors">✕ Cerrar mapa</button>`;
       ov.innerHTML = `
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0 relative">
           <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ ${esc(ev.nombre_evento)}${readonly ? ' <span class="opacity-80 font-normal">· solo lectura</span>' : ""}</div>
-          <div id="dist_actions" class="dist-actions absolute right-2 top-[48px] z-[600] flex-col gap-1 bg-[#0f5323] rounded-xl shadow-2xl p-2 min-w-[180px]">${acciones}</div>
+          <div id="dist_actions" class="dist-actions absolute right-2 top-[48px] z-[600] flex-col gap-2 bg-[#0f5323] rounded-xl shadow-2xl p-3 min-w-[180px]">${acciones}</div>
           <button id="dist_menu" class="dist-menu-btn btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
         </div>
         <div class="relative flex-1 min-h-0">
@@ -2051,28 +2056,63 @@
         const totAsig = state.asist.filter(a => a.puesto_id).length;
         const sinAsig = state.asist.length - totAsig;
         panel.innerHTML = `
-          <div class="p-3 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-            <div class="font-semibold text-slate-700 text-sm">Puestos (${state.puestos.length})</div>
-            <button id="pnl_close" class="text-slate-400 text-xl leading-none">✕</button>
+          <div class="p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10 shadow-sm">
+            <div class="font-bold text-slate-800">Resumen de Puestos (${state.puestos.length})</div>
+            <button id="pnl_close" class="text-slate-400 hover:text-slate-600 text-xl leading-none transition-colors">✕</button>
           </div>
-          <div class="p-3 grid grid-cols-2 gap-2 text-center border-b border-slate-100">
-            <div class="rounded-lg bg-slate-50 py-2"><div class="text-lg font-bold text-slate-800">${totAsig}/${totPlan}</div><div class="text-[11px] text-slate-500">Asignados / plan</div></div>
-            <div class="rounded-lg bg-slate-50 py-2"><div class="text-lg font-bold text-slate-800">${totPal}</div><div class="text-[11px] text-slate-500">Paletas</div></div>
-            <div class="rounded-lg bg-slate-50 py-2 col-span-2"><div class="text-sm font-semibold ${sinAsig > 0 ? "text-amber-600" : "text-green-700"}">${sinAsig} guardia(s) sin asignar</div></div>
+          <div class="p-3 grid grid-cols-2 gap-2 text-center border-b border-slate-200 bg-slate-50/50">
+            <div class="rounded-xl bg-white border border-slate-200 py-2 shadow-sm flex flex-col items-center justify-center">
+              <div class="text-xl font-black text-slate-800 leading-none mb-1">${totAsig}<span class="text-sm text-slate-400 font-medium">/${totPlan}</span></div>
+              <div class="text-[9px] uppercase font-bold tracking-widest text-slate-500">Asignados</div>
+            </div>
+            <div class="rounded-xl bg-white border border-slate-200 py-2 shadow-sm flex flex-col items-center justify-center">
+              <div class="text-xl font-black text-slate-800 leading-none mb-1">${totPal}</div>
+              <div class="text-[9px] uppercase font-bold tracking-widest text-slate-500">Paletas</div>
+            </div>
+            <div class="rounded-xl ${sinAsig > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"} border py-2.5 col-span-2 shadow-sm flex items-center justify-center gap-2">
+              <span class="text-base leading-none">${sinAsig > 0 ? "⚠️" : "✅"}</span>
+              <div class="text-sm font-bold">${sinAsig} guardia(s) pendientes</div>
+            </div>
           </div>
-          <div class="p-2 space-y-2">
-            ${state.puestos.length ? state.puestos.map(p => `
-              <div class="border border-slate-200 rounded-xl p-2.5">
-                <div class="flex items-center justify-between gap-2">
-                  <div class="font-semibold text-slate-800 text-sm truncate">${esc(p.nombre)}</div>
-                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" style="background:${colorAnillo(p.anillo)}1a;color:${colorAnillo(p.anillo)}">${esc(p.anillo || "—")}</span>
+          <div class="p-3 space-y-3 bg-slate-50 min-h-full">
+            ${state.puestos.length ? state.puestos.map(p => {
+              const asig = asignados(p.id);
+              const plan = p.guardias_plan || 0;
+              const full = plan > 0 && asig >= plan;
+              const statusColor = full ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100";
+              return `
+              <div class="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between gap-2 mb-3">
+                  <div class="min-w-0 flex-1">
+                    <div class="font-bold text-slate-800 text-base leading-tight truncate">${esc(p.nombre)}</div>
+                    ${p.notas ? `<div class="text-xs text-slate-500 mt-1 truncate">📍 ${esc(p.notas)}</div>` : ""}
+                  </div>
+                  <span class="text-[10px] font-bold px-2 py-1 rounded-md flex-shrink-0 border" style="background:${colorAnillo(p.anillo)}0f;color:${colorAnillo(p.anillo)};border-color:${colorAnillo(p.anillo)}33">${esc(p.anillo || "—")}</span>
                 </div>
-                <div class="text-xs text-slate-500 mt-0.5">👤 ${asignados(p.id)}/${p.guardias_plan || 0} · 🔍 ${p.paletas || 0} paletas${p.notas ? ` · 📍 ${esc(p.notas)}` : ""}</div>
-                <div class="flex gap-1.5 mt-2">
-                  <button data-pver="${p.id}" class="btn btn-ghost text-xs flex-1">Ubicar</button>
-                  <button data-pasig="${p.id}" class="btn btn-ghost text-xs flex-1">Asignar</button>
+                
+                <div class="flex items-stretch gap-2 mb-3">
+                  <div class="flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-xl ${statusColor} border">
+                    <span class="text-lg leading-none opacity-80">👮</span>
+                    <div class="flex flex-col text-left">
+                      <span class="text-[9px] uppercase font-bold tracking-wider opacity-70 leading-none mb-0.5">Guardias</span>
+                      <span class="font-bold text-sm leading-none">${asig} <span class="opacity-60 text-xs font-medium">de ${plan}</span></span>
+                    </div>
+                  </div>
+                  
+                  <div class="flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-xl bg-slate-50 text-slate-600 border border-slate-100">
+                    <span class="text-lg leading-none opacity-80">🔍</span>
+                    <div class="flex flex-col text-left">
+                      <span class="text-[9px] uppercase font-bold tracking-wider opacity-70 leading-none mb-0.5">Paletas</span>
+                      <span class="font-bold text-sm leading-none">${p.paletas || 0}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>`).join("") : `<div class="text-slate-400 text-sm text-center py-8">Aún no hay puestos. Usa "➕ Puesto" y toca el mapa donde ubicarlo.</div>`}
+
+                <div class="flex gap-2">
+                  <button data-pver="${p.id}" class="btn btn-ghost text-xs flex-1 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl py-2">📍 Ver en mapa</button>
+                  <button data-pasig="${p.id}" class="btn ${full ? 'btn-ghost border border-slate-200 bg-white hover:bg-slate-50' : 'btn-p'} text-xs flex-1 rounded-xl py-2">👥 Asignar</button>
+                </div>
+              </div>`}).join("") : `<div class="text-slate-500 text-sm text-center py-10 px-4 bg-white rounded-2xl border border-slate-200 border-dashed">Aún no hay puestos creados.<br><br>Cierra este panel y usa <b>➕ Agregar puesto</b> para empezar.</div>`}
           </div>`;
         $("#pnl_close", panel).addEventListener("click", togglePanel);
         panel.querySelectorAll("[data-pver]").forEach(b => b.addEventListener("click", () => { const p = state.puestos.find(x => x.id === b.dataset.pver); if (p && p.lat != null) { map.setView([p.lat, p.lng], 18); const m = state.markers[p.id]; } }));
