@@ -1794,20 +1794,21 @@
         const total = Math.max(n, plan);
         // Recuadro con solo nombre y N/M (sin 👤 ni 🔍)
         const box = `<div style="background:${c};color:#fff;border:2px solid #fff;border-radius:10px;padding:3px 7px 4px;font:600 11px system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);text-align:center;line-height:1.15;white-space:nowrap"><div>${esc(p.nombre)}</div><div style="font-weight:700">${n}/${plan}</div></div>`;
-        // Fila de mini-iconos guardia, DEBAJO del recuadro (fuera). Máx 5 iconos con "+N" si sobran, todos pegados (sin separación).
+        // Grilla ordenada de mini-iconos guardia DEBAJO del recuadro (representa la cantidad).
+        // Hasta 12 iconos en filas de 6; si hay más, se muestra "+N".
         let iconos = "";
         if (total > 0) {
-          const MAX = 5;
+          const POR_FILA = 6, MAX = 12;
           const mostrar = Math.min(total, MAX);
           let chips = "";
           for (let i = 0; i < mostrar; i++) {
-            const on = i < n;
-            chips += `<img src="images/guardia.webp" alt="" width="16" height="16" style="display:block;width:16px;height:16px;object-fit:contain;${on ? "filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
+            const on = i < n;   // asignados a color, faltantes (hasta el plan) en gris
+            chips += `<img src="images/guardia.webp" alt="" width="14" height="14" style="display:block;width:14px;height:14px;object-fit:contain;${on ? "filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
           }
           const extra = total > MAX
-            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;padding:0 4px;margin-left:2px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4)">+${total - MAX}</span>`
+            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 4px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4)">+${total - MAX}</span>`
             : "";
-          iconos = `<div style="display:inline-flex;flex-wrap:nowrap;gap:0;justify-content:center;align-items:center;margin:3px auto 0">${chips}${extra}</div>`;
+          iconos = `<div style="display:flex;flex-wrap:wrap;gap:1px;justify-content:center;align-items:center;margin:3px auto 0;max-width:${POR_FILA * 15}px">${chips}${extra}</div>`;
         }
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
       }
