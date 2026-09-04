@@ -1852,38 +1852,55 @@
         toast("Generando PDF…");
         try {
           const mapEl = document.getElementById("distMap");
-          const canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 1.5, logging: false });
-          const imgData = canvas.toDataURL("image/jpeg", 0.9);
+          const canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 2, logging: false });
+          const imgData = canvas.toDataURL("image/jpeg", 0.92);
 
-          const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+          const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
           const W = doc.internal.pageSize.getWidth();
           const H = doc.internal.pageSize.getHeight();
+          const marginX = 28;
           doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(15, 83, 35);
           doc.text(`Relación de facciones — ${ev.nombre_evento}`, W / 2, 34, { align: "center" });
           doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
           const sub = `Empresa: ${ev.empresa}${ev.fecha_evento ? " · Fecha: " + fechaFmt(ev.fecha_evento) : ""} · Puestos: ${state.puestos.length} · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`;
           doc.text(sub, W / 2, 50, { align: "center" });
 
-          // Captura del mapa (ancho útil, alto proporcional)
-          const marginX = 28, imgW = W - marginX * 2;
-          const imgH = Math.min(canvas.height * imgW / canvas.width, H * 0.42);
-          doc.addImage(imgData, "JPEG", marginX, 62, imgW, imgH);
+          // Captura del mapa: respetar proporción real y limitar altura
+          const maxW = W - marginX * 2;
+          const maxH = H * 0.40;
+          const ratio = canvas.width / canvas.height;
+          let imgW = maxW, imgH = imgW / ratio;
+          if (imgH > maxH) { imgH = maxH; imgW = imgH * ratio; }
+          const imgX = (W - imgW) / 2;
+          const imgY = 62;
+          doc.addImage(imgData, "JPEG", imgX, imgY, imgW, imgH);
 
-          // Tabla con las facciones
+          // Tabla con las facciones. Cada guardia: "Nombre — RUT" en línea propia.
+          const trim = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
           const rows = state.puestos.map((p, i) => {
-            const nombres = guardiasDePuesto(p.id);
-            const n = nombres.length, plan = p.guardias_plan || 0;
-            return [String(i + 1), p.nombre, p.anillo || "—", `${n}/${plan}`, String(p.paletas || 0), nombres.length ? nombres.join(", ") : "—"];
+            const asig = state.asist.filter(a => a.puesto_id === p.id);
+            const asigTxt = asig.length
+              ? asig.map(a => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim(); return `${trim(nom || "—", 28)} — ${a.rut}`; }).join("\n")
+              : "—";
+            const plan = p.guardias_plan || 0;
+            return [String(i + 1), p.nombre, p.anillo || "—", `${asig.length}/${plan}`, String(p.paletas || 0), asigTxt];
           });
           doc.autoTable({
-            startY: 62 + imgH + 14,
-            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Asignados"]],
+            startY: imgY + imgH + 14,
+            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Asignados (nombre — RUT)"]],
             body: rows,
             theme: "grid",
-            styles: { fontSize: 8, cellPadding: 4, valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+            styles: { font: "helvetica", fontSize: 8, cellPadding: 3, valign: "top", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
             headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
             alternateRowStyles: { fillColor: [244, 247, 245] },
-            columnStyles: { 0: { cellWidth: 22, halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" } },
+            columnStyles: {
+              0: { cellWidth: 22, halign: "center" },
+              1: { cellWidth: 110, fontStyle: "bold" },
+              2: { cellWidth: 60, halign: "center" },
+              3: { cellWidth: 46, halign: "center", fontStyle: "bold" },
+              4: { cellWidth: 46, halign: "center" },
+              5: { cellWidth: "auto", font: "courier", fontSize: 8 }
+            },
             margin: { left: marginX, right: marginX, bottom: 34 },
             didDrawPage: () => {
               doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
