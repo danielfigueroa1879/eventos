@@ -790,7 +790,7 @@
         submit = $("#g_submit"), rutMsg = $("#rutMsg"),
         nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha"),
         nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg");
-      let modo = null, guardiaExiste = false;
+      let modo = null, guardiaExiste = false, guardiaCargado = null;
 
       // Fecha del examen: no puede ser futura
       const hoyISO = new Date().toISOString().slice(0, 10);
@@ -846,7 +846,7 @@
         }
         mostrarTurnoActual();
         if (g) {
-          guardiaExiste = true; modo = "existe";
+          guardiaExiste = true; modo = "existe"; guardiaCargado = g;
           extra.hidden = false;
           nombres.value = g.nombres || ""; apellidos.value = g.apellidos || ""; tel.value = g.telefono || ""; fecha.value = g.fecha_ultimo_examen || "";
           [nombres, apellidos, tel, fecha].forEach(i => i.setAttribute("readonly", "readonly"));
@@ -884,8 +884,13 @@
           if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
             await Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' });
           } else if (modo === "existe") {
-            // permitir corrección de fecha
-            await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' });
+            const modificado = guardiaCargado && fecha.value !== (guardiaCargado.fecha_ultimo_examen || "");
+            if (modificado) {
+              await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' });
+            } else {
+              // Si no modificó nada, solo actualizamos los datos básicos sin tocar su estado de aprobación
+              await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value });
+            }
           }
           const asis = await Data.createAsistencia(ev.id, rutV);
           const v = calcularVigencia(fecha.value);
@@ -1348,10 +1353,8 @@
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
       const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-800 ml-1 whitespace-nowrap">🟡 ${g.revision_tipo === 'MODIFICADO' ? 'Datos editados' : 'Nuevo guardia'}</span>` : '';
-      // La empresa no ve la fecha del examen; en su lugar muestra la hora de ingreso
-      const segunda = modo === "empresa"
-        ? `<span class="font-mono">${esc(a.rut)}</span> · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`
-        : `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
+      // Mostrar rut, curso y hora de ingreso para todos
+      const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50">
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
@@ -1411,7 +1414,7 @@
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
       ${telHTML}
-      ${empresa ? "" : detalleFila("📅", "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
+      ${detalleFila("📅", "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
