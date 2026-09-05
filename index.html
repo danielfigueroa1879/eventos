@@ -1314,7 +1314,7 @@
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
-      const pend = g.aprobado === false ? `<span class="badge" style="background:#fef9c3;color:#a16207;margin-left:4px" title="Pendiente de revisión">🟡 ${g.revision_tipo === 'MODIFICADO' ? 'Datos editados' : 'Nuevo guardia'}</span>` : '';
+      const pend = g.aprobado === false ? `<span class="badge" style="background:#fef9c3;color:#a16207;margin-left:4px" title="Pendiente de revisión">🟡 ${g.revision_tipo === 'NUEVO' ? 'Nuevo guardia' : 'Datos editados'}</span>` : '';
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50">
     <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
@@ -1352,7 +1352,7 @@
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
-      const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-800 ml-1 whitespace-nowrap">🟡 ${g.revision_tipo === 'MODIFICADO' ? 'Datos editados' : 'Nuevo guardia'}</span>` : '';
+      const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-800 ml-1 whitespace-nowrap">🟡 ${g.revision_tipo === 'NUEVO' ? 'Nuevo guardia' : 'Datos editados'}</span>` : '';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50">
@@ -1421,7 +1421,7 @@
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
     </div>
-    ${g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn btn-p w-full bg-yellow-500 hover:bg-yellow-600 border-yellow-600 text-white shadow-sm flex items-center justify-center gap-2">✔ Aprobar ${g.revision_tipo === 'MODIFICADO' ? 'modificación' : 'nuevo guardia'}</button></div>` : ""}
+    ${g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn btn-p w-full bg-yellow-500 hover:bg-yellow-600 border-yellow-600 text-white shadow-sm flex items-center justify-center gap-2">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
       <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
