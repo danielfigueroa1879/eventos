@@ -1056,9 +1056,10 @@
       ADMIN_STATE._avisSigs = new Set(sigActual.keys());
 
       const partes = [];
-      if (nuevos.length) partes.push(`🆕 ${nuevos.length === 1 ? "Nuevo guardia" : nuevos.length + " guardias nuevos"}: ${nuevos.join(", ")}`);
-      if (modificados.length) partes.push(`✏️ ${modificados.length === 1 ? "Datos modificados" : modificados.length + " guardias con datos modificados"}: ${modificados.join(", ")}`);
-      if (partes.length) toast(partes.join("   ·   "), true, 5000);
+      if (nuevos.length) partes.push(`🔴 ${nuevos.length === 1 ? "Nuevo guardia" : nuevos.length + " guardias nuevos"}: ${nuevos.join(", ")}`);
+      if (modificados.length) partes.push(`🟡 ${modificados.length === 1 ? "Datos editados" : modificados.length + " guardias con datos editados"}: ${modificados.join(", ")}`);
+      // Borde rojo si hay guardias nuevos (más urgente); si no, verde para datos editados.
+      if (partes.length) toast(partes.join("   ·   "), !nuevos.length, 5000);
     }
 
     async function renderMain() {
@@ -1359,7 +1360,8 @@
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
-      const pend = g.aprobado === false ? `<span class="badge" style="background:#fef9c3;color:#a16207;margin-left:4px" title="Pendiente de revisión">🟡 ${g.revision_tipo === 'NUEVO' ? 'Nuevo guardia' : 'Datos editados'}</span>` : '';
+      const esNuevoG = g.revision_tipo === 'NUEVO';
+      const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50">
     <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
@@ -1398,7 +1400,8 @@
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
-      const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-800 ml-1 whitespace-nowrap">🟡 ${g.revision_tipo === 'NUEVO' ? 'Nuevo guardia' : 'Datos editados'}</span>` : '';
+      const esNuevoG = g.revision_tipo === 'NUEVO';
+      const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${esNuevoG ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} ml-1 whitespace-nowrap">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50">
