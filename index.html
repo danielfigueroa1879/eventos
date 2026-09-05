@@ -34,13 +34,31 @@
 
     body {
       background-color: #eef2f0;
-      background-image: linear-gradient(rgba(238, 242, 240, .55), rgba(238, 242, 240, .62)), url("images/fondo.webp");
-      background-position: center center;
-      background-size: cover;
-      background-repeat: no-repeat;
-      background-attachment: fixed;
       font-family: ui-sans-serif, system-ui, Arial, sans-serif;
       -webkit-tap-highlight-color: transparent
+    }
+
+    /* Fondo (imagen) con leve desenfoque, en una capa detrás del contenido */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -12px;
+      z-index: -2;
+      background: url("images/fondo.webp") center center / cover no-repeat;
+      filter: blur(3px);
+    }
+
+    /* Velo claro encima del fondo para mantener la legibilidad */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: rgba(238, 242, 240, .66);
+    }
+
+    html[data-theme="dark"] body::after {
+      background: rgba(27, 30, 35, .87);
     }
 
     .brand-bg {
@@ -259,11 +277,6 @@
 
     html[data-theme="dark"] body {
       background-color: #1b1e23;
-      background-image: linear-gradient(rgba(27, 30, 35, .80), rgba(27, 30, 35, .84)), url("images/fondo.webp");
-      background-position: center center;
-      background-size: cover;
-      background-repeat: no-repeat;
-      background-attachment: fixed;
       color: #dfe3e8
     }
 
