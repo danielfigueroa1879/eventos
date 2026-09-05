@@ -659,9 +659,9 @@
       paint();
     })();
 
-    function toast(msg, ok = true) {
+    function toast(msg, ok = true, ms = 2600) {
       const t = $("#toast"); t.innerHTML = `<div class="card px-4 py-3 text-sm font-medium ${ok ? 'text-green-800' : 'text-red-700'}" style="border-left:4px solid ${ok ? '#16a34a' : '#dc2626'}">${esc(msg)}</div>`;
-      t.style.display = "block"; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", 2600);
+      t.style.display = "block"; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", ms);
     }
     function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     function closeModal() { $("#modal").style.display = "none"; }
@@ -1028,11 +1028,47 @@
       ADMIN_STATE.eventos.forEach(async e => { const as = await Data.listAsistencias(e.id); const el = $(`[data-count="${e.id}"]`); if (el) el.textContent = `${as.length} / ${e.cantidad_esperada || "—"} guardias`; });
     }
 
+    // Detecta y avisa (toast) cuando ingresa un guardia nuevo o se modifican datos de un guardia.
+    // Solo avisa de cambios ocurridos MIENTRAS se ve el evento; al cambiar de evento fija la línea base sin avisar.
+    function detectarAvisosGuardias(ev, asist) {
+      const pend = (asist || []).filter(a => a.guardia && a.guardia.aprobado === false);
+      const sigActual = new Map(); // firma única -> { tipo, nombre }
+      pend.forEach(a => {
+        const g = a.guardia;
+        const sig = `${a.rut}|${g.revision_tipo || ""}|${g.updated_at || ""}`;
+        const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
+        sigActual.set(sig, { tipo: g.revision_tipo, nombre });
+      });
+
+      // Primera carga o cambio de evento: fijar línea base sin avisar de lo que ya estaba.
+      if (ADMIN_STATE._avisEvento !== ev.id) {
+        ADMIN_STATE._avisEvento = ev.id;
+        ADMIN_STATE._avisSigs = new Set(sigActual.keys());
+        return;
+      }
+
+      const nuevos = [], modificados = [];
+      sigActual.forEach((info, sig) => {
+        if (ADMIN_STATE._avisSigs && ADMIN_STATE._avisSigs.has(sig)) return;
+        if (info.tipo === "MODIFICADO") modificados.push(info.nombre);
+        else nuevos.push(info.nombre); // NUEVO (o pendiente sin tipo)
+      });
+      ADMIN_STATE._avisSigs = new Set(sigActual.keys());
+
+      const partes = [];
+      if (nuevos.length) partes.push(`🆕 ${nuevos.length === 1 ? "Nuevo guardia" : nuevos.length + " guardias nuevos"}: ${nuevos.join(", ")}`);
+      if (modificados.length) partes.push(`✏️ ${modificados.length === 1 ? "Datos modificados" : modificados.length + " guardias con datos modificados"}: ${modificados.join(", ")}`);
+      if (partes.length) toast(partes.join("   ·   "), true, 5000);
+    }
+
     async function renderMain() {
       const main = $("#main"); if (!main) return;
       const ev = ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected);
       if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>Crea un evento para comenzar.</div>`; return; }
       const asist = await Data.listAsistencias(ev.id);
+
+      // Aviso en tiempo real: guardias nuevos o con datos modificados (pendientes de aprobación)
+      detectarAvisosGuardias(ev, asist);
 
       // Partidos: cierre automático 12 h después del último ingreso (se archiva y la lista queda limpia)
       if (esPartido(ev) && asist.length && !ADMIN_STATE._cerrando) {
