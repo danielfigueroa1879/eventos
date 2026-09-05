@@ -668,11 +668,23 @@
     function sonarIngreso() {
       try {
         if (!_audioIngreso) { _audioIngreso = new Audio("sonidos/ingreso.mp3"); _audioIngreso.preload = "auto"; }
-        _audioIngreso.volume = 0.8; // 80% del volumen
+        _audioIngreso.volume = 1.0; // 100% del volumen
         _audioIngreso.currentTime = 0;
         const p = _audioIngreso.play();
         if (p && p.catch) p.catch(() => { }); // el navegador puede bloquear el autoplay; se ignora
       } catch (e) { }
+    }
+    // Corre una promesa con límite de tiempo: si el servidor no responde a tiempo (señal mala),
+    // rechaza para que el llamador NO dé por exitoso el ingreso.
+    function conTimeout(promise, ms, msg) {
+      let t;
+      const limite = new Promise((_, reject) => { t = setTimeout(() => reject(new Error(msg || "TIMEOUT")), ms); });
+      return Promise.race([promise, limite]).finally(() => clearTimeout(t));
+    }
+    // ¿El error de Supabase es por duplicado (el guardia ya estaba registrado en este evento)?
+    function esErrorDuplicado(err) {
+      const c = err && (err.code || ""); const m = ((err && (err.message || err.details)) || "").toLowerCase();
+      return c === "23505" || m.includes("duplicate") || m.includes("unique") || m.includes("ya registrad");
     }
     function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     function closeModal() { $("#modal").style.display = "none"; }
@@ -860,9 +872,9 @@
           guardiaExiste = true; modo = "existe"; guardiaCargado = g;
           extra.hidden = false;
           nombres.value = g.nombres || ""; apellidos.value = g.apellidos || ""; tel.value = g.telefono || ""; fecha.value = g.fecha_ultimo_examen || "";
-          [nombres, apellidos, tel, fecha].forEach(i => i.setAttribute("readonly", "readonly"));
-          fecha.removeAttribute("readonly"); // por si quiere corregir fecha vencida
-          rutMsg.innerHTML = `<span class="text-green-700 font-medium">✔ Datos encontrados. Verifica y confirma tu ingreso.</span>`;
+          // El guardia puede corregir sus datos (nombres, apellidos, teléfono o curso) una sola vez, en el momento de su ingreso al partido.
+          [nombres, apellidos, tel, fecha].forEach(i => i.removeAttribute("readonly"));
+          rutMsg.innerHTML = `<span class="text-green-700 font-medium">✔ Datos encontrados. Si algo está mal, corrígelo y confirma tu ingreso.</span>`;
           mostrarVigencia(fecha.value);
           avisoNombres(); avisoApellidos(); avisoFecha();
           submit.disabled = false; submit.textContent = "✔ Confirmar ingreso"; actualizarBtn();
@@ -880,56 +892,99 @@
       function actualizarBtn() {
         // La fecha futura sí bloquea; un solo nombre/apellido solo avisa (no bloquea)
         if (fecha.value && fechaFutura(fecha.value)) { submit.disabled = true; submit.textContent = "Fecha de examen inválida"; return; }
-        if (modo === "existe") { submit.disabled = false; submit.textContent = "✔ Confirmar ingreso"; return; }
+        if (modo === "existe") {
+          const ok = nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
+          submit.disabled = !ok; submit.textContent = ok ? "✔ Confirmar ingreso" : "Complete los datos";
+          return;
+        }
         if (modo === "nuevo") {
           const ok = rutValido(rut.value) && nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
           submit.disabled = !ok; submit.textContent = ok ? "Registrar ingreso" : "Complete los datos";
         }
       }
 
-      submit.addEventListener("click", async () => {
-        if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); toast("La fecha del examen no puede ser futura", false); actualizarBtn(); return; }
-        submit.disabled = true;
-        try {
-          const rutV = formatRut(rut.value);
-          if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
-            await Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' });
-          } else if (modo === "existe") {
-            const modificado = guardiaCargado && fecha.value !== (guardiaCargado.fecha_ultimo_examen || "");
-            if (modificado) {
-              await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' });
-            } else {
-              // Si no modificó nada, solo actualizamos los datos básicos sin tocar su estado de aprobación
-              await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value });
-            }
-          }
-          const asis = await Data.createAsistencia(ev.id, rutV);
-          sonarIngreso(); // sonido de confirmación de ingreso
-          const v = calcularVigencia(fecha.value);
-          const tn = calcularTurno(asis?.hora_ingreso || nowISO(), ev);
-          app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
+      // Pantalla de ÉXITO — solo se muestra cuando la escritura quedó CONFIRMADA por el servidor.
+      function mostrarIngresoExitoso(asisRec) {
+        sonarIngreso(); // sonido de confirmación de ingreso
+        const v = calcularVigencia(fecha.value);
+        const tn = calcularTurno((asisRec && asisRec.hora_ingreso) || nowISO(), ev);
+        app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
         <div class="text-5xl mb-3">✅</div>
         <h1 class="font-bold text-xl text-slate-800">Ingreso registrado</h1>
         <p class="text-slate-600 mt-1">${esc(formatNombre(nombres.value))} ${esc(formatNombre(apellidos.value))}</p>
         ${tn ? `<div class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">🕑 ${esc(tn.etiqueta)} · ${esc(tn.rango)}</div>` : ""}
         <div class="mt-3" id="vigReveal">${badge(v)} ${v.siges ? `<span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""}</div>
         ${!v.puedeTrabajar ? `<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>` : ""}
-        <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt(nowISO())}</p>
+        <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt((asisRec && asisRec.hora_ingreso) || nowISO())}</p>
         <button id="otroRegistro" class="btn btn-p w-full mt-5">➕ Ingresar otro registro</button>
         <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">10</span> s…</p>
       </div></div>`;
-          // Prórroga: primero "NO VIGENTE" (amarillo) y luego revela "CON PRÓRROGA" en verde con tic
-          if (v.estado === "VENCIDO_CON_PRORROGA") {
-            setTimeout(() => {
-              const vr = $("#vigReveal");
-              if (vr) vr.innerHTML = `<span class="badge b-verde">✅ CON PRÓRROGA</span> <span class="text-xs text-slate-500">(${esc(v.siges)})</span>`;
-            }, 2500);
+        // Prórroga: primero "NO VIGENTE" (amarillo) y luego revela "CON PRÓRROGA" en verde con tic
+        if (v.estado === "VENCIDO_CON_PRORROGA") {
+          setTimeout(() => {
+            const vr = $("#vigReveal");
+            if (vr) vr.innerHTML = `<span class="badge b-verde">✅ CON PRÓRROGA</span> <span class="text-xs text-slate-500">(${esc(v.siges)})</span>`;
+          }, 2500);
+        }
+        let restante = 10, tmpAuto = null;
+        const irOtro = () => { if (tmpAuto) clearInterval(tmpAuto); renderGuard(ev.slug); };
+        const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", irOtro);
+        tmpAuto = setInterval(() => { restante--; const c = $("#otroCount"); if (c) c.textContent = restante; if (restante <= 0) irOtro(); }, 1000);
+      }
+
+      const TIMEOUT_MS = 20000; // límite de espera para confirmar cada escritura en el servidor
+
+      submit.addEventListener("click", async () => {
+        if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); toast("La fecha del examen no puede ser futura", false); actualizarBtn(); return; }
+        // Sin conexión (modo producción): no se intenta. El guardia simplemente no podrá registrar hasta tener señal.
+        if (USING_SUPABASE && navigator.onLine === false) {
+          toast("Sin conexión a internet. Verifica tu señal e intenta nuevamente.", false);
+          return;
+        }
+        const rutV = formatRut(rut.value);
+        const txtPrev = submit.textContent;
+        submit.disabled = true; submit.textContent = "Guardando… no cierres esta ventana";
+        try {
+          // 1) Guardar/actualizar los datos del guardia (con límite de tiempo).
+          if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
+            await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' }), TIMEOUT_MS);
+          } else if (modo === "existe") {
+            const g0 = guardiaCargado || {};
+            const nom = formatNombre(nombres.value).trim(), ape = formatNombre(apellidos.value).trim(), telf = tel.value.trim();
+            // Detecta corrección en cualquiera de los cuatro campos: nombres, apellidos, teléfono o curso (fecha).
+            // Se normaliza ambos lados igual para no marcar cambios inexistentes (solo diferencia de mayúsculas/espacios).
+            const modificado =
+              nom !== formatNombre(g0.nombres || "").trim() ||
+              ape !== formatNombre(g0.apellidos || "").trim() ||
+              telf !== (g0.telefono || "").trim() ||
+              fecha.value !== (g0.fecha_ultimo_examen || "");
+            if (modificado) {
+              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' }), TIMEOUT_MS);
+            } else {
+              // Si no modificó nada, solo actualizamos los datos básicos sin tocar su estado de aprobación
+              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value }), TIMEOUT_MS);
+            }
           }
-          let restante = 10, tmpAuto = null;
-          const irOtro = () => { if (tmpAuto) clearInterval(tmpAuto); renderGuard(ev.slug); };
-          const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", irOtro);
-          tmpAuto = setInterval(() => { restante--; const c = $("#otroCount"); if (c) c.textContent = restante; if (restante <= 0) irOtro(); }, 1000);
-        } catch (err) { console.error(err); toast("Error al registrar: " + (err.message || err), false); submit.disabled = false; }
+          // 2) Registrar la asistencia y CONFIRMAR que el servidor la escribió (devuelve la fila insertada).
+          const asis = await conTimeout(Data.createAsistencia(ev.id, rutV), TIMEOUT_MS);
+          if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
+          // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
+          mostrarIngresoExitoso(asis);
+        } catch (err) {
+          console.error(err);
+          // ¿Ya estaba registrado? (doble toque o reintento cuya escritura anterior sí llegó al servidor).
+          if (esErrorDuplicado(err)) {
+            const ya = await Data.yaRegistrado(ev.id, rutV).catch(() => null);
+            mostrarIngresoExitoso(ya);
+            return;
+          }
+          // Recuperación: la escritura pudo haber llegado y solo se perdió la respuesta. Verificamos en el servidor.
+          const ya = await conTimeout(Data.yaRegistrado(ev.id, rutV), 8000).catch(() => null);
+          if (ya) { mostrarIngresoExitoso(ya); return; }
+          // No quedó confirmado → error claro, sin falso éxito. El guardia puede reintentar.
+          toast("No se pudo registrar tu ingreso. Verifica tu conexión e intenta nuevamente.", false);
+          submit.disabled = false; submit.textContent = txtPrev || "✔ Confirmar ingreso";
+        }
       });
     }
 
