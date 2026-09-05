@@ -380,12 +380,10 @@
     const SUPABASE_URL = "https://ncnopdsbiirbicslfnvk.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jbm9wZHNiaWlyYmljc2xmbnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NDQ5NzcsImV4cCI6MjEwNDAyMDk3N30.498aWvQrs6Zqgd-PoKmKT11AQukcjuQ9VmZs0PUun2A";
 
-    // 2) PIN para entrar al panel de administrador (cámbialo).
-    const ADMIN_PIN = "8979";
-
-    // 2b) CLAVE PARA ELIMINAR un evento. Solo tú debes conocerla (distinta al PIN de admin),
-    //     así tus colegas no pueden borrar un evento por error desde su celular. CÁMBIALA aquí:
-    const DELETE_PIN = "4040";
+    // 2) Contraseñas (PIN de admin y clave para eliminar): YA NO están en este código.
+    //    Se verifican EN EL SERVIDOR mediante la función RPC 'verificar_clave' de Supabase,
+    //    y las claves reales viven hasheadas en la tabla 'secretos' (ver SQL de instalación).
+    //    Para cambiarlas, actualiza la tabla 'secretos' en Supabase, NO este archivo.
 
     // 3) Reglas legales OS10 (Ley 21.659 / prórroga Ley 21.825). No suelen cambiar.
     const MESES_VIGENCIA = 36;
@@ -557,6 +555,8 @@
       const ping = () => listeners.forEach(f => f());
       return {
         onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
+        // MODO DEMO (sin servidor): claves solo para probar en local. En producción se usa Supabase (ver adaptador Remote).
+        async verificarClave(nombre, clave) { const demo = { admin: "0000", eliminar: "0000" }; return clave === demo[nombre]; },
         async listEventos() { return get(K.ev).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)); },
         async createEvento(e) { const ev = { ...e, id: uid(), created_at: nowISO(), activo: true }; const a = get(K.ev); a.push(ev); set(K.ev, a); ping(); return ev; },
         async updateEvento(id, patch) { const a = get(K.ev).map(x => x.id === id ? { ...x, ...patch } : x); set(K.ev, a); ping(); },
@@ -604,6 +604,8 @@
       const ok = (r) => { if (r.error) throw r.error; return r.data; };
       return {
         onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
+        // Verifica la clave EN EL SERVIDOR (función RPC). La contraseña real vive en Supabase, no en este código.
+        async verificarClave(nombre, clave) { const { data, error } = await sb.rpc("verificar_clave", { p_nombre: nombre, p_clave: clave }); if (error) throw error; return data === true; },
         async listEventos() { return ok(await sb.from("eventos").select("*").order("created_at", { ascending: true })); },
         async createEvento(e) { return ok(await sb.from("eventos").insert({ ...e, activo: true }).select().single()); },
         async updateEvento(id, patch) { ok(await sb.from("eventos").update(patch).eq("id", id)); },
@@ -1018,7 +1020,19 @@
       <button id="pinBtn" class="btn btn-p w-full mt-3">Entrar</button>
       <p class="text-xs text-slate-400 mt-3">${USING_SUPABASE ? '● Conectado a Supabase' : 'MODO DEMO — datos solo en este dispositivo'} · ${APP_VERSION}</p>
     </div></div>`;
-      const go = () => { if ($("#pin").value === ADMIN_PIN) { sessionStorage.setItem("os10_admin", "1"); renderAdmin(); } else toast("PIN incorrecto", false); };
+      const go = async () => {
+        const btn = $("#pinBtn"), inp = $("#pin");
+        if (btn) { btn.disabled = true; btn.textContent = "Verificando…"; }
+        try {
+          const ok = await Data.verificarClave("admin", inp ? inp.value : "");
+          if (ok) { sessionStorage.setItem("os10_admin", "1"); renderAdmin(); return; }
+          toast("PIN incorrecto", false);
+        } catch (e) {
+          toast("No se pudo verificar (sin conexión). Intenta nuevamente.", "danger", 4000);
+        }
+        if (btn) { btn.disabled = false; btn.textContent = "Entrar"; }
+        if (inp) { inp.value = ""; inp.focus(); }
+      };
       $("#pinBtn").addEventListener("click", go);
       $("#pin").addEventListener("keydown", e => { if (e.key === "Enter") go(); });
     }
@@ -2451,17 +2465,26 @@
     }
 
     // Confirmación protegida por clave: para acciones destructivas (eliminar evento).
-    // Solo continúa si la clave coincide con DELETE_PIN. Evita borrados por error de colegas.
+    // Solo continúa si el servidor confirma la clave 'eliminar'. Evita borrados por error de colegas.
     function confirmarConClave(msg, onOk) {
       openModal(`<h2 class="font-bold text-slate-800 mb-2">🔒 Eliminar (requiere clave)</h2>
     <p class="text-slate-600 text-sm mb-3">${esc(msg)}</p>
     <input id="del_pin" type="password" inputmode="numeric" autocomplete="off" class="fld text-center tracking-widest text-lg" placeholder="Clave para eliminar">
     <p id="del_err" class="text-red-600 text-sm mt-2 font-medium" hidden>❌ Clave incorrecta. No se eliminó nada.</p>
     <div class="flex gap-2 mt-4"><button id="c_no" class="btn btn-ghost flex-1">Cancelar</button><button id="c_si" class="btn btn-danger flex-1">Eliminar</button></div>`);
-      const intentar = () => {
-        const inp = $("#del_pin");
-        if (inp && inp.value === DELETE_PIN) { onOk(); }
-        else { const e = $("#del_err"); if (e) e.hidden = false; if (inp) { inp.value = ""; inp.focus(); } }
+      const intentar = async () => {
+        const inp = $("#del_pin"), btnSi = $("#c_si"), e = $("#del_err");
+        if (btnSi) { btnSi.disabled = true; btnSi.textContent = "Verificando…"; }
+        if (e) e.hidden = true;
+        try {
+          const ok = await Data.verificarClave("eliminar", inp ? inp.value : "");
+          if (ok) { onOk(); return; }
+          if (e) e.hidden = false;
+          if (inp) { inp.value = ""; inp.focus(); }
+        } catch (err) {
+          toast("No se pudo verificar la clave (sin conexión). Intenta nuevamente.", "danger", 4000);
+        }
+        if (btnSi) { btnSi.disabled = false; btnSi.textContent = "Eliminar"; }
       };
       $("#c_no").addEventListener("click", closeModal);
       $("#c_si").addEventListener("click", intentar);

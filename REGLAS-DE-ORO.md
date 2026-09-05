@@ -76,3 +76,65 @@ Antes de la primera funcionalidad, crea:
 
 Confírmame que aplicarás estas reglas de oro y muéstrame primero el esquema SQL
 y la capa de datos antes de avanzar con la interfaz.
+
+---
+
+## 11. Contraseñas y secretos: NUNCA en el código del cliente
+- Cualquier constante escrita en el HTML/JS del navegador (un PIN, una clave)
+  es **visible para cualquiera** con "Ver código fuente" o las herramientas de
+  desarrollador. Ofuscar (base64, minificar) NO es seguridad: solo entretiene.
+- La verificación de contraseñas debe hacerse **en el servidor**. La clave real
+  vive en la base de datos; el cliente solo envía lo que el usuario escribió y el
+  servidor responde verdadero/falso. Ejemplo con Supabase/Postgres (RPC):
+  ```sql
+  -- La clave se guarda hasheada en una tabla que el cliente NO puede leer.
+  create or replace function verificar_clave(p_clave text)
+  returns boolean language sql security definer as $$
+    select exists(
+      select 1 from secretos
+      where nombre = 'eliminar'
+        and hash = crypt(p_clave, hash)   -- pgcrypto
+    );
+  $$;
+  ```
+  En el cliente: `const ok = await sb.rpc('verificar_clave', { p_clave: valor });`
+  Así el HTML nunca contiene la contraseña.
+- **Nunca subas secretos reales a un repositorio público** (GitHub). Usa variables
+  de entorno / configuración del hosting, y un archivo `.gitignore` para las claves.
+- La `ANON KEY` de Supabase SÍ puede ir en el cliente (es pública), pero SOLO si
+  proteges las tablas con **Row Level Security (RLS)** bien configurado. Políticas
+  abiertas (`using (true) with check (true)`) dejan la base al descubierto para
+  cualquiera que tenga esa key: restringe lecturas/escrituras por rol o por RPC.
+- Contraseñas cortas (PIN de 4 dígitos) son fáciles de adivinar por fuerza bruta;
+  aun verificadas en el servidor, usa claves largas y/o límites de intentos.
+
+---
+
+## CASO REAL — "El guardia fantasma de 300 minutos" (lección aprendida)
+
+**Qué pasó:** En un proyecto anterior, de repente un guardia aparecía "En Examen"
+con 300 minutos en el cronómetro, aunque ya había terminado. Reaparecía como
+fantasma en un PC y descuadraba a todos los administradores.
+
+**Causa raíz (dos errores combinados):**
+1. Cada dispositivo guardaba **TODO el estado en un solo bloque JSON** y, al
+   guardar o al reconectar, **empujaba el bloque entero** al servidor.
+2. El cronómetro se calculaba desde un `examStartTime` **guardado en el registro
+   y sincronizado** dentro de ese bloque.
+
+**La secuencia:** un guardia terminaba (servidor correcto) → pero un celular que
+había estado **sin señal** conservaba una copia vieja donde ese guardia seguía
+"En Examen" con un `examStartTime` de horas atrás → al reconectar, ese celular
+**re-empujaba su bloque viejo** y revivía al guardia → el cronómetro mostraba
+`ahora − (hace 5 h)` ≈ **300 minutos**.
+
+**Por qué NO puede pasar con el modelo correcto (una fila por registro):**
+- El dispositivo nunca manda "toda la lista", solo la operación puntual sobre una
+  fila. Una copia vieja no tiene forma de resucitar nada.
+- El servidor es la fuente de verdad; se lee fresco.
+- Los borrados son DELETE de fila (definitivos).
+- El tiempo se calcula al mostrar, desde un timestamp fijo del servidor, no desde
+  un contador sincronizado y revivible.
+
+**Regla de una línea:** *el bug nació de "cada dispositivo guarda y empuja todo el
+estado"; la cura es "cada acción toca solo su fila y el servidor manda".*
