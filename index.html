@@ -667,7 +667,7 @@
     let _audioIngreso = null;
     function sonarIngreso() {
       try {
-        if (!_audioIngreso) { _audioIngreso = new Audio("sonidos/ingreso.wav"); _audioIngreso.preload = "auto"; }
+        if (!_audioIngreso) { _audioIngreso = new Audio("sonidos/ingreso.mp3"); _audioIngreso.preload = "auto"; }
         _audioIngreso.volume = 0.8; // 80% del volumen
         _audioIngreso.currentTime = 0;
         const p = _audioIngreso.play();
