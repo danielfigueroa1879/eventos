@@ -663,6 +663,16 @@
       const t = $("#toast"); t.innerHTML = `<div class="card px-4 py-3 text-sm font-medium ${ok ? 'text-green-800' : 'text-red-700'}" style="border-left:4px solid ${ok ? '#16a34a' : '#dc2626'}">${esc(msg)}</div>`;
       t.style.display = "block"; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", ms);
     }
+    // Sonido de ingreso de guardia (carpeta /sonidos/ingreso.mp3)
+    let _audioIngreso = null;
+    function sonarIngreso() {
+      try {
+        if (!_audioIngreso) { _audioIngreso = new Audio("sonidos/ingreso.mp3"); _audioIngreso.preload = "auto"; }
+        _audioIngreso.currentTime = 0;
+        const p = _audioIngreso.play();
+        if (p && p.catch) p.catch(() => { }); // el navegador puede bloquear el autoplay; se ignora
+      } catch (e) { }
+    }
     function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
@@ -893,6 +903,7 @@
             }
           }
           const asis = await Data.createAsistencia(ev.id, rutV);
+          sonarIngreso(); // sonido de confirmación de ingreso
           const v = calcularVigencia(fecha.value);
           const tn = calcularTurno(asis?.hora_ingreso || nowISO(), ev);
           app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
