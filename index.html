@@ -882,10 +882,10 @@
         try {
           const rutV = formatRut(rut.value);
           if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
-            await Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value });
+            await Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value, aprobado: false });
           } else if (modo === "existe") {
             // permitir corrección de fecha
-            await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value });
+            await Data.upsertGuardia({ rut: rutV, nombres: nombres.value, apellidos: apellidos.value, telefono: tel.value, fecha_ultimo_examen: fecha.value, aprobado: false });
           }
           const asis = await Data.createAsistencia(ev.id, rutV);
           const v = calcularVigencia(fecha.value);
@@ -1309,10 +1309,11 @@
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
+      const pend = g.aprobado === false ? `<span class="badge" style="background:#fef9c3;color:#a16207;margin-left:4px" title="Pendiente de revisión">🟡 Pendiente</span>` : '';
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50">
     <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}</td>
+    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}${pend}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -1346,6 +1347,7 @@
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
+      const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-800 ml-1 whitespace-nowrap">🟡 Pendiente</span>` : '';
       // La empresa no ve la fecha del examen; en su lugar muestra la hora de ingreso
       const segunda = modo === "empresa"
         ? `<span class="font-mono">${esc(a.rut)}</span> · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`
@@ -1353,7 +1355,7 @@
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50">
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-slate-900 text-sm truncate">${esc(nomLista)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</span>
+        <span class="block font-semibold text-slate-900 text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${pend}</span>
         <span class="block text-[11px] text-slate-600 truncate">${segunda}</span>
       </span>
       ${vigenciaPill(v)}
@@ -1415,6 +1417,8 @@
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
+    </div>
+    ${g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn btn-p w-full bg-yellow-500 hover:bg-yellow-600 border-yellow-600 text-white shadow-sm flex items-center justify-center gap-2">✔ Aprobar Guardia</button></div>` : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
       <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
@@ -1422,6 +1426,15 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
+      if (g.aprobado === false) {
+        const btnApp = $("#dg_approve");
+        if (btnApp) btnApp.addEventListener("click", async () => {
+          try {
+            await Data.upsertGuardia({ ...g, aprobado: true });
+            closeModal(); refreshAdmin();
+          } catch (err) { toast("Error: " + (err.message || err), false); }
+        });
+      }
       if (!empresa) {
         $("#dg_edit").addEventListener("click", () => modalEditarGuardia(a, ev));
         $("#dg_del").addEventListener("click", () => confirmar(`¿Quitar a ${g.nombres || a.rut} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }));
@@ -2291,7 +2304,7 @@
         const fx = $("#e_fec").value;
         if (fx) { const d = parseFecha(fx); if (d && startOfDay(d).getTime() > startOfDay(new Date()).getTime()) { toast("La fecha del examen no puede ser futura", false); return; } }
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null });
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null, aprobado: true });
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
