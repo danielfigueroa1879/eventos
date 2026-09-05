@@ -33,8 +33,14 @@ create table if not exists guardias_central (
   apellidos           text,                       -- MAYÚSCULAS (2 apellidos)
   telefono            text,
   fecha_ultimo_examen date,
+  aprobado            boolean default true,      -- false = pendiente de revisión
+  revision_tipo       text,                      -- 'NUEVO' o 'MODIFICADO'
   updated_at          timestamptz default now()
 );
+
+-- Migración para la tabla guardias_central (agrega la columna si falta):
+alter table guardias_central add column if not exists aprobado boolean default true;
+alter table guardias_central add column if not exists revision_tipo text;
 
 create table if not exists asistencias (
   id           uuid primary key default gen_random_uuid(),
