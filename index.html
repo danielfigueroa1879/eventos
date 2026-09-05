@@ -27,16 +27,24 @@
       --brand2: #13612b;
     }
 
-    html,
-    body {
+    html {
       height: 100%
     }
 
     body {
       background-color: #eef2f0;
       font-family: ui-sans-serif, system-ui, Arial, sans-serif;
-      -webkit-tap-highlight-color: transparent
+      -webkit-tap-highlight-color: transparent;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
+    /* El contenido crece para empujar el pie al borde inferior: así no queda
+       un hueco con el fondo asomando debajo (ni encima) de los créditos. */
+    #app { flex: 1 0 auto; display: flex; flex-direction: column; }
+    #app > * { flex: 1 0 auto; }   /* la vista llena todo el alto de #app */
+    #creditos { flex-shrink: 0; }
 
     /* Fondo (imagen) con leve desenfoque, en una capa detrás del contenido */
     body::before {
@@ -54,11 +62,11 @@
       position: fixed;
       inset: 0;
       z-index: -1;
-      background: rgba(238, 242, 240, .66);
+      background: rgba(238, 242, 240, .60);
     }
 
     html[data-theme="dark"] body::after {
-      background: rgba(27, 30, 35, .87);
+      background: rgba(27, 30, 35, .84);
     }
 
     .brand-bg {
