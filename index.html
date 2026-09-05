@@ -226,21 +226,26 @@
     #themeToggle {
       position: fixed;
       right: 1rem;
-      bottom: 1rem;
+      bottom: 4.25rem;           /* sobre el pie de créditos fijo */
       z-index: 70;
-      width: 2.75rem;
-      height: 2.75rem;
+      width: 2.5rem;
+      height: 2.5rem;
       border-radius: 9999px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.15rem;
+      font-size: 1.05rem;
       cursor: pointer;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
-      transition: transform .15s ease
+      background: transparent;    /* semi-transparente, sin color propio */
+      border: 1px solid rgba(100, 116, 139, .22);
+      color: inherit;
+      box-shadow: none;
+      opacity: .38;               /* discreto, casi no se nota */
+      transition: opacity .15s ease, transform .15s ease
+    }
+
+    #themeToggle:hover {
+      opacity: .9
     }
 
     #themeToggle:active {
@@ -253,9 +258,9 @@
     }
 
     html[data-theme="dark"] #themeToggle {
-      background: #2f343b;
-      border-color: #4a515b;
-      color: #ffd479
+      background: transparent;
+      border-color: rgba(148, 163, 184, .25);
+      color: inherit
     }
 
     html[data-theme="dark"] .brand-bg {
@@ -359,22 +364,26 @@
       background: #4a515b
     }
 
-    /* Pie de créditos — aparece al final de todas las vistas */
+    /* Pie de créditos — en flujo normal, pero visible en la primera vista (ver override de .min-h-screen) */
     #creditos {
       text-align: center;
       font-size: 11px;
-      line-height: 1.5;
+      line-height: 1.45;
       color: #64748b;
-      padding: 18px 16px 26px;
+      padding: 9px 16px 12px;
       border-top: 1px solid #e2e8f0;
-      margin-top: 8px;
     }
-    #creditos .cred-dev { color: #94a3b8; margin-top: 2px; }
+    #creditos .cred-dev { color: #94a3b8; margin-top: 1px; }
     html[data-theme="dark"] #creditos {
       color: #94a3b8;
       border-top-color: #2f343b;
     }
     html[data-theme="dark"] #creditos .cred-dev { color: #7c8794; }
+
+    /* Que cada vista ocupe la pantalla MENOS el alto del pie, para que el pie
+       se vea en la primera vista sin tener que bajar (y sin quedar fijo). */
+    .min-h-screen { min-height: calc(100vh - 64px) !important; }
+    @media (min-width: 768px) { .md\:min-h-screen { min-height: calc(100vh - 64px) !important; } }
   </style>
 </head>
 
@@ -391,7 +400,7 @@
   <div id="modal" class="fixed inset-0 bg-black/40 z-[60] items-center justify-center p-4" style="display:none">
     <div class="card w-full max-w-md p-5 max-h-[90vh] overflow-auto" id="modalBox"></div>
   </div>
-  <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50" style="display:none"></div>
+  <div id="toast" class="fixed bottom-16 left-1/2 -translate-x-1/2 z-50" style="display:none"></div>
   <button id="themeToggle" type="button" aria-label="Cambiar modo claro/oscuro" title="Modo claro/oscuro">🌙</button>
 
   <script>
