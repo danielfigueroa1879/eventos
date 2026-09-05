@@ -747,10 +747,12 @@
             <div>
               <label class="text-sm font-semibold text-slate-700">Nombres (2 nombres)</label>
               <input id="g_nombres" class="fld" placeholder="JUAN CARLOS" autocomplete="off"/>
+              <div id="g_nomMsg" class="text-[11px] mt-0.5"></div>
             </div>
             <div>
               <label class="text-sm font-semibold text-slate-700">Apellidos (2 apellidos)</label>
               <input id="g_apellidos" class="fld" placeholder="PÉREZ SOTO" autocomplete="off"/>
+              <div id="g_apeMsg" class="text-[11px] mt-0.5"></div>
             </div>
             <div>
               <label class="text-sm font-semibold text-slate-700">Teléfono</label>
@@ -759,6 +761,7 @@
             <div>
               <label class="text-sm font-semibold text-slate-700">Fecha último examen OS10</label>
               <input id="g_fecha" type="date" class="fld"/>
+              <div id="g_fecMsg" class="text-[11px] mt-0.5"></div>
             </div>
           </div>
         </div>
@@ -785,8 +788,28 @@
       const rut = $("#g_rut"), extra = $("#camposExtra"), vigBox = $("#vigBox"), vigBadge = $("#vigBadge"),
         turnoBox = $("#turnoBox"), turnoInfo = $("#turnoInfo"),
         submit = $("#g_submit"), rutMsg = $("#rutMsg"),
-        nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha");
+        nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha"),
+        nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg");
       let modo = null, guardiaExiste = false;
+
+      // Fecha del examen: no puede ser futura
+      const hoyISO = new Date().toISOString().slice(0, 10);
+      if (fecha) { fecha.max = hoyISO; fecha.setAttribute("max", hoyISO); }
+      const fechaFutura = (f) => { const d = parseFecha(f); return !!d && startOfDay(d).getTime() > startOfDay(new Date()).getTime(); };
+      const nPalabras = (s) => (s || "").trim().split(/\s+/).filter(Boolean).length;
+      // Avisos (no bloquean): un solo nombre / un solo apellido
+      function avisoNombres() {
+        const n = nPalabras(nombres.value);
+        nomMsg.innerHTML = n === 1 ? `<span class="text-amber-600">⚠ Solo un nombre. Si tiene un 2º nombre agréguelo; si no, puede continuar.</span>` : "";
+      }
+      function avisoApellidos() {
+        const n = nPalabras(apellidos.value);
+        apeMsg.innerHTML = n === 1 ? `<span class="text-amber-600">⚠ Solo un apellido. Si tiene 2º apellido agréguelo; si no, puede continuar.</span>` : "";
+      }
+      function avisoFecha() {
+        if (fecha.value && fechaFutura(fecha.value)) { fecMsg.innerHTML = `<span class="text-red-600 font-medium">⚠ La fecha del examen no puede ser futura.</span>`; return false; }
+        fecMsg.innerHTML = ""; return true;
+      }
 
       function mostrarTurnoActual() {
         const tn = calcularTurno(nowISO(), ev);
@@ -795,10 +818,10 @@
         turnoInfo.innerHTML = `${esc(tn.etiqueta)} <span class="text-indigo-500 font-normal">(${esc(tn.rango)})</span>`;
       }
 
-      nombres.addEventListener("input", () => { nombres.value = formatNombre(nombres.value); actualizarBtn(); });
-      apellidos.addEventListener("input", () => { apellidos.value = formatNombre(apellidos.value); actualizarBtn(); });
+      nombres.addEventListener("input", () => { nombres.value = formatNombre(nombres.value); avisoNombres(); actualizarBtn(); });
+      apellidos.addEventListener("input", () => { apellidos.value = formatNombre(apellidos.value); avisoApellidos(); actualizarBtn(); });
       tel.addEventListener("input", actualizarBtn);
-      fecha.addEventListener("change", () => { mostrarVigencia(fecha.value); actualizarBtn(); });
+      fecha.addEventListener("change", () => { if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); vigBox.hidden = true; } else { avisoFecha(); mostrarVigencia(fecha.value); } actualizarBtn(); });
 
       rut.addEventListener("input", () => {
         rut.value = formatRut(rut.value); rutMsg.innerHTML = ""; submit.disabled = true; submit.textContent = "Ingrese su RUT";
@@ -830,19 +853,23 @@
           fecha.removeAttribute("readonly"); // por si quiere corregir fecha vencida
           rutMsg.innerHTML = `<span class="text-green-700 font-medium">✔ Datos encontrados. Verifica y confirma tu ingreso.</span>`;
           mostrarVigencia(fecha.value);
-          submit.disabled = false; submit.textContent = "✔ Confirmar ingreso";
+          avisoNombres(); avisoApellidos(); avisoFecha();
+          submit.disabled = false; submit.textContent = "✔ Confirmar ingreso"; actualizarBtn();
         } else {
           guardiaExiste = false; modo = "nuevo";
           extra.hidden = false;
           [nombres, apellidos, tel, fecha].forEach(i => i.removeAttribute("readonly"));
           nombres.value = apellidos.value = tel.value = ""; fecha.value = "";
+          nomMsg.innerHTML = apeMsg.innerHTML = fecMsg.innerHTML = "";
           rutMsg.innerHTML = `<span class="text-red-600 font-semibold">⚠ RUT NO ENCONTRADO EN LA BASE DE DATOS. Por favor, ingrese sus datos.</span>`;
           vigBox.hidden = true; actualizarBtn();
         }
       }
       function mostrarVigencia(f) { if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
       function actualizarBtn() {
-        if (modo === "existe") { submit.disabled = false; return; }
+        // La fecha futura sí bloquea; un solo nombre/apellido solo avisa (no bloquea)
+        if (fecha.value && fechaFutura(fecha.value)) { submit.disabled = true; submit.textContent = "Fecha de examen inválida"; return; }
+        if (modo === "existe") { submit.disabled = false; submit.textContent = "✔ Confirmar ingreso"; return; }
         if (modo === "nuevo") {
           const ok = rutValido(rut.value) && nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
           submit.disabled = !ok; submit.textContent = ok ? "Registrar ingreso" : "Complete los datos";
@@ -850,6 +877,7 @@
       }
 
       submit.addEventListener("click", async () => {
+        if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); toast("La fecha del examen no puede ser futura", false); actualizarBtn(); return; }
         submit.disabled = true;
         try {
           const rutV = formatRut(rut.value);
@@ -2250,7 +2278,7 @@
       <div><label class="text-sm font-semibold text-slate-700">Nombres</label><input id="e_nom" class="fld" value="${esc(g.nombres || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Apellidos</label><input id="e_ape" class="fld" value="${esc(g.apellidos || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Teléfono</label><input id="e_tel" class="fld" value="${esc(g.telefono || "")}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Fecha último examen</label><input id="e_fec" type="date" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">Fecha último examen</label><input id="e_fec" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="e_cancel" class="btn btn-ghost flex-1">Cancelar</button>
@@ -2260,8 +2288,10 @@
       $("#e_ape").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
       $("#e_cancel").addEventListener("click", closeModal);
       $("#e_save").addEventListener("click", async () => {
+        const fx = $("#e_fec").value;
+        if (fx) { const d = parseFecha(fx); if (d && startOfDay(d).getTime() > startOfDay(new Date()).getTime()) { toast("La fecha del examen no puede ser futura", false); return; } }
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: $("#e_fec").value || null });
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null });
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
