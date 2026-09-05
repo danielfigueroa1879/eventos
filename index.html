@@ -383,6 +383,10 @@
     // 2) PIN para entrar al panel de administrador (cámbialo).
     const ADMIN_PIN = "8979";
 
+    // 2b) CLAVE PARA ELIMINAR un evento. Solo tú debes conocerla (distinta al PIN de admin),
+    //     así tus colegas no pueden borrar un evento por error desde su celular. CÁMBIALA aquí:
+    const DELETE_PIN = "1234";
+
     // 3) Reglas legales OS10 (Ley 21.659 / prórroga Ley 21.825). No suelen cambiar.
     const MESES_VIGENCIA = 36;
     const ENTRADA_VIGENCIA_LEY = new Date(2025, 10, 28);        // 28-nov-2025 (entrada en vigor)
@@ -1320,7 +1324,7 @@
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
-      $("#delEv").addEventListener("click", () => { confirmar(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros?`, async () => { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); }); });
+      $("#delEv").addEventListener("click", () => { confirmarConClave(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros? Esta acción no se puede deshacer.`, async () => { try { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); toast("Evento eliminado."); } catch (e) { toast("No se pudo eliminar: " + (e.message || e), "danger", 4000); } }); });
       const b = $("#buscar"); if (b) b.addEventListener("input", () => { ADMIN_STATE.search = b.value; filtrarLista(); });
       filtrarLista();
       main.querySelectorAll(".turnoChip").forEach(c => c.addEventListener("click", () => { ADMIN_STATE.turnoFiltro = c.dataset.turno; renderMain(); }));
@@ -2444,6 +2448,25 @@
       openModal(`<h2 class="font-bold text-slate-800 mb-3">Confirmar</h2><p class="text-slate-600 text-sm mb-4">${esc(msg)}</p>
     <div class="flex gap-2"><button id="c_no" class="btn btn-ghost flex-1">Cancelar</button><button id="c_si" class="btn btn-danger flex-1">Sí, continuar</button></div>`);
       $("#c_no").addEventListener("click", closeModal); $("#c_si").addEventListener("click", onOk);
+    }
+
+    // Confirmación protegida por clave: para acciones destructivas (eliminar evento).
+    // Solo continúa si la clave coincide con DELETE_PIN. Evita borrados por error de colegas.
+    function confirmarConClave(msg, onOk) {
+      openModal(`<h2 class="font-bold text-slate-800 mb-2">🔒 Eliminar (requiere clave)</h2>
+    <p class="text-slate-600 text-sm mb-3">${esc(msg)}</p>
+    <input id="del_pin" type="password" inputmode="numeric" autocomplete="off" class="fld text-center tracking-widest text-lg" placeholder="Clave para eliminar">
+    <p id="del_err" class="text-red-600 text-sm mt-2 font-medium" hidden>❌ Clave incorrecta. No se eliminó nada.</p>
+    <div class="flex gap-2 mt-4"><button id="c_no" class="btn btn-ghost flex-1">Cancelar</button><button id="c_si" class="btn btn-danger flex-1">Eliminar</button></div>`);
+      const intentar = () => {
+        const inp = $("#del_pin");
+        if (inp && inp.value === DELETE_PIN) { onOk(); }
+        else { const e = $("#del_err"); if (e) e.hidden = false; if (inp) { inp.value = ""; inp.focus(); } }
+      };
+      $("#c_no").addEventListener("click", closeModal);
+      $("#c_si").addEventListener("click", intentar);
+      const inp = $("#del_pin");
+      if (inp) { setTimeout(() => inp.focus(), 50); inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); intentar(); } }); }
     }
 
     /* ---- Modal: link de empresa (solo lectura) ---- */
