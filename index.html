@@ -660,7 +660,19 @@
     })();
 
     function toast(msg, ok = true, ms = 2600) {
-      const t = $("#toast"); t.innerHTML = `<div class="card px-4 py-3 text-sm font-medium ${ok ? 'text-green-800' : 'text-red-700'}" style="border-left:4px solid ${ok ? '#16a34a' : '#dc2626'}">${esc(msg)}</div>`;
+      const t = $("#toast");
+      let cls, style;
+      if (ok === "danger") {                 // aviso crítico: fondo rojo, letras blancas (bien visible)
+        cls = "text-white font-semibold";
+        style = "background:#dc2626;border-left:4px solid #7f1d1d";
+      } else if (ok) {                        // ok normal: verde
+        cls = "text-green-800";
+        style = "border-left:4px solid #16a34a";
+      } else {                                // error normal: texto rojo sobre tarjeta blanca
+        cls = "text-red-700";
+        style = "border-left:4px solid #dc2626";
+      }
+      t.innerHTML = `<div class="card px-4 py-3 text-sm font-medium ${cls}" style="${style}">${esc(msg)}</div>`;
       t.style.display = "block"; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", ms);
     }
     // Sonido de ingreso de guardia (carpeta /sonidos/ingreso.mp3)
@@ -938,7 +950,7 @@
         if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); toast("La fecha del examen no puede ser futura", false); actualizarBtn(); return; }
         // Sin conexión (modo producción): no se intenta. El guardia simplemente no podrá registrar hasta tener señal.
         if (USING_SUPABASE && navigator.onLine === false) {
-          toast("Sin conexión a internet. Verifica tu señal e intenta nuevamente.", false);
+          toast("Sin conexión a internet. Verifica tu señal e intenta nuevamente.", "danger", 4000);
           return;
         }
         const rutV = formatRut(rut.value);
@@ -982,7 +994,7 @@
           const ya = await conTimeout(Data.yaRegistrado(ev.id, rutV), 8000).catch(() => null);
           if (ya) { mostrarIngresoExitoso(ya); return; }
           // No quedó confirmado → error claro, sin falso éxito. El guardia puede reintentar.
-          toast("No se pudo registrar tu ingreso. Verifica tu conexión e intenta nuevamente.", false);
+          toast("No se pudo registrar tu ingreso. Verifica tu conexión e intenta nuevamente.", "danger", 4000);
           submit.disabled = false; submit.textContent = txtPrev || "✔ Confirmar ingreso";
         }
       });
