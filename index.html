@@ -1210,6 +1210,15 @@
       main.querySelectorAll(".turnoChip").forEach(c => c.addEventListener("click", () => { ADMIN_STATE.turnoFiltro = c.dataset.turno; renderMain(); }));
       main.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev)));
       main.querySelectorAll("[data-edit]").forEach(x => x.addEventListener("click", () => modalEditarGuardia(asist.find(a => a.id === x.dataset.edit), ev)));
+      main.querySelectorAll("[data-approve]").forEach(x => x.addEventListener("click", async () => {
+        const a = asist.find(a => a.id === x.dataset.approve);
+        if (a && a.guardia) {
+          try {
+            await Data.upsertGuardia({ ...a.guardia, aprobado: true, revision_tipo: null });
+            refreshAdmin();
+          } catch (err) { toast("Error: " + (err.message || err), false); }
+        }
+      }));
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
     }
     function chip(label, n, color) { return `<div class="rounded-lg py-2 b-${color}"><div class="text-lg font-bold">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
@@ -1326,6 +1335,7 @@
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
     <td class="acciones whitespace-nowrap">
+      ${g.aprobado === false ? `<button data-approve="${a.id}" class="text-yellow-600 hover:text-yellow-800 font-bold px-2 py-0.5 rounded border border-yellow-400 bg-yellow-50 mr-2" title="Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
       <button data-edit="${a.id}" class="text-slate-500 hover:text-green-700 px-1" title="Editar">✎</button>
       <button data-del="${a.id}" class="text-slate-500 hover:text-red-600 px-1" title="Quitar">🗑</button>
     </td>
