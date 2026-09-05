@@ -358,11 +358,34 @@
     html[data-theme="dark"] ::-webkit-scrollbar-thumb {
       background: #4a515b
     }
+
+    /* Pie de créditos — aparece al final de todas las vistas */
+    #creditos {
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #64748b;
+      padding: 18px 16px 26px;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 8px;
+    }
+    #creditos .cred-dev { color: #94a3b8; margin-top: 2px; }
+    html[data-theme="dark"] #creditos {
+      color: #94a3b8;
+      border-top-color: #2f343b;
+    }
+    html[data-theme="dark"] #creditos .cred-dev { color: #7c8794; }
   </style>
 </head>
 
 <body>
   <div id="app"></div>
+
+  <!-- ===== Pie de créditos (visible en todas las vistas) ===== -->
+  <footer id="creditos">
+    © 2026 Prefectura de Coquimbo. Todos los derechos reservados.
+    <div class="cred-dev">Plataforma desarrollada por Daniel Figueroa Chacama. Ingeniero en Informática &amp; Ciberseguridad.</div>
+  </footer>
 
   <!-- ===== Modales ===== -->
   <div id="modal" class="fixed inset-0 bg-black/40 z-[60] items-center justify-center p-4" style="display:none">
