@@ -1470,7 +1470,7 @@
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
     </div>
-    ${g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn btn-p w-full ${g.revision_tipo === 'NUEVO' ? 'bg-red-500 hover:bg-red-600 border-red-600' : 'bg-yellow-500 hover:bg-yellow-600 border-yellow-600'} text-white shadow-sm flex items-center justify-center gap-2">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
+    ${!empresa && g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn btn-p w-full ${g.revision_tipo === 'NUEVO' ? 'bg-red-500 hover:bg-red-600 border-red-600' : 'bg-yellow-500 hover:bg-yellow-600 border-yellow-600'} text-white shadow-sm flex items-center justify-center gap-2">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
       <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
@@ -1478,7 +1478,7 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
-      if (g.aprobado === false) {
+      if (!empresa && g.aprobado === false) {
         const btnApp = $("#dg_approve");
         if (btnApp) btnApp.addEventListener("click", async () => {
           try {
