@@ -72,6 +72,9 @@ create index if not exists idx_puestos_evento on puestos(evento_id);
 -- Asignación de un guardia (asistencia) a un puesto
 alter table asistencias add column if not exists puesto_id uuid references puestos(id) on delete set null;
 
+-- Marca si el ingreso es de un SUPERVISOR (se registra con el mismo QR que los guardias)
+alter table asistencias add column if not exists es_supervisor boolean default false;
+
 -- ---------- HISTORIAL DE PARTIDOS ----------
 -- Cada vez que se "cierra y archiva" un partido, se guarda una foto (snapshot) de los
 -- guardias que asistieron. Así el mismo evento-partido se reutiliza (se cambia el nombre
