@@ -1447,7 +1447,7 @@
         </div>
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" class="fld py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
-          <button id="consultarGuardiaBtn" class="btn btn-ghost text-xs sm:text-sm whitespace-nowrap flex-shrink-0" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
+          <button id="consultarGuardiaBtn" class="btn text-xs sm:text-sm px-3 py-2 text-white font-bold bg-emerald-700 hover:bg-emerald-800 rounded-xl shadow-md whitespace-nowrap flex-shrink-0 flex items-center gap-1" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
         </div>
       </div>
       ${usaT ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
@@ -2643,24 +2643,30 @@
       const winW = isMobile ? "width:min(95vw, 420px);" : "width:min(780px, 95vw);";
       const winH = isMobile ? "height:min(390px, 70vh);" : "height:min(540px, 82vh);";
       const winTop = isMobile ? "top:35px;" : "top:60px;";
-      const cropOffset = isMobile ? "-195px" : "-140px";
-      const cropH = isMobile ? "calc(100% + 195px)" : "calc(100% + 140px)";
 
-      // Evita duplicar la ventana si ya esta abierta.
+      // Offsets de recorte: RUT bien arriba y Resultado enfocado
+      const cropOffsetRut = isMobile ? "-230px" : "-175px";
+      const cropHRut = isMobile ? "calc(100% + 230px)" : "calc(100% + 175px)";
+
+      const cropOffsetRes = isMobile ? "-420px" : "-350px";
+      const cropHRes = isMobile ? "calc(100% + 420px)" : "calc(100% + 350px)";
+
+      // Evita duplicar la ventana si ya está abierta.
       const prev = document.getElementById("cgWindow");
       if (prev) { prev.remove(); }
       const win = document.createElement("div");
       win.id = "cgWindow";
-      win.style.cssText = `position:fixed;${winTop}left:50%;transform:translateX(-50%);${winW}${winH}min-width:260px;min-height:200px;max-width:100vw;max-height:100vh;background:#fff;border:3px solid #2563eb;border-radius:16px;box-shadow:0 20px 50px rgba(37,99,235,0.3);z-index:70;display:flex;flex-direction:column;overflow:hidden;resize:both;`;
+      win.style.cssText = `position:fixed;${winTop}left:50%;transform:translateX(-50%);${winW}${winH}min-width:260px;min-height:200px;max-width:100vw;max-height:100vh;background:#fff;border:3px solid #0f5323;border-radius:16px;box-shadow:0 20px 50px rgba(15,83,35,0.35);z-index:70;display:flex;flex-direction:column;overflow:hidden;resize:both;`;
       win.innerHTML = `
-        <div id="cg_header" class="flex items-center justify-between gap-2 px-3 py-2 border-b border-blue-200 bg-blue-50/90 select-none" style="cursor:move;touch-action:none;flex-shrink:0;">
-          <div class="flex items-center gap-2 text-sm font-semibold text-slate-800 truncate">
-            <span class="text-slate-400 text-base leading-none" aria-hidden="true">⠿</span>
-            🔎 Consultar guardia
-            <span class="text-slate-400 font-normal text-xs hidden sm:inline">· Zosepcar</span>
+        <div id="cg_header" class="flex items-center justify-between gap-2 px-3 py-2 border-b border-emerald-200 bg-emerald-50/90 select-none" style="cursor:move;touch-action:none;flex-shrink:0;">
+          <div class="flex items-center gap-1.5 text-sm font-bold text-emerald-900 truncate">
+            <span class="text-emerald-500 text-base leading-none" aria-hidden="true">⠿</span>
+            🔎 Consultar
+            <span class="text-emerald-700 font-normal text-xs hidden sm:inline">· Zosepcar</span>
           </div>
-          <div class="flex items-center gap-1.5 flex-shrink-0">
-            <button id="cg_toggle_view" class="text-xs px-2 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 flex items-center gap-1 font-semibold text-slate-700 shadow-sm" title="Alternar entre vista enfocada en RUT/Respuesta y página completa">🔍 <span id="cg_toggle_txt" class="hidden sm:inline">Vista enfocada</span></button>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button id="cg_btn_rut" class="text-xs px-2 py-1 rounded-lg border border-emerald-700 bg-emerald-700 text-white flex items-center gap-1 font-bold shadow-sm" title="Ver campo de consulta RUT">⌨️ <span class="hidden sm:inline">RUT</span></button>
+            <button id="cg_btn_res" class="text-xs px-2 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 flex items-center gap-1 font-semibold text-slate-700 shadow-sm" title="Ver resultado de acreditación">📋 <span class="hidden sm:inline">Resultado</span></button>
             <a href="${url}" target="_blank" rel="noopener" class="text-xs px-2 py-1 rounded-lg border border-slate-300 hover:bg-white flex items-center gap-1" title="Abrir en pestaña nueva">🔗<span class="hidden sm:inline">Nueva pestaña</span></a>
             <button id="cg_close" class="text-slate-500 hover:text-red-600 text-lg leading-none w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white" title="Cerrar">✕</button>
           </div>
@@ -2670,31 +2676,51 @@
         </div>
         <div class="flex-1 relative overflow-hidden bg-white" style="min-height:0;">
           <div id="cg_dragMask" class="hidden absolute inset-0" style="z-index:5;background:transparent;"></div>
-          <iframe id="cg_iframe" src="${url}" class="w-full block transition-all duration-300" style="border:0;background:#fff;height:${cropH};margin-top:${cropOffset};" referrerpolicy="no-referrer"></iframe>
+          <iframe id="cg_iframe" src="${url}" class="w-full block transition-all duration-500" style="border:0;background:#fff;height:${cropHRut};margin-top:${cropOffsetRut};" referrerpolicy="no-referrer"></iframe>
         </div>
       `;
       document.body.appendChild(win);
 
       const iframe = win.querySelector("#cg_iframe");
       const aviso = win.querySelector("#cg_aviso");
-      const toggleBtn = win.querySelector("#cg_toggle_view");
-      const toggleTxt = win.querySelector("#cg_toggle_txt");
+      const btnRut = win.querySelector("#cg_btn_rut");
+      const btnRes = win.querySelector("#cg_btn_res");
 
-      let isFocusedView = true;
-      if (toggleBtn) {
-        toggleBtn.addEventListener("click", () => {
-          isFocusedView = !isFocusedView;
-          if (isFocusedView) {
-            iframe.style.height = cropH;
-            iframe.style.marginTop = cropOffset;
-            if (toggleTxt) toggleTxt.textContent = "Vista enfocada";
-          } else {
-            iframe.style.height = "100%";
-            iframe.style.marginTop = "0px";
-            if (toggleTxt) toggleTxt.textContent = "Página completa";
-          }
-        });
+      let activeView = "rut"; // "rut" | "resultado"
+      let autoTimer = null;
+
+      function setView(view) {
+        activeView = view;
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        if (view === "rut") {
+          iframe.style.height = cropHRut;
+          iframe.style.marginTop = cropOffsetRut;
+          btnRut.className = "text-xs px-2 py-1 rounded-lg border border-emerald-700 bg-emerald-700 text-white flex items-center gap-1 font-bold shadow-sm";
+          btnRes.className = "text-xs px-2 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 flex items-center gap-1 font-semibold text-slate-700 shadow-sm";
+        } else {
+          iframe.style.height = cropHRes;
+          iframe.style.marginTop = cropOffsetRes;
+          btnRes.className = "text-xs px-2 py-1 rounded-lg border border-emerald-700 bg-emerald-700 text-white flex items-center gap-1 font-bold shadow-sm";
+          btnRut.className = "text-xs px-2 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 flex items-center gap-1 font-semibold text-slate-700 shadow-sm";
+        }
       }
+
+      btnRut.addEventListener("click", () => setView("rut"));
+      btnRes.addEventListener("click", () => setView("resultado"));
+
+      // Al interactuar con el iframe (click/focus para ingresar RUT o presionar Consultar),
+      // programa el enfoque automático del resultado después de 2.2 segundos.
+      let blurHandled = false;
+      const onWindowBlur = () => {
+        if (document.activeElement === iframe && !blurHandled && activeView === "rut") {
+          blurHandled = true;
+          autoTimer = setTimeout(() => {
+            setView("resultado");
+          }, 2200);
+        }
+      };
+      window.addEventListener("blur", onWindowBlur);
+
       let cargado = false;
       iframe.addEventListener("load", () => {
         cargado = true;
@@ -2706,7 +2732,11 @@
       });
       setTimeout(() => { if (!cargado) aviso.classList.remove("hidden"); }, 4000);
 
-      win.querySelector("#cg_close").addEventListener("click", () => win.remove());
+      win.querySelector("#cg_close").addEventListener("click", () => {
+        window.removeEventListener("blur", onWindowBlur);
+        if (autoTimer) clearTimeout(autoTimer);
+        win.remove();
+      });
 
       // Arrastre desde la barra de titulo (mouse y touch unificados).
       const header = win.querySelector("#cg_header");
