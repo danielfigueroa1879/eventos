@@ -648,6 +648,34 @@
       return (v || "").toUpperCase().replace(/\s+/g, " ").trimStart();
     }
     function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    // Inferencia de genero por primer nombre. Es aproximada (no hay campo "genero" en la BD):
+    // se apoya en excepciones frecuentes y en la regla "termina en A -> mujer, resto -> hombre".
+    // Devuelve "H" (hombre), "M" (mujer) o null (sin nombre).
+    function generoDeNombre(nombres) {
+      const primero = (nombres || "").trim().split(/\s+/)[0];
+      if (!primero) return null;
+      const n = primero.toUpperCase();
+      const M_EXC = new Set([
+        "ANDRÉS", "ANDRES", "MATÍAS", "MATIAS", "NICOLÁS", "NICOLAS", "TOBÍAS", "TOBIAS",
+        "JESÚS", "JESUS", "JOSÉ", "JOSE", "MOISÉS", "MOISES", "ELÍAS", "ELIAS", "RENÉ", "RENE",
+        "JEREMÍAS", "JEREMIAS", "JOAQUÍN", "JOAQUIN", "ISMAEL", "MIGUEL", "GABRIEL", "DANIEL",
+        "RAFAEL", "MANUEL", "EZEQUIEL", "DAVID", "RUBÉN", "RUBEN", "EFRAÍN", "EFRAIN",
+        "GERMÁN", "GERMAN", "JULIÁN", "JULIAN", "IVÁN", "IVAN", "BASTIÁN", "BASTIAN",
+        "SEBASTIÁN", "SEBASTIAN", "CRISTIÁN", "CRISTIAN", "AGUSTÍN", "AGUSTIN",
+        "MARTÍN", "MARTIN", "ADRIÁN", "ADRIAN", "FABIÁN", "FABIAN", "SIMÓN", "SIMON",
+        "HERNÁN", "HERNAN", "JHON", "JOHN", "MICHAEL"
+      ]);
+      const F_EXC = new Set([
+        "CARMEN", "ISABEL", "RAQUEL", "MABEL", "MERCEDES", "INÉS", "INES", "MILAGROS",
+        "SOLEDAD", "LOURDES", "ESPERANZA", "LIBERTAD", "CARIDAD", "BEATRIZ", "BEATRÍZ",
+        "JAZMÍN", "JAZMIN", "YASMÍN", "YASMIN", "MIRIAM", "MIRIAN", "RUTH", "JUDITH",
+        "LUZ", "PAZ", "CRUZ", "ANDREA", "LILIAN", "LILIÁN", "ROCÍO", "ROCIO",
+        "PILAR", "SOL", "ABIGAIL"
+      ]);
+      if (M_EXC.has(n)) return "H";
+      if (F_EXC.has(n)) return "M";
+      return n[n.length - 1] === "A" ? "M" : "H";
+    }
 
     /* =========================================================================
        CAPA DE DATOS  (Supabase  ó  LocalStorage/Demo)
@@ -1354,6 +1382,9 @@
       const nX = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
       const nS = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length;
       const nSup = asistSupervisores.length;
+      // Conteo aproximado de hombres/mujeres por primer nombre (ver generoDeNombre).
+      const nH = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "H").length;
+      const nM = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "M").length;
 
       main.innerHTML = `
     <div class="flex items-start justify-between gap-2 mb-3">
@@ -1363,7 +1394,7 @@
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0 items-center">
-        <button id="btnCuentaOS10Top" class="btn text-xs px-2.5 text-white font-bold flex items-center gap-1 shadow-sm hover:brightness-110" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 <span class="sm:hidden">Cuenta</span><span class="hidden sm:inline">Cuenta O.S.10</span></button>
+        <button id="btnCuentaOS10Top" class="btn text-xs px-2.5 text-white font-bold hidden md:flex items-center gap-1 shadow-sm hover:brightness-110" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta O.S.10</button>
         <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
         <button id="compartir" class="btn btn-ghost px-3 hidden md:flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
@@ -1381,7 +1412,7 @@
 
     <div class="card mb-3 overflow-hidden">
     <button id="toggleQR" class="w-full px-3 py-2.5 flex items-center justify-between text-sm font-semibold text-slate-700">
-      <span>🔳 QR y estado del evento <span class="text-slate-400 font-normal">· ${asistGuardias.length}${total ? " / " + total : ""} guardias${nSup ? " · " + nSup + " sup." : ""} · ${pct}%</span></span>
+      <span>🔳 QR y estado del evento</span>
       <span id="qrChevron" class="text-slate-400 transition-transform flex-shrink-0" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
     </button>
     <div id="qrPanel" class="p-3 border-t border-slate-100" ${ADMIN_STATE.showQR ? "" : "hidden"}>
@@ -1413,8 +1444,16 @@
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 py-2 border-b border-slate-100">
         <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
-          <div class="font-semibold text-slate-700">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
-          <button id="compartirMovil" class="md:hidden btn btn-ghost !py-1 !px-2 flex items-center justify-center flex-shrink-0" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+          <div class="font-semibold text-slate-700 text-sm flex items-center gap-2 flex-wrap">
+            <span title="Hombres">👨 <span class="text-slate-500 font-normal">Hombres:</span> ${nH}</span>
+            <span class="text-slate-300">·</span>
+            <span title="Mujeres">👩 <span class="text-slate-500 font-normal">Mujeres:</span> ${nM}</span>
+            ${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? `<span class="text-slate-300">·</span><span class="text-indigo-600 font-normal text-xs">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0 md:hidden">
+            <button id="cuentaMovil" class="btn text-[11px] px-2 py-1 text-white font-bold flex items-center gap-1 shadow-sm" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta</button>
+            <button id="compartirMovil" class="btn btn-ghost !py-1 !px-2 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+          </div>
         </div>
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" class="fld py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
@@ -1517,6 +1556,7 @@
       });
       const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
+      const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const btnHist = $("#histPartidos");
       if (btnHist) btnHist.addEventListener("click", () => modalHistorialPartidos(ev));
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
@@ -2601,49 +2641,95 @@
     }
 
     /* ---- Modal Cuenta O.S.10 (Informe para WhatsApp) ---- */
-    // Consultar guardia en Zosepcar dentro de la app (iframe embebido).
-    // Muchos sitios institucionales bloquean el embebido con X-Frame-Options o
-    // Content-Security-Policy frame-ancestors: si eso pasa, mostramos un aviso
-    // y el usuario puede abrir el sitio en una pestaña nueva desde el modal.
+    // Consultar guardia en Zosepcar: ventana flotante dentro de la app.
+    // - Arrastrable desde la barra de titulo (mouse y touch via pointer events).
+    // - Redimensionable desde la esquina inferior derecha (CSS resize: both).
+    // - Si el sitio bloquea el embebido (X-Frame-Options / CSP frame-ancestors)
+    //   se muestra un aviso ambar y el usuario tiene un boton 🔗 para abrir el
+    //   sitio en una pestana nueva como respaldo.
     function modalConsultarGuardia() {
       const url = "https://zosepcar.cl/consulta_componentes/";
-      openModal(`
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-bold text-slate-800 flex items-center gap-2 text-base">🔎 Consultar guardia <span class="text-slate-400 font-normal text-xs">Zosepcar</span></h2>
-          <button id="cg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+      // Evita duplicar la ventana si ya esta abierta.
+      const prev = document.getElementById("cgWindow");
+      if (prev) { prev.remove(); }
+      const win = document.createElement("div");
+      win.id = "cgWindow";
+      win.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);width:min(900px,95vw);height:min(600px,80vh);min-width:260px;min-height:200px;max-width:100vw;max-height:100vh;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.25);z-index:70;display:flex;flex-direction:column;overflow:hidden;resize:both;";
+      win.innerHTML = `
+        <div id="cg_header" class="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 bg-slate-50 select-none" style="cursor:move;touch-action:none;flex-shrink:0;">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-800 truncate">
+            <span class="text-slate-400 text-base leading-none" aria-hidden="true">⠿</span>
+            🔎 Consultar guardia
+            <span class="text-slate-400 font-normal text-xs hidden sm:inline">· Zosepcar</span>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <a href="${url}" target="_blank" rel="noopener" class="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-white flex items-center gap-1" title="Abrir en pestaña nueva">🔗<span class="hidden sm:inline">Nueva pestaña</span></a>
+            <button id="cg_close" class="text-slate-500 hover:text-red-600 text-lg leading-none w-7 h-7 flex items-center justify-center rounded hover:bg-white" title="Cerrar">✕</button>
+          </div>
         </div>
-        <div id="cg_aviso" class="hidden mb-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-          ⚠ El sitio de Zosepcar no permite abrirse dentro de esta app. Ábrelo en una pestaña nueva con el botón de abajo.
+        <div id="cg_aviso" class="hidden mx-3 mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex-shrink-0">
+          ⚠ El sitio no permite abrirse embebido aquí. Usa el botón 🔗 para abrirlo en pestaña nueva.
         </div>
-        <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-white">
-          <iframe id="cg_iframe" src="${url}" class="w-full block" style="height:min(70vh,700px);border:0;" referrerpolicy="no-referrer"></iframe>
+        <div class="flex-1 relative overflow-hidden" style="min-height:0;">
+          <div id="cg_dragMask" class="hidden absolute inset-0" style="z-index:5;background:transparent;"></div>
+          <iframe id="cg_iframe" src="${url}" class="w-full h-full block" style="border:0;background:#fff;" referrerpolicy="no-referrer"></iframe>
         </div>
-        <div class="flex gap-2 mt-3">
-          <a href="${url}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm flex items-center justify-center gap-1">🔗 Abrir en pestaña nueva</a>
-          <button id="cg_close" class="btn btn-ghost flex-1 text-sm">Cerrar</button>
-        </div>
-      `);
-      // El modal por defecto es max-w-md; para el iframe conviene mas ancho.
-      const mb = $("#modalBox"); if (mb) mb.className = "card w-full max-w-4xl p-4 max-h-[95vh] overflow-auto";
-      const iframe = $("#cg_iframe"), aviso = $("#cg_aviso");
-      // Deteccion best-effort: si el iframe no dispara "load" en unos segundos
-      // (bloqueado por CSP frame-ancestors sin evento visible) o si carga con
-      // altura cero, mostramos el aviso.
+      `;
+      document.body.appendChild(win);
+
+      const iframe = win.querySelector("#cg_iframe");
+      const aviso = win.querySelector("#cg_aviso");
       let cargado = false;
-      if (iframe) {
-        iframe.addEventListener("load", () => {
-          cargado = true;
-          try {
-            // Si el src fue reescrito a about:blank por el navegador al bloquear, avisar.
-            if (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href === "about:blank") {
-              aviso.classList.remove("hidden");
-            }
-          } catch (_) { /* cross-origin: no podemos leer, es esperable */ }
-        });
-        setTimeout(() => { if (!cargado && aviso) aviso.classList.remove("hidden"); }, 4000);
-      }
-      $("#cg_x").addEventListener("click", closeModal);
-      $("#cg_close").addEventListener("click", closeModal);
+      iframe.addEventListener("load", () => {
+        cargado = true;
+        try {
+          if (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href === "about:blank") {
+            aviso.classList.remove("hidden");
+          }
+        } catch (_) { /* cross-origin ok */ }
+      });
+      setTimeout(() => { if (!cargado) aviso.classList.remove("hidden"); }, 4000);
+
+      win.querySelector("#cg_close").addEventListener("click", () => win.remove());
+
+      // Arrastre desde la barra de titulo (mouse y touch unificados).
+      const header = win.querySelector("#cg_header");
+      const dragMask = win.querySelector("#cg_dragMask");
+      let dragging = false, sx = 0, sy = 0, startLeft = 0, startTop = 0;
+      header.addEventListener("pointerdown", (e) => {
+        // Los clicks en los botones del header no inician arrastre.
+        if (e.target.closest("a,button")) return;
+        dragging = true;
+        // Al arrastrar por primera vez, cambia de translateX centrado a coords absolutas.
+        const rect = win.getBoundingClientRect();
+        win.style.left = rect.left + "px";
+        win.style.top = rect.top + "px";
+        win.style.transform = "none";
+        sx = e.clientX; sy = e.clientY;
+        startLeft = rect.left; startTop = rect.top;
+        // Mascara sobre el iframe: evita que este capture eventos durante el drag.
+        dragMask.classList.remove("hidden");
+        try { header.setPointerCapture(e.pointerId); } catch (_) { }
+      });
+      header.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const nx = startLeft + (e.clientX - sx);
+        const ny = startTop + (e.clientY - sy);
+        const w = win.offsetWidth;
+        // Deja al menos 60px visibles horizontal y 0 vertical.
+        const maxX = window.innerWidth - 60, minX = -(w - 60);
+        const maxY = window.innerHeight - 40, minY = 0;
+        win.style.left = Math.max(minX, Math.min(maxX, nx)) + "px";
+        win.style.top = Math.max(minY, Math.min(maxY, ny)) + "px";
+      });
+      const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        dragMask.classList.add("hidden");
+        try { header.releasePointerCapture(e.pointerId); } catch (_) { }
+      };
+      header.addEventListener("pointerup", endDrag);
+      header.addEventListener("pointercancel", endDrag);
     }
     function modalCuentaOS10(ev, asist) {
       const isPart = esPartido(ev);
