@@ -1152,8 +1152,8 @@
   <div class="min-h-screen flex flex-col md:flex-row">
     <!-- Topbar móvil -->
     <div class="md:hidden brand-bg text-white flex items-center justify-between px-4 py-3">
-      <button id="hamb" class="text-2xl leading-none" aria-label="Abrir menú">☰</button>
-      <div class="font-bold flex items-center gap-2"><img src="images/logo-os10-original.webp" class="w-7 h-7 rounded-full bg-white/90" alt="OS10">Control de Guardias</div>
+      <button id="hamb" class="text-3xl leading-none" aria-label="Abrir menú">☰</button>
+      <div class="font-bold flex items-center gap-2"><img src="images/logo-os10-original.webp" class="w-7 h-7 rounded-full bg-white/90" alt="OS10">CONTROL EVENTOS</div>
       <div class="w-6"></div>
     </div>
 
@@ -1165,7 +1165,7 @@
       <div class="brand-bg text-white p-4 flex items-center gap-3">
         <img src="images/logo-os10-original.webp" class="w-11 h-11 rounded-full bg-white/90" alt="OS10">
         <div class="flex-1">
-          <div class="font-bold text-lg leading-tight">Control Guardias</div>
+          <div class="font-bold text-lg leading-tight">CONTROL EVENTOS</div>
           <div class="text-xs opacity-80">Fiestas Patrias · O.S.10 Coquimbo</div>
         </div>
         <button id="cerrarMenu" class="md:hidden text-white text-2xl leading-none px-1" aria-label="Cerrar menú">✕</button>
@@ -1187,7 +1187,7 @@
     </aside>
 
     <!-- Main -->
-    <main id="main" class="flex-1 p-4 md:p-6 bg-[#f1f5f4]"></main>
+    <main id="main" class="flex-1 p-4 md:p-6 bg-slate-200"></main>
   </div>`;
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
@@ -1462,7 +1462,7 @@
       }));
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
     }
-    function chip(label, n, color) { return `<div class="rounded-lg py-2 b-${color}"><div class="text-lg font-bold">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
+    function chip(label, n, color) { return `<div class="rounded-lg py-1.5 b-${color}"><div class="text-lg font-bold leading-tight">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
     // Filtra en vivo el listado de guardias (móvil y escritorio) sin re-renderizar
     function filtrarLista() {
       const q = (ADMIN_STATE.search || "").toLowerCase().trim();
