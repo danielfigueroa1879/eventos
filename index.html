@@ -166,6 +166,11 @@
       color: #334155
     }
 
+    .b-azul {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
     .row-dup {
       background: #fef2f2 !important;
       outline: 2px solid #fca5a5;
@@ -1325,14 +1330,16 @@
         <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(fechaFmt(ev.fecha_evento))}` : ""}</div>
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
-      <div class="flex gap-1.5 flex-shrink-0">
+      <div class="flex gap-1.5 flex-shrink-0 items-center">
+        <button id="btnCuentaOS10Top" class="btn btn-p text-xs px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center gap-1 shadow-sm" title="Informe Cuenta O.S.10">📋 Cuenta O.S.10</button>
         <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
         <button id="compartir" class="btn btn-ghost px-3 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
       </div>
     </div>
 
-    <div class="grid grid-cols-4 gap-2 mb-3 text-center">
+    <div class="grid grid-cols-5 gap-2 mb-3 text-center">
+      ${chip("Total llegaron", asist.length, "azul")}
       ${chip("Vigentes", nV, "verde")}
       ${chip("Prórroga", nP, "amarillo")}
       ${chip("Vencidos", nX, "rojo")}
@@ -1359,6 +1366,7 @@
         </div>
       </div>
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
+        <button id="cuentaOS10" class="btn btn-p text-sm bg-emerald-700 hover:bg-emerald-800 text-white font-semibold">📋 Cuenta O.S.10</button>
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
@@ -1442,6 +1450,8 @@
           } catch (e) { toast("Error al archivar: " + (e.message || e), false); }
         });
       });
+      const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asist));
+      const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const btnHist = $("#histPartidos");
       if (btnHist) btnHist.addEventListener("click", () => modalHistorialPartidos(ev));
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
@@ -2423,6 +2433,289 @@
         else panel.style.transform = "translateX(100%)";
       }
       $("#dist_panel", ov).addEventListener("click", togglePanel);
+    }
+
+    /* ---- Modal Cuenta O.S.10 (Informe para WhatsApp) ---- */
+    function modalCuentaOS10(ev, asist) {
+      const isPart = esPartido(ev);
+      const saved = ev.reporte_os10 || {};
+
+      let defaultFecha = "";
+      if (ev.fecha_evento) {
+        const parts = ev.fecha_evento.split("-");
+        if (parts.length === 3) defaultFecha = `${parts[2]}.${parts[1]}.${parts[0]}`;
+      }
+      if (!defaultFecha) {
+        const d = new Date();
+        defaultFecha = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+      }
+
+      const totalGuardias = (asist && asist.length) ? asist.length : (ev.cantidad_esperada || 0);
+
+      const state = {
+        fecha: saved.fecha || defaultFecha,
+        hora_inicio: saved.hora_inicio || (ev.turno_inicio ? `${ev.turno_inicio} hrs.` : "20:00 hrs."),
+        partido_o_nombre: saved.partido_o_nombre || (isPart ? (ev.partido || ev.nombre_evento) : ev.nombre_evento),
+        lugar: saved.lugar || (isPart ? "Estadio Francisco Sánchez Rumoroso, Coquimbo." : "Coquimbo."),
+        
+        resolucion_num: saved.resolucion_num || "N°877",
+        resolucion_fecha: saved.resolucion_fecha || "28.08.2026",
+        resolucion_entidad: saved.resolucion_entidad || "Delegación Presidencial Regional de Coquimbo.",
+        categoria: saved.categoria || "Clase C",
+        aforo: saved.aforo || (ev.cantidad_esperada ? `${(ev.cantidad_esperada * 100).toLocaleString('es-CL')} personas.` : "10.000 personas."),
+        detec_metales: saved.detec_metales || "29 de 25.",
+        ambulancias: saved.ambulancias || "02",
+
+        empresa_nombre: saved.empresa_nombre || (ev.empresa ? `${ev.empresa} Sc Spa.` : "North Security Sc Spa."),
+        empresa_rut: saved.empresa_rut || "77.671.725-8",
+        ddff_num: saved.ddff_num || "N°78",
+        ddff_fecha: saved.ddff_fecha || "25.08.2026",
+
+        rep_legal_nombre: saved.rep_legal_nombre || "Sebastián Urbina Isla",
+        rep_legal_rut: saved.rep_legal_rut || "17827708-1",
+        jefe_seguridad_nombre: saved.jefe_seguridad_nombre || "Carlos Lillo Julio",
+        jefe_seguridad_rut: saved.jefe_seguridad_rut || "10592675-8",
+
+        total_ggss: saved.total_ggss != null ? saved.total_ggss : totalGuardias,
+        hombres: saved.hombres != null ? saved.hombres : Math.max(0, Math.round(totalGuardias * 0.71)),
+        mujeres: saved.mujeres != null ? saved.mujeres : Math.max(0, totalGuardias - Math.round(totalGuardias * 0.71)),
+        supervisores: saved.supervisores || "03",
+        jefe_seguridad_cant: saved.jefe_seguridad_cant || "01",
+        cctv_cant: saved.cctv_cant || "01",
+
+        personal_os10: saved.personal_os10 || "Sgto. 1ro. Daniel Figueroa Chacama.",
+        estado: saved.estado || "Sin novedad."
+      };
+
+      function buildText() {
+        const header = isPart 
+          ? "*🏟️ INFORME ESTADIO*" 
+          : `*🎪 INFORME EVENTO: ${state.partido_o_nombre}*`;
+
+        const matchOrLocation = isPart 
+          ? `* ${state.partido_o_nombre}\n* ${state.lugar}` 
+          : `* ${state.lugar}`;
+
+        return `Buenas tardes, OS10 Coquimbo remite el siguiente Informe:
+
+${header}
+* Fecha: ${state.fecha}
+* Hora inicio: ${state.hora_inicio}
+${matchOrLocation}
+
+*📋 DATOS ADMINISTRATIVOS*
+* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
+   de la ${state.resolucion_entidad}
+* Categoría: ${state.categoria}
+* Aforo: ${state.aforo}
+* Detec. Metales: ${state.detec_metales}
+* Ambulancias 🚑: ${state.ambulancias}
+
+*🏢 EMPRESA SEGURIDAD*
+* ${state.empresa_nombre}
+* RUT: ${state.empresa_rut}
+* DD.FF.: ${state.ddff_num} (${state.ddff_fecha})
+
+*👥 REPRESENTANTES*
+* Representante Legal: 
+   ${state.rep_legal_nombre}
+   RUT: ${state.rep_legal_rut}
+* Jefe Seguridad: 
+   ${state.jefe_seguridad_nombre}
+   C/I: ${state.jefe_seguridad_rut}
+
+*👮‍♂️ PERSONAL DE SEGURIDAD*
+* Total GG.SS.: ${state.total_ggss}
+* Hombres: ${state.hombres}
+* Mujeres: ${state.mujeres}
+* Supervisores: ${state.supervisores}
+* Jefe de Seguridad: ${state.jefe_seguridad_cant}
+* Operador CCTV: ${state.cctv_cant}
+
+*🚔 PERSONAL OS.10*
+* ${state.personal_os10}
+* Estado: ${state.estado}`;
+      }
+
+      openModal(`
+        <div class="space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-1">
+            <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+              <span class="text-emerald-700 text-xl">📋</span> Informe Cuenta O.S.10
+            </h2>
+            <span class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">Formato WhatsApp</span>
+          </div>
+
+          <button id="cpCuentaOS10" class="btn btn-p w-full py-3 text-base bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 shadow-md rounded-xl transition-all">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copiar Cuenta O.S.10 al Portapapeles
+          </button>
+
+          <div class="relative">
+            <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1 flex justify-between items-center">
+              <span>Vista previa del mensaje</span>
+              <span class="text-emerald-600 font-bold text-xs">Listo para pegar en WhatsApp</span>
+            </div>
+            <textarea id="cuentaOS10Preview" class="w-full bg-slate-900 text-emerald-400 p-3 rounded-xl text-xs font-mono whitespace-pre-wrap border border-emerald-500/30 shadow-inner h-56 focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed" readonly></textarea>
+          </div>
+
+          <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs" open>
+            <summary class="font-bold text-slate-700 cursor-pointer text-xs mb-2 select-none flex items-center justify-between">
+              <span>✎ Editar datos del informe (Resolución, Empresa, Representantes, Personal)</span>
+              <span class="text-slate-400 font-normal text-[11px]">Desplegar/ocultar</span>
+            </summary>
+            
+            <div class="space-y-2.5 pt-2 border-t border-slate-200">
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700">🏟️ / 🎪 Datos del Evento</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Fecha</label><input id="r_fecha" class="fld text-xs py-1" value="${esc(state.fecha)}"/></div>
+                <div><label class="font-medium text-slate-600">Hora inicio</label><input id="r_hora" class="fld text-xs py-1" value="${esc(state.hora_inicio)}"/></div>
+              </div>
+              <div><label class="font-medium text-slate-600">${isPart ? "Partido / Equipos" : "Nombre del Evento"}</label><input id="r_partido" class="fld text-xs py-1" value="${esc(state.partido_o_nombre)}"/></div>
+              <div><label class="font-medium text-slate-600">Lugar / Estadio</label><input id="r_lugar" class="fld text-xs py-1" value="${esc(state.lugar)}"/></div>
+
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">📋 Datos Administrativos (Resolución siempre editable)</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Resolución N°</label><input id="r_res_num" class="fld text-xs py-1" value="${esc(state.resolucion_num)}"/></div>
+                <div><label class="font-medium text-slate-600">Fecha Res.</label><input id="r_res_fecha" class="fld text-xs py-1" value="${esc(state.resolucion_fecha)}"/></div>
+              </div>
+              <div><label class="font-medium text-slate-600">Entidad Emisora</label><input id="r_res_entidad" class="fld text-xs py-1" value="${esc(state.resolucion_entidad)}"/></div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Categoría</label><input id="r_cat" class="fld text-xs py-1" value="${esc(state.categoria)}"/></div>
+                <div><label class="font-medium text-slate-600">Aforo</label><input id="r_aforo" class="fld text-xs py-1" value="${esc(state.aforo)}"/></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Detec. Metales</label><input id="r_metales" class="fld text-xs py-1" value="${esc(state.detec_metales)}"/></div>
+                <div><label class="font-medium text-slate-600">Ambulancias 🚑</label><input id="r_amb" class="fld text-xs py-1" value="${esc(state.ambulancias)}"/></div>
+              </div>
+
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">🏢 Empresa de Seguridad</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Nombre Empresa</label><input id="r_emp_nom" class="fld text-xs py-1" value="${esc(state.empresa_nombre)}"/></div>
+                <div><label class="font-medium text-slate-600">RUT Empresa</label><input id="r_emp_rut" class="fld text-xs py-1" value="${esc(state.empresa_rut)}"/></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">DD.FF. N°</label><input id="r_ddff_num" class="fld text-xs py-1" value="${esc(state.ddff_num)}"/></div>
+                <div><label class="font-medium text-slate-600">Fecha DD.FF.</label><input id="r_ddff_fecha" class="fld text-xs py-1" value="${esc(state.ddff_fecha)}"/></div>
+              </div>
+
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">👥 Representantes</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Rep. Legal</label><input id="r_rep_nom" class="fld text-xs py-1" value="${esc(state.rep_legal_nombre)}"/></div>
+                <div><label class="font-medium text-slate-600">RUT Rep. Legal</label><input id="r_rep_rut" class="fld text-xs py-1" value="${esc(state.rep_legal_rut)}"/></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Jefe Seguridad</label><input id="r_jefe_nom" class="fld text-xs py-1" value="${esc(state.jefe_seguridad_nombre)}"/></div>
+                <div><label class="font-medium text-slate-600">C/I Jefe Seg.</label><input id="r_jefe_rut" class="fld text-xs py-1" value="${esc(state.jefe_seguridad_rut)}"/></div>
+              </div>
+
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">👮‍♂️ Personal de Seguridad</div>
+              <div class="grid grid-cols-3 gap-2">
+                <div><label class="font-medium text-slate-600">Total GG.SS.</label><input id="r_total_ggss" type="number" class="fld text-xs py-1" value="${state.total_ggss}"/></div>
+                <div><label class="font-medium text-slate-600">Hombres</label><input id="r_hombres" type="number" class="fld text-xs py-1" value="${state.hombres}"/></div>
+                <div><label class="font-medium text-slate-600">Mujeres</label><input id="r_mujeres" type="number" class="fld text-xs py-1" value="${state.mujeres}"/></div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div><label class="font-medium text-slate-600">Supervisores</label><input id="r_supervisores" class="fld text-xs py-1" value="${esc(state.supervisores)}"/></div>
+                <div><label class="font-medium text-slate-600">Jefe Seg. (Cant)</label><input id="r_jefe_cant" class="fld text-xs py-1" value="${esc(state.jefe_seguridad_cant)}"/></div>
+                <div><label class="font-medium text-slate-600">CCTV (Cant)</label><input id="r_cctv_cant" class="fld text-xs py-1" value="${esc(state.cctv_cant)}"/></div>
+              </div>
+
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">🚔 Personal OS.10</div>
+              <div><label class="font-medium text-slate-600">Personal OS.10 a Cargo</label><input id="r_os10" class="fld text-xs py-1" value="${esc(state.personal_os10)}"/></div>
+              <div><label class="font-medium text-slate-600">Estado del Evento</label><input id="r_estado" class="fld text-xs py-1" value="${esc(state.estado)}"/></div>
+            </div>
+          </details>
+
+          <div class="flex gap-2 pt-1">
+            <button id="m_close_report" class="btn btn-ghost flex-1">Cerrar</button>
+            <button id="m_save_report" class="btn btn-p flex-1 bg-slate-700 hover:bg-slate-800 text-white">💾 Guardar plantilla</button>
+          </div>
+        </div>
+      `);
+
+      const prev = $("#cuentaOS10Preview");
+      const updatePreview = () => {
+        state.fecha = $("#r_fecha").value.trim();
+        state.hora_inicio = $("#r_hora").value.trim();
+        state.partido_o_nombre = $("#r_partido").value.trim();
+        state.lugar = $("#r_lugar").value.trim();
+
+        state.resolucion_num = $("#r_res_num").value.trim();
+        state.resolucion_fecha = $("#r_res_fecha").value.trim();
+        state.resolucion_entidad = $("#r_res_entidad").value.trim();
+        state.categoria = $("#r_cat").value.trim();
+        state.aforo = $("#r_aforo").value.trim();
+        state.detec_metales = $("#r_metales").value.trim();
+        state.ambulancias = $("#r_amb").value.trim();
+
+        state.empresa_nombre = $("#r_emp_nom").value.trim();
+        state.empresa_rut = $("#r_emp_rut").value.trim();
+        state.ddff_num = $("#r_ddff_num").value.trim();
+        state.ddff_fecha = $("#r_ddff_fecha").value.trim();
+
+        state.rep_legal_nombre = $("#r_rep_nom").value.trim();
+        state.rep_legal_rut = $("#r_rep_rut").value.trim();
+        state.jefe_seguridad_nombre = $("#r_jefe_nom").value.trim();
+        state.jefe_seguridad_rut = $("#r_jefe_rut").value.trim();
+
+        state.total_ggss = $("#r_total_ggss").value;
+        state.hombres = $("#r_hombres").value;
+        state.mujeres = $("#r_mujeres").value;
+        state.supervisores = $("#r_supervisores").value.trim();
+        state.jefe_seguridad_cant = $("#r_jefe_cant").value.trim();
+        state.cctv_cant = $("#r_cctv_cant").value.trim();
+
+        state.personal_os10 = $("#r_os10").value.trim();
+        state.estado = $("#r_estado").value.trim();
+
+        prev.value = buildText();
+      };
+
+      prev.value = buildText();
+
+      const inputs = [
+        "r_fecha", "r_hora", "r_partido", "r_lugar", "r_res_num", "r_res_fecha", "r_res_entidad",
+        "r_cat", "r_aforo", "r_metales", "r_amb", "r_emp_nom", "r_emp_rut", "r_ddff_num", "r_ddff_fecha",
+        "r_rep_nom", "r_rep_rut", "r_jefe_nom", "r_jefe_rut", "r_total_ggss", "r_hombres", "r_mujeres",
+        "r_supervisores", "r_jefe_cant", "r_cctv_cant", "r_os10", "r_estado"
+      ];
+      inputs.forEach(id => {
+        const el = $("#" + id);
+        if (el) el.addEventListener("input", updatePreview);
+      });
+
+      const guardarEstado = async () => {
+        updatePreview();
+        try {
+          await Data.updateEvento(ev.id, { reporte_os10: state });
+        } catch (e) { console.error("Error guardando plantilla de informe:", e); }
+      };
+
+      $("#m_close_report").addEventListener("click", closeModal);
+      $("#m_save_report").addEventListener("click", async () => {
+        await guardarEstado();
+        toast("Plantilla de informe guardada para este evento.");
+      });
+
+      $("#cpCuentaOS10").addEventListener("click", async () => {
+        updatePreview();
+        const textToCopy = prev.value;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(textToCopy);
+          } else {
+            prev.select();
+            document.execCommand("copy");
+          }
+          await guardarEstado();
+          toast("¡Informe Cuenta O.S.10 copiado al portapapeles! Listo para pegar en WhatsApp.", true, 4000);
+        } catch (err) {
+          prev.select();
+          document.execCommand("copy");
+          toast("¡Informe copiado al portapapeles!", true);
+        }
+      });
     }
 
     /* ---- Modales evento ---- */
