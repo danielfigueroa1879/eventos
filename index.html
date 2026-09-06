@@ -1299,11 +1299,12 @@
       ${chip("Sin curso", nS, "gris")}
     </div>
 
-    <button id="toggleQR" class="card w-full px-3 py-2.5 mb-3 flex items-center justify-between text-sm font-semibold text-slate-700">
+    <div class="card mb-3 overflow-hidden">
+    <button id="toggleQR" class="w-full px-3 py-2.5 flex items-center justify-between text-sm font-semibold text-slate-700">
       <span>🔳 QR y estado del evento <span class="text-slate-400 font-normal">· ${asist.length}${total ? " / " + total : ""} guardias · ${pct}%</span></span>
-      <span id="qrChevron" class="text-slate-400 transition-transform" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span id="qrChevron" class="text-slate-400 transition-transform flex-shrink-0" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
     </button>
-    <div id="qrPanel" class="card p-3 mb-3" ${ADMIN_STATE.showQR ? "" : "hidden"}>
+    <div id="qrPanel" class="p-3 border-t border-slate-100" ${ADMIN_STATE.showQR ? "" : "hidden"}>
       <div class="flex items-center justify-between mb-1.5">
         <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia</div>
         <div class="text-xl font-bold text-green-700">${asist.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
@@ -1325,6 +1326,7 @@
         <button id="editEv" class="btn btn-ghost text-sm">${esPartido(ev) ? "✎ Cambiar equipos" : "✎ Editar evento"}</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
       </div>
+    </div>
     </div>
 
     <div class="card">
