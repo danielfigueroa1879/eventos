@@ -2641,49 +2641,95 @@
     }
 
     /* ---- Modal Cuenta O.S.10 (Informe para WhatsApp) ---- */
-    // Consultar guardia en Zosepcar dentro de la app (iframe embebido).
-    // Muchos sitios institucionales bloquean el embebido con X-Frame-Options o
-    // Content-Security-Policy frame-ancestors: si eso pasa, mostramos un aviso
-    // y el usuario puede abrir el sitio en una pestaña nueva desde el modal.
+    // Consultar guardia en Zosepcar: ventana flotante dentro de la app.
+    // - Arrastrable desde la barra de titulo (mouse y touch via pointer events).
+    // - Redimensionable desde la esquina inferior derecha (CSS resize: both).
+    // - Si el sitio bloquea el embebido (X-Frame-Options / CSP frame-ancestors)
+    //   se muestra un aviso ambar y el usuario tiene un boton 🔗 para abrir el
+    //   sitio en una pestana nueva como respaldo.
     function modalConsultarGuardia() {
       const url = "https://zosepcar.cl/consulta_componentes/";
-      openModal(`
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-bold text-slate-800 flex items-center gap-2 text-base">🔎 Consultar guardia <span class="text-slate-400 font-normal text-xs">Zosepcar</span></h2>
-          <button id="cg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+      // Evita duplicar la ventana si ya esta abierta.
+      const prev = document.getElementById("cgWindow");
+      if (prev) { prev.remove(); }
+      const win = document.createElement("div");
+      win.id = "cgWindow";
+      win.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);width:min(900px,95vw);height:min(600px,80vh);min-width:260px;min-height:200px;max-width:100vw;max-height:100vh;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.25);z-index:70;display:flex;flex-direction:column;overflow:hidden;resize:both;";
+      win.innerHTML = `
+        <div id="cg_header" class="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 bg-slate-50 select-none" style="cursor:move;touch-action:none;flex-shrink:0;">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-800 truncate">
+            <span class="text-slate-400 text-base leading-none" aria-hidden="true">⠿</span>
+            🔎 Consultar guardia
+            <span class="text-slate-400 font-normal text-xs hidden sm:inline">· Zosepcar</span>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <a href="${url}" target="_blank" rel="noopener" class="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-white flex items-center gap-1" title="Abrir en pestaña nueva">🔗<span class="hidden sm:inline">Nueva pestaña</span></a>
+            <button id="cg_close" class="text-slate-500 hover:text-red-600 text-lg leading-none w-7 h-7 flex items-center justify-center rounded hover:bg-white" title="Cerrar">✕</button>
+          </div>
         </div>
-        <div id="cg_aviso" class="hidden mb-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-          ⚠ El sitio de Zosepcar no permite abrirse dentro de esta app. Ábrelo en una pestaña nueva con el botón de abajo.
+        <div id="cg_aviso" class="hidden mx-3 mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex-shrink-0">
+          ⚠ El sitio no permite abrirse embebido aquí. Usa el botón 🔗 para abrirlo en pestaña nueva.
         </div>
-        <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-white">
-          <iframe id="cg_iframe" src="${url}" class="w-full block" style="height:min(70vh,700px);border:0;" referrerpolicy="no-referrer"></iframe>
+        <div class="flex-1 relative overflow-hidden" style="min-height:0;">
+          <div id="cg_dragMask" class="hidden absolute inset-0" style="z-index:5;background:transparent;"></div>
+          <iframe id="cg_iframe" src="${url}" class="w-full h-full block" style="border:0;background:#fff;" referrerpolicy="no-referrer"></iframe>
         </div>
-        <div class="flex gap-2 mt-3">
-          <a href="${url}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm flex items-center justify-center gap-1">🔗 Abrir en pestaña nueva</a>
-          <button id="cg_close" class="btn btn-ghost flex-1 text-sm">Cerrar</button>
-        </div>
-      `);
-      // El modal por defecto es max-w-md; para el iframe conviene mas ancho.
-      const mb = $("#modalBox"); if (mb) mb.className = "card w-full max-w-4xl p-4 max-h-[95vh] overflow-auto";
-      const iframe = $("#cg_iframe"), aviso = $("#cg_aviso");
-      // Deteccion best-effort: si el iframe no dispara "load" en unos segundos
-      // (bloqueado por CSP frame-ancestors sin evento visible) o si carga con
-      // altura cero, mostramos el aviso.
+      `;
+      document.body.appendChild(win);
+
+      const iframe = win.querySelector("#cg_iframe");
+      const aviso = win.querySelector("#cg_aviso");
       let cargado = false;
-      if (iframe) {
-        iframe.addEventListener("load", () => {
-          cargado = true;
-          try {
-            // Si el src fue reescrito a about:blank por el navegador al bloquear, avisar.
-            if (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href === "about:blank") {
-              aviso.classList.remove("hidden");
-            }
-          } catch (_) { /* cross-origin: no podemos leer, es esperable */ }
-        });
-        setTimeout(() => { if (!cargado && aviso) aviso.classList.remove("hidden"); }, 4000);
-      }
-      $("#cg_x").addEventListener("click", closeModal);
-      $("#cg_close").addEventListener("click", closeModal);
+      iframe.addEventListener("load", () => {
+        cargado = true;
+        try {
+          if (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href === "about:blank") {
+            aviso.classList.remove("hidden");
+          }
+        } catch (_) { /* cross-origin ok */ }
+      });
+      setTimeout(() => { if (!cargado) aviso.classList.remove("hidden"); }, 4000);
+
+      win.querySelector("#cg_close").addEventListener("click", () => win.remove());
+
+      // Arrastre desde la barra de titulo (mouse y touch unificados).
+      const header = win.querySelector("#cg_header");
+      const dragMask = win.querySelector("#cg_dragMask");
+      let dragging = false, sx = 0, sy = 0, startLeft = 0, startTop = 0;
+      header.addEventListener("pointerdown", (e) => {
+        // Los clicks en los botones del header no inician arrastre.
+        if (e.target.closest("a,button")) return;
+        dragging = true;
+        // Al arrastrar por primera vez, cambia de translateX centrado a coords absolutas.
+        const rect = win.getBoundingClientRect();
+        win.style.left = rect.left + "px";
+        win.style.top = rect.top + "px";
+        win.style.transform = "none";
+        sx = e.clientX; sy = e.clientY;
+        startLeft = rect.left; startTop = rect.top;
+        // Mascara sobre el iframe: evita que este capture eventos durante el drag.
+        dragMask.classList.remove("hidden");
+        try { header.setPointerCapture(e.pointerId); } catch (_) { }
+      });
+      header.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const nx = startLeft + (e.clientX - sx);
+        const ny = startTop + (e.clientY - sy);
+        const w = win.offsetWidth;
+        // Deja al menos 60px visibles horizontal y 0 vertical.
+        const maxX = window.innerWidth - 60, minX = -(w - 60);
+        const maxY = window.innerHeight - 40, minY = 0;
+        win.style.left = Math.max(minX, Math.min(maxX, nx)) + "px";
+        win.style.top = Math.max(minY, Math.min(maxY, ny)) + "px";
+      });
+      const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        dragMask.classList.add("hidden");
+        try { header.releasePointerCapture(e.pointerId); } catch (_) { }
+      };
+      header.addEventListener("pointerup", endDrag);
+      header.addEventListener("pointercancel", endDrag);
     }
     function modalCuentaOS10(ev, asist) {
       const isPart = esPartido(ev);
