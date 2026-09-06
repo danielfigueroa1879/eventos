@@ -808,20 +808,11 @@
       paint();
     })();
 
-    function toast(msg, ok = true, ms = 2600) {
+    function toast(msg, ok = true, ms = 3200) {
       const t = $("#toast");
-      let cls, style;
-      if (ok === "danger") {                 // aviso crítico: fondo rojo, letras blancas (bien visible)
-        cls = "text-white font-semibold";
-        style = "background:#dc2626;border-left:4px solid #7f1d1d";
-      } else if (ok) {                        // ok normal: verde
-        cls = "text-green-800";
-        style = "border-left:4px solid #16a34a";
-      } else {                                // error normal: texto rojo sobre tarjeta blanca
-        cls = "text-red-700";
-        style = "border-left:4px solid #dc2626";
-      }
-      t.innerHTML = `<div class="card px-4 py-3 text-sm font-medium ${cls}" style="${style}">${esc(msg)}</div>`;
+      // Alertas y avisos con fondo rojo vivo y letras blancas en negrita (alta visibilidad)
+      const bgStyle = "background:#dc2626; color:#ffffff; border:2px solid #991b1b; box-shadow:0 10px 25px -5px rgba(220,38,38,0.6);";
+      t.innerHTML = `<div class="px-5 py-3 rounded-2xl text-sm font-extrabold text-white flex items-center justify-center gap-2 text-center shadow-2xl backdrop-blur-md" style="${bgStyle}">📢 <span>${esc(msg)}</span></div>`;
       t.style.display = "block"; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", ms);
     }
     // Sonido de ingreso de guardia (carpeta /sonidos/ingreso.mp3)
@@ -1394,7 +1385,7 @@
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0 items-center">
-        <button id="btnCuentaOS10Top" class="btn text-xs px-2.5 text-white font-bold hidden md:flex items-center gap-1 shadow-sm hover:brightness-110" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta O.S.10</button>
+        <button id="btnCuentaOS10Top" class="btn text-xs md:text-sm px-3 py-2 text-white font-extrabold hidden md:flex items-center gap-1.5 shadow-md hover:brightness-110 rounded-xl transition-all" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta O.S.10</button>
         <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
         <button id="compartir" class="btn btn-ghost px-3 hidden md:flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
@@ -1430,7 +1421,7 @@
         </div>
       </div>
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
-        <button id="cuentaOS10" class="btn btn-p text-sm bg-emerald-700 hover:bg-emerald-800 text-white font-semibold">📋 Cuenta O.S.10</button>
+        <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
@@ -1444,14 +1435,13 @@
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 py-2 border-b border-slate-100">
         <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
-          <div class="font-semibold text-slate-700 text-sm flex items-center gap-2 flex-wrap">
-            <span title="Hombres">👨 <span class="text-slate-500 font-normal">Hombres:</span> ${nH}</span>
-            <span class="text-slate-300">·</span>
-            <span title="Mujeres">👩 <span class="text-slate-500 font-normal">Mujeres:</span> ${nM}</span>
-            ${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? `<span class="text-slate-300">·</span><span class="text-indigo-600 font-normal text-xs">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}
+          <div class="font-semibold text-slate-700 text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
+            <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${nH} <span class="text-slate-400 font-normal">H</span></span>
+            <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${nM} <span class="text-slate-400 font-normal">M</span></span>
+            ${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? `<span class="text-indigo-600 font-normal text-xs ml-0.5">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 md:hidden">
-            <button id="cuentaMovil" class="btn text-[11px] px-2 py-1 text-white font-bold flex items-center gap-1 shadow-sm" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta</button>
+            <button id="cuentaMovil" class="btn text-xs px-3 py-2 text-white font-extrabold flex items-center gap-1 shadow-md hover:brightness-110 rounded-xl transition-all" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta</button>
             <button id="compartirMovil" class="btn btn-ghost !py-1 !px-2 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
           </div>
         </div>
@@ -2748,8 +2738,17 @@
       // Los supervisores se cuentan aparte del total de guardias.
       const asistGuardias = (asist || []).filter(a => !a.es_supervisor);
       const asistSupervisores = (asist || []).filter(a => a.es_supervisor);
-      const totalGuardias = asistGuardias.length ? asistGuardias.length : (ev.cantidad_esperada || 0);
-      const totalSupervisoresReal = asistSupervisores.length;
+
+      // Conteo automático en tiempo real desde la asistencia registrada
+      const calcHombres = asistGuardias.filter(a => generoDeNombre(a.guardia?.nombres) === "H").length;
+      const calcMujeres = asistGuardias.filter(a => generoDeNombre(a.guardia?.nombres) === "M").length;
+      const calcSupervisores = asistSupervisores.length;
+      const calcTotalGGSS = asistGuardias.length;
+
+      const autoHombres = asistGuardias.length ? calcHombres : (saved.hombres != null ? saved.hombres : Math.round((ev.cantidad_esperada || 0) * 0.8));
+      const autoMujeres = asistGuardias.length ? calcMujeres : (saved.mujeres != null ? saved.mujeres : Math.max(0, (ev.cantidad_esperada || 0) - autoHombres));
+      const autoTotalGGSS = asistGuardias.length ? calcTotalGGSS : (saved.total_ggss != null ? saved.total_ggss : (ev.cantidad_esperada || 0));
+      const autoSupervisores = String(calcSupervisores).padStart(2, '0');
 
       const state = {
         fecha: saved.fecha || defaultFecha,
@@ -2775,10 +2774,10 @@
         jefe_seguridad_nombre: saved.jefe_seguridad_nombre || "Carlos Lillo Julio",
         jefe_seguridad_rut: saved.jefe_seguridad_rut || "10592675-8",
 
-        total_ggss: saved.total_ggss != null ? saved.total_ggss : totalGuardias,
-        hombres: saved.hombres != null ? saved.hombres : Math.max(0, Math.round(totalGuardias * 0.71)),
-        mujeres: saved.mujeres != null ? saved.mujeres : Math.max(0, totalGuardias - Math.round(totalGuardias * 0.71)),
-        supervisores: saved.supervisores || (totalSupervisoresReal ? String(totalSupervisoresReal).padStart(2, '0') : "03"),
+        total_ggss: autoTotalGGSS,
+        hombres: autoHombres,
+        mujeres: autoMujeres,
+        supervisores: autoSupervisores,
         jefe_seguridad_cant: saved.jefe_seguridad_cant || "01",
         cctv_cant: saved.cctv_cant || "01",
 
@@ -2786,7 +2785,15 @@
         estado: saved.estado || "Sin novedad."
       };
 
+      function obtenerSaludoHorario() {
+        const h = new Date().getHours();
+        if (h >= 5 && h < 12) return "Buenos días";
+        if (h >= 12 && h < 20) return "Buenas tardes";
+        return "Buenas noches";
+      }
+
       function buildText() {
+        const saludo = obtenerSaludoHorario();
         const header = isPart 
           ? "*🏟️ INFORME ESTADIO*" 
           : `*🎪 INFORME EVENTO: ${state.partido_o_nombre}*`;
@@ -2795,7 +2802,7 @@
           ? `* ${state.partido_o_nombre}\n* ${state.lugar}` 
           : `* ${state.lugar}`;
 
-        return `Buenas tardes, OS10 Coquimbo remite el siguiente Informe:
+        return `${saludo}, OS10 Coquimbo remite el siguiente Informe:
 
 ${header}
 * Fecha: ${state.fecha}
