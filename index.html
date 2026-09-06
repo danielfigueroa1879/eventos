@@ -1363,10 +1363,10 @@
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0 items-center">
-        <button id="btnCuentaOS10Top" class="btn btn-p text-xs px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center gap-1 shadow-sm" title="Informe Cuenta O.S.10">📋 Cuenta O.S.10</button>
+        <button id="btnCuentaOS10Top" class="btn text-xs px-2.5 text-white font-bold flex items-center gap-1 shadow-sm hover:brightness-110" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 <span class="sm:hidden">Cuenta</span><span class="hidden sm:inline">Cuenta O.S.10</span></button>
         <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
-        <button id="compartir" class="btn btn-ghost px-3 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+        <button id="compartir" class="btn btn-ghost px-3 hidden md:flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
       </div>
     </div>
 
@@ -1412,7 +1412,10 @@
 
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 py-2 border-b border-slate-100">
-        <div class="font-semibold text-slate-700 w-full sm:w-auto">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
+        <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
+          <div class="font-semibold text-slate-700">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
+          <button id="compartirMovil" class="md:hidden btn btn-ghost !py-1 !px-2 flex items-center justify-center flex-shrink-0" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+        </div>
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" class="fld py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
           <a href="https://zosepcar.cl/consulta_componentes/" target="_blank" rel="noopener" class="btn btn-ghost text-xs sm:text-sm whitespace-nowrap flex-shrink-0" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</a>
@@ -1497,6 +1500,7 @@
       $("#expExcel").addEventListener("click", () => descargarExcel(ev, asist));
       $("#expPDF").addEventListener("click", () => descargarPDF(ev, asist));
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asist));
+      const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asist));
       const btnCerrar = $("#cerrarPartido");
       if (btnCerrar) btnCerrar.addEventListener("click", () => {
         if (!asist.length) { toast("No hay guardias en este partido para archivar", false); return; }
@@ -2610,14 +2614,18 @@
         defaultFecha = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
       }
 
-      const totalGuardias = (asist && asist.length) ? asist.length : (ev.cantidad_esperada || 0);
+      // Los supervisores se cuentan aparte del total de guardias.
+      const asistGuardias = (asist || []).filter(a => !a.es_supervisor);
+      const asistSupervisores = (asist || []).filter(a => a.es_supervisor);
+      const totalGuardias = asistGuardias.length ? asistGuardias.length : (ev.cantidad_esperada || 0);
+      const totalSupervisoresReal = asistSupervisores.length;
 
       const state = {
         fecha: saved.fecha || defaultFecha,
         hora_inicio: saved.hora_inicio || (ev.turno_inicio ? `${ev.turno_inicio} hrs.` : "20:00 hrs."),
         partido_o_nombre: saved.partido_o_nombre || (isPart ? (ev.partido || ev.nombre_evento) : ev.nombre_evento),
         lugar: saved.lugar || (isPart ? "Estadio Francisco Sánchez Rumoroso, Coquimbo." : "Coquimbo."),
-        
+
         resolucion_num: saved.resolucion_num || "N°877",
         resolucion_fecha: saved.resolucion_fecha || "28.08.2026",
         resolucion_entidad: saved.resolucion_entidad || "Delegación Presidencial Regional de Coquimbo.",
@@ -2639,7 +2647,7 @@
         total_ggss: saved.total_ggss != null ? saved.total_ggss : totalGuardias,
         hombres: saved.hombres != null ? saved.hombres : Math.max(0, Math.round(totalGuardias * 0.71)),
         mujeres: saved.mujeres != null ? saved.mujeres : Math.max(0, totalGuardias - Math.round(totalGuardias * 0.71)),
-        supervisores: saved.supervisores || "03",
+        supervisores: saved.supervisores || (totalSupervisoresReal ? String(totalSupervisoresReal).padStart(2, '0') : "03"),
         jefe_seguridad_cant: saved.jefe_seguridad_cant || "01",
         cctv_cant: saved.cctv_cant || "01",
 
