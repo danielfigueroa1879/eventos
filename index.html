@@ -531,18 +531,22 @@
     }
     function startOfDay(d) { const x = new Date(d.getTime()); x.setHours(0, 0, 0, 0); return x; }
 
-    function calcularVigencia(fechaStr, hoy = new Date()) {
+    // esSupervisor: los supervisores tienen "resolución" válida 3 años (no examen OS10) y NO tienen prórroga
+    function calcularVigencia(fechaStr, hoy = new Date(), esSupervisor = false) {
       const h = startOfDay(hoy);
-      if (!fechaStr) return { estado: "SIN_CURSO", vigencia: "SIN CURSO", siges: "", color: "gris", puedeTrabajar: false, vence: null };
+      if (!fechaStr) return { estado: "SIN_CURSO", vigencia: esSupervisor ? "SIN RESOLUCIÓN" : "SIN CURSO", siges: "", color: "gris", puedeTrabajar: false, vence: null };
       const fx = parseFecha(fechaStr);
       if (!fx) return { estado: "SIN_CURSO", vigencia: "FECHA INVÁLIDA", siges: "", color: "gris", puedeTrabajar: false, vence: null };
       const vence = addMonths(fx, MESES_VIGENCIA);
       if (vence.getTime() >= h.getTime())
-        return { estado: "VIGENTE", vigencia: "VIGENTE", siges: "OK", color: "verde", puedeTrabajar: true, vence };
-      const estabaVigenteAlEntrarLey = vence.getTime() >= ENTRADA_VIGENCIA_LEY.getTime();
-      const dentroDelTope = h.getTime() <= FECHA_TOPE_PRORROGA.getTime();
-      if (estabaVigenteAlEntrarLey && dentroDelTope)
-        return { estado: "VENCIDO_CON_PRORROGA", vigencia: "PRÓRROGA", siges: "LEY 21.825", color: "amarillo", puedeTrabajar: true, vence };
+        return { estado: "VIGENTE", vigencia: "VIGENTE", siges: esSupervisor ? "RESOLUCIÓN" : "OK", color: "verde", puedeTrabajar: true, vence };
+      // Supervisor: sin prórroga (la prórroga LEY 21.825 es solo para el curso OS10)
+      if (!esSupervisor) {
+        const estabaVigenteAlEntrarLey = vence.getTime() >= ENTRADA_VIGENCIA_LEY.getTime();
+        const dentroDelTope = h.getTime() <= FECHA_TOPE_PRORROGA.getTime();
+        if (estabaVigenteAlEntrarLey && dentroDelTope)
+          return { estado: "VENCIDO_CON_PRORROGA", vigencia: "PRÓRROGA", siges: "LEY 21.825", color: "amarillo", puedeTrabajar: true, vence };
+      }
       return { estado: "VENCIDO_SIN_PRORROGA", vigencia: "NO VIGENTE", siges: "", color: "rojo", puedeTrabajar: false, vence };
     }
 
@@ -720,7 +724,7 @@
           const hid = uid();
           const hp = get(K.hp); hp.push({ id: hid, evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length, cerrado_at: nowISO() }); set(K.hp, hp);
           const hpa = get(K.hpa);
-          asist.forEach(a => { const g = a.guardia || {}; hpa.push({ id: uid(), historial_id: hid, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso }); });
+          asist.forEach(a => { const g = a.guardia || {}; hpa.push({ id: uid(), historial_id: hid, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor).vigencia, hora_ingreso: a.hora_ingreso }); });
           set(K.hpa, hpa);
           set(K.as, get(K.as).filter(x => x.evento_id !== ev.id));
           ping(); return hid;
@@ -768,7 +772,7 @@
         async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
         async cerrarPartido(ev, asist) {
           const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
-          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso }; });
+          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor).vigencia, hora_ingreso: a.hora_ingreso }; });
           if (rows.length) ok(await sb.from("partidos_historial_asist").insert(rows));
           ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
           return hp.id;
@@ -1013,6 +1017,7 @@
         const esSup = !!(superChk && superChk.checked);
         if (fechaLabel) fechaLabel.textContent = esSup ? "Fecha de autorización de la resolución" : "Fecha último examen OS10";
         if (vigBoxLabel) vigBoxLabel.textContent = esSup ? "Estado de la autorización" : "Estado del curso";
+        if (fecha.value) mostrarVigencia(fecha.value);
       }
       if (superChk) superChk.addEventListener("change", aplicarRotuloSupervisor);
 
@@ -1059,7 +1064,7 @@
           vigBox.hidden = true; actualizarBtn();
         }
       }
-      function mostrarVigencia(f) { if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
+      function mostrarVigencia(f) { if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f, undefined, !!(superChk && superChk.checked)); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
       function actualizarBtn() {
         // La fecha futura sí bloquea; un solo nombre/apellido solo avisa (no bloquea)
         if (fecha.value && fechaFutura(fecha.value)) { submit.disabled = true; submit.textContent = "Fecha de examen inválida"; return; }
@@ -1077,7 +1082,7 @@
       // Pantalla de ÉXITO — solo se muestra cuando la escritura quedó CONFIRMADA por el servidor.
       function mostrarIngresoExitoso(asisRec) {
         sonarIngreso(); // sonido de confirmación de ingreso
-        const v = calcularVigencia(fecha.value);
+        const v = calcularVigencia(fecha.value, undefined, !!(superChk && superChk.checked));
         const tn = calcularTurno((asisRec && asisRec.hora_ingreso) || nowISO(), ev);
         app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
         <div class="text-5xl mb-3">✅</div>
@@ -1696,7 +1701,7 @@
     }
     function fila(a, i, ev, rutCount, nomCount, usaT) {
       const g = a.guardia || {};
-      const v = calcularVigencia(g.fecha_ultimo_examen);
+      const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
@@ -1736,7 +1741,7 @@
     }
     function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
-      const v = calcularVigencia(g.fecha_ultimo_examen);
+      const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
@@ -1759,7 +1764,7 @@
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
     function filaEmpresa(a, i, ev) {
       const g = a.guardia || {};
-      const v = calcularVigencia(g.fecha_ultimo_examen);
+      const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const tf = normalizarTelefono(g.telefono);
       const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—";
@@ -1797,7 +1802,7 @@
       if (!a) return;
       const empresa = !!(opts && opts.empresa);           // vista de empresa = solo lectura, sin datos privados
       const g = a.guardia || {};
-      const v = calcularVigencia(g.fecha_ultimo_examen);
+      const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
       const telHTML = (() => {
@@ -1949,7 +1954,7 @@
       const usaT = eventoUsaTurnos(ev);
       return asist.map((a, i) => {
         const g = a.guardia || {};
-        const v = calcularVigencia(g.fecha_ultimo_examen);
+        const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
         const row = [i + 1, a.rut, nom || "—", g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), v.vigencia, v.siges || "—"];
         if (usaT) { const tn = calcularTurno(a.hora_ingreso, ev); row.push(tn ? `${tn.fecha} ${tn.etiqueta}` : "—"); }
@@ -1964,7 +1969,7 @@
       const usaT = eventoUsaTurnos(ev);
       return asist.map((a, i) => {
         const g = a.guardia || {};
-        const v = calcularVigencia(g.fecha_ultimo_examen);
+        const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
         const tn = usaT ? calcularTurno(a.hora_ingreso, ev) : null;
         const cells = [String(i + 1), a.rut, nom, g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), v.vigencia, v.siges || "—"];
@@ -2166,7 +2171,7 @@
       asistG.forEach((a, i) => {
         const g = a.guardia || {};
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
-        const v = calcularVigencia(g.fecha_ultimo_examen);
+        const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
         L.push(`${i + 1}. ${a.rut} — ${nom} — ${v.vigencia} — ${horaFmt(a.hora_ingreso)}`);
       });
       if (asistS.length) {
@@ -2175,7 +2180,7 @@
         asistS.forEach((a, i) => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
-          const v = calcularVigencia(g.fecha_ultimo_examen);
+          const v = calcularVigencia(g.fecha_ultimo_examen, undefined, a.es_supervisor);
           L.push(`${i + 1}. ${a.rut} — ${nom} — ${v.vigencia} — ${horaFmt(a.hora_ingreso)}`);
         });
       }
