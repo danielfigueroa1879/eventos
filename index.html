@@ -912,7 +912,7 @@
               <input id="g_tel" class="fld" inputmode="tel" placeholder="9 1234 5678" autocomplete="off"/>
             </div>
             <div>
-              <label class="text-sm font-semibold text-slate-700">Fecha último examen OS10</label>
+              <label id="g_fechaLabel" class="text-sm font-semibold text-slate-700">Fecha último examen OS10</label>
               <input id="g_fecha" type="date" class="fld"/>
               <div id="g_fecMsg" class="text-[11px] mt-0.5"></div>
             </div>
@@ -920,7 +920,7 @@
         </div>
 
         <div id="vigBox" hidden class="rounded-xl p-3 text-center bg-slate-50 border border-slate-200">
-          <div class="text-xs text-slate-500">Estado del curso</div>
+          <div id="vigBoxLabel" class="text-xs text-slate-500">Estado del curso</div>
           <div id="vigBadge" class="mt-1"></div>
         </div>
 
@@ -981,6 +981,16 @@
       apellidos.addEventListener("input", () => { apellidos.value = formatNombre(apellidos.value); avisoApellidos(); actualizarBtn(); });
       tel.addEventListener("input", actualizarBtn);
       fecha.addEventListener("change", () => { if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); vigBox.hidden = true; } else { avisoFecha(); mostrarVigencia(fecha.value); } actualizarBtn(); });
+
+      // El supervisor no da examen OS10: su vigencia (3 años) nace de la fecha de autorización de la resolución.
+      // Al marcar la casilla de Supervisor, cambian los rótulos del formulario para reflejarlo.
+      const fechaLabel = $("#g_fechaLabel"), vigBoxLabel = $("#vigBoxLabel");
+      function aplicarRotuloSupervisor() {
+        const esSup = !!(superChk && superChk.checked);
+        if (fechaLabel) fechaLabel.textContent = esSup ? "Fecha de autorización de la resolución" : "Fecha último examen OS10";
+        if (vigBoxLabel) vigBoxLabel.textContent = esSup ? "Estado de la autorización" : "Estado del curso";
+      }
+      if (superChk) superChk.addEventListener("change", aplicarRotuloSupervisor);
 
       rut.addEventListener("input", () => {
         rut.value = formatRut(rut.value); rutMsg.innerHTML = ""; submit.disabled = true; submit.textContent = "Ingrese su RUT";
@@ -1689,7 +1699,7 @@
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
       ${telHTML}
-      ${detalleFila("📅", "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
+      ${detalleFila("📅", a.es_supervisor ? "Fecha de autorización de la resolución" : "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
@@ -2845,14 +2855,16 @@ ${matchOrLocation}
     }
     function modalEditarGuardia(a, ev) {
       const g = a.guardia || { rut: a.rut };
+      const esSup = !!(a && a.es_supervisor);
+      const rotuloFecha = esSup ? "Fecha de autorización de la resolución" : "Fecha último examen";
       openModal(`
-    <h2 class="font-bold text-lg text-slate-800 mb-1">Editar guardia</h2>
+    <h2 class="font-bold text-lg text-slate-800 mb-1">Editar guardia${esSup ? ' <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle ml-1">👔 SUPERVISOR</span>' : ''}</h2>
     <p class="text-xs text-slate-400 mb-3">RUT: ${esc(a.rut)}</p>
     <div class="space-y-3">
       <div><label class="text-sm font-semibold text-slate-700">Nombres</label><input id="e_nom" class="fld" value="${esc(g.nombres || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Apellidos</label><input id="e_ape" class="fld" value="${esc(g.apellidos || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Teléfono</label><input id="e_tel" class="fld" value="${esc(g.telefono || "")}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Fecha último examen</label><input id="e_fec" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
+      <div><label class="text-sm font-semibold text-slate-700">${rotuloFecha}</label><input id="e_fec" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="e_cancel" class="btn btn-ghost flex-1">Cancelar</button>
