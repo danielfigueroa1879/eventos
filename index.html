@@ -1395,10 +1395,10 @@
     </div>
 
     <div class="card">
-      <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-slate-100">
-        <div class="font-semibold text-slate-700">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
-        <div class="flex items-center gap-2 flex-1 sm:flex-none justify-end min-w-0">
-          <input id="buscar" class="fld py-2 text-sm w-32 sm:w-auto sm:max-w-xs min-w-0" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
+      <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 py-2 border-b border-slate-100">
+        <div class="font-semibold text-slate-700 w-full sm:w-auto">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
+          <input id="buscar" class="fld py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
           <a href="https://zosepcar.cl/consulta_componentes/" target="_blank" rel="noopener" class="btn btn-ghost text-xs sm:text-sm whitespace-nowrap flex-shrink-0" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</a>
         </div>
       </div>
