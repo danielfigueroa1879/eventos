@@ -251,6 +251,34 @@
       }
     }
 
+    /* En celular: marcar un poco más los contornos de contenedores, botones y eventos */
+    @media (max-width: 767px) {
+      .card {
+        border-color: #cbd5cf;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, .08)
+      }
+
+      .card .border-b,
+      .card .border-t,
+      .card .border-r,
+      .card .border-l {
+        border-color: #d3dbd8 !important
+      }
+
+      .btn-ghost {
+        border-color: #b6c1cd
+      }
+
+      /* Contornos de los eventos en el menú hamburguesa */
+      #listaEventos .evItem {
+        box-shadow: 0 0 0 1px #dbe1e6
+      }
+
+      #listaEventos .evItem:not(.border-transparent) {
+        box-shadow: 0 0 0 1px #bbe0c4
+      }
+    }
+
     /* =========================================================================
        MODO OSCURO — tonos grises (no negro puro), para PC y celular
        ========================================================================= */
@@ -316,6 +344,16 @@
     html[data-theme="dark"] aside#sidebar {
       background: #21252b !important;
       border-color: #3a4048 !important
+    }
+
+    @media (max-width: 767px) {
+      html[data-theme="dark"] #listaEventos .evItem {
+        box-shadow: 0 0 0 1px #3a4048
+      }
+
+      html[data-theme="dark"] #listaEventos .evItem:not(.border-transparent) {
+        box-shadow: 0 0 0 1px #2f5738
+      }
     }
 
     html[data-theme="dark"] .fld {
