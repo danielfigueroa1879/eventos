@@ -1379,6 +1379,8 @@
       const nX = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
       const nS = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length;
       const nSup = asistSupervisores.length;
+      const totalProrrogas = nP + asistSupervisores.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
+      const totalVencidos = nX + asistSupervisores.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
       // Conteo aproximado de hombres/mujeres por primer nombre (ver generoDeNombre).
       const nH = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "H").length;
       const nM = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "M").length;
@@ -1400,9 +1402,12 @@
 
     <div class="card mb-3 overflow-hidden">
       <button id="toggleResumen" class="w-full px-3 py-2.5 flex items-center justify-between text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <span>Resumen de acreditaciones</span>
           <span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${asistGuardias.length} registrados</span>
+          ${nSup > 0 ? `<span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${nSup} SUPERVISORES</span>` : ""}
+          ${totalProrrogas > 0 ? `<span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${totalProrrogas} PRÓRROGAS</span>` : ""}
+          <span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${totalVencidos} VENCIDOS</span>
         </div>
         <span id="resumenChevron" class="text-slate-400 transition-transform duration-300 flex-shrink-0" style="${ADMIN_STATE.showResumen ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
       </button>
