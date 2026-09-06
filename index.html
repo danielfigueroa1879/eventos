@@ -1363,10 +1363,10 @@
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0 items-center">
-        <button id="btnCuentaOS10Top" class="btn btn-p text-xs px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center gap-1 shadow-sm" title="Informe Cuenta O.S.10">📋 Cuenta O.S.10</button>
+        <button id="btnCuentaOS10Top" class="btn text-xs px-2.5 text-white font-bold flex items-center gap-1 shadow-sm hover:brightness-110" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 <span class="sm:hidden">Cuenta</span><span class="hidden sm:inline">Cuenta O.S.10</span></button>
         <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
-        <button id="compartir" class="btn btn-ghost px-3 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+        <button id="compartir" class="btn btn-ghost px-3 hidden md:flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
       </div>
     </div>
 
@@ -1412,10 +1412,13 @@
 
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 py-2 border-b border-slate-100">
-        <div class="font-semibold text-slate-700 w-full sm:w-auto">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
+        <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
+          <div class="font-semibold text-slate-700">Guardias registrados${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? ` · <span class="text-indigo-600">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}</div>
+          <button id="compartirMovil" class="md:hidden btn btn-ghost !py-1 !px-2 flex items-center justify-center flex-shrink-0" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+        </div>
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" class="fld py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
-          <a href="https://zosepcar.cl/consulta_componentes/" target="_blank" rel="noopener" class="btn btn-ghost text-xs sm:text-sm whitespace-nowrap flex-shrink-0" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</a>
+          <button id="consultarGuardiaBtn" class="btn btn-ghost text-xs sm:text-sm whitespace-nowrap flex-shrink-0" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
         </div>
       </div>
       ${usaT ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
@@ -1497,6 +1500,8 @@
       $("#expExcel").addEventListener("click", () => descargarExcel(ev, asist));
       $("#expPDF").addEventListener("click", () => descargarPDF(ev, asist));
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asist));
+      const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asist));
+      const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
       const btnCerrar = $("#cerrarPartido");
       if (btnCerrar) btnCerrar.addEventListener("click", () => {
         if (!asist.length) { toast("No hay guardias en este partido para archivar", false); return; }
@@ -1871,6 +1876,16 @@
       cols.push("Ingreso");
       return cols;
     }
+    // Columnas para el bloque de supervisores: mismas casillas pero rotulando "Fecha autorizacion" en vez de examen.
+    function listadoColumnasSup(ev) {
+      const cols = ["#", "RUT", "Nombre completo", "Teléfono", "Fecha autorización", "Vigencia", "SIGES"];
+      if (eventoUsaTurnos(ev)) cols.push("Turno");
+      cols.push("Ingreso");
+      return cols;
+    }
+    // Paleta celeste del bloque supervisor, usada por Excel/PDF/impresion.
+    const CELESTE_SUPERVISOR = "#0369a1";
+    const CELESTE_SUPERVISOR_BORDE = "#075985";
     function listadoFilas(ev, asist) {
       const usaT = eventoUsaTurnos(ev);
       return asist.map((a, i) => {
@@ -1911,23 +1926,36 @@
 
     // --- Excel real (.xls con formato: encabezado verde, texto centrado, columnas autoajustadas) ---
     function xlsFile(ev, asist) {
-      const cols = listadoColumnas(ev), rows = detalleRows(ev, asist);
+      const asistG = asist.filter(a => !a.es_supervisor);
+      const asistS = asist.filter(a => a.es_supervisor);
+      const cols = listadoColumnas(ev), rows = detalleRows(ev, asistG);
+      const colsSup = listadoColumnasSup(ev), rowsSup = detalleRows(ev, asistS);
       const thS = `background:${VERDE_PAGINA};color:#ffffff;font-weight:bold;text-align:center;border:1px solid #0a3d18;padding:6px 10px;white-space:nowrap;`;
+      const thSupS = `background:${CELESTE_SUPERVISOR};color:#ffffff;font-weight:bold;text-align:center;border:1px solid ${CELESTE_SUPERVISOR_BORDE};padding:6px 10px;white-space:nowrap;`;
       const tdS = `text-align:center;border:1px solid #cbd5e1;padding:5px 10px;white-space:nowrap;mso-number-format:'\\@';`;
       const header = `<tr>${cols.map(c => `<th style="${thS}">${esc(c)}</th>`).join("")}</tr>`;
       const body = rows.map(r => `<tr>${r.cells.map((c, j) => {
         const extra = j === r.vigIdx ? `background:${r.vigColor}22;color:${r.vigColor};font-weight:bold;` : "";
         return `<td style="${tdS}${extra}">${esc(String(c))}</td>`;
       }).join("")}</tr>`).join("");
+      const nCols = Math.max(cols.length, colsSup.length);
       const meta = `
-        <tr><td colspan="${cols.length}" style="font-weight:bold;font-size:14px;text-align:center;padding:6px;">${esc(tituloListado(ev))}</td></tr>
-        <tr><td colspan="${cols.length}" style="text-align:center;padding:2px;">Empresa: ${esc(ev.empresa)}${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</td></tr>
-        <tr><td colspan="${cols.length}" style="text-align:center;padding:2px;">Total: ${asist.length}${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</td></tr>
-        <tr><td colspan="${cols.length}" style="padding:2px;"></td></tr>`;
+        <tr><td colspan="${nCols}" style="font-weight:bold;font-size:14px;text-align:center;padding:6px;">${esc(tituloListado(ev))}</td></tr>
+        <tr><td colspan="${nCols}" style="text-align:center;padding:2px;">Empresa: ${esc(ev.empresa)}${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</td></tr>
+        <tr><td colspan="${nCols}" style="text-align:center;padding:2px;">Total: ${asistG.length}${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias${asistS.length ? " · " + asistS.length + " supervisor" + (asistS.length === 1 ? "" : "es") : ""} · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</td></tr>
+        <tr><td colspan="${nCols}" style="padding:2px;"></td></tr>`;
+      const bloqueSup = asistS.length ? `
+        <tr><td colspan="${nCols}" style="padding:6px;"></td></tr>
+        <tr><td colspan="${nCols}" style="background:${CELESTE_SUPERVISOR};color:#ffffff;font-weight:bold;font-size:13px;text-align:center;padding:6px;border:1px solid ${CELESTE_SUPERVISOR_BORDE};">🤵 SUPERVISORES (${asistS.length})</td></tr>
+        <tr>${colsSup.map(c => `<th style="${thSupS}">${esc(c)}</th>`).join("")}</tr>
+        ${rowsSup.map(r => `<tr>${r.cells.map((c, j) => {
+          const extra = j === r.vigIdx ? `background:${r.vigColor}22;color:${r.vigColor};font-weight:bold;` : `background:#e0f2fe22;`;
+          return `<td style="${tdS}${extra}">${esc(String(c))}</td>`;
+        }).join("")}</tr>`).join("")}` : "";
       const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
         <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${esc(ev.nombre_evento).slice(0, 28)}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
         <style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}</style></head>
-        <body><table>${meta}${header}${body}</table></body></html>`;
+        <body><table>${meta}${header}${body}${bloqueSup}</table></body></html>`;
       return new File(["﻿" + html], `Listado-${ev.slug}.xls`, { type: "application/vnd.ms-excel;charset=utf-8;" });
     }
     function descargarExcel(ev, asist) {
@@ -1937,28 +1965,43 @@
 
     // --- PDF (ventana de impresión → Guardar como PDF), con colores de la tabla ---
     function listadoPrintHTML(ev, asist) {
-      const cols = listadoColumnas(ev), rows = detalleRows(ev, asist);
+      const asistG = asist.filter(a => !a.es_supervisor);
+      const asistS = asist.filter(a => a.es_supervisor);
+      const cols = listadoColumnas(ev), rows = detalleRows(ev, asistG);
+      const colsSup = listadoColumnasSup(ev), rowsSup = detalleRows(ev, asistS);
       const th = cols.map(c => `<th>${esc(c)}</th>`).join("");
       const tr = rows.map(r => `<tr>${r.cells.map((c, j) => {
         const st = j === r.vigIdx ? ` style="background:${r.vigColor}22;color:${r.vigColor};font-weight:bold"` : "";
         return `<td${st}>${esc(String(c))}</td>`;
       }).join("")}</tr>`).join("");
+      const thSup = colsSup.map(c => `<th>${esc(c)}</th>`).join("");
+      const trSup = rowsSup.map(r => `<tr>${r.cells.map((c, j) => {
+        const st = j === r.vigIdx ? ` style="background:${r.vigColor}22;color:${r.vigColor};font-weight:bold"` : "";
+        return `<td${st}>${esc(String(c))}</td>`;
+      }).join("")}</tr>`).join("");
+      const bloqueSup = asistS.length ? `
+        <h2 class="sup-h">🤵 Supervisores (${asistS.length})</h2>
+        <table class="sup"><thead><tr>${thSup}</tr></thead><tbody>${trSup}</tbody></table>` : "";
       return `<html><head><meta charset="utf-8"><title>${esc(tituloListado(ev))}</title>
       <style>
         *{font-family:Arial,Helvetica,sans-serif}
         html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
         body{padding:24px;color:#111}
         h1{font-size:18px;margin:0 0 2px;text-align:center} .sub{color:#555;font-size:12px;margin:2px 0;text-align:center}
+        h2.sup-h{font-size:14px;margin:22px 0 4px;color:#fff;background:${CELESTE_SUPERVISOR};padding:6px 10px;border-radius:4px}
         table{border-collapse:collapse;width:100%;margin-top:12px;font-size:11px}
         th,td{border:1px solid #cbd5e1;padding:5px 6px;text-align:center}
         thead th{background:${VERDE_PAGINA};color:#fff;font-weight:bold}
         tbody tr:nth-child(even) td{background:#f4f7f5}
+        table.sup thead th{background:${CELESTE_SUPERVISOR}}
+        table.sup tbody tr:nth-child(even) td{background:#e0f2fe33}
         .foot{margin-top:16px;color:#888;font-size:10px;text-align:center}
       </style></head><body>
         <h1>${esc(tituloListado(ev))}</h1>
         <div class="sub">Empresa: <b>${esc(ev.empresa)}</b>${ev.fecha_evento ? " · Fecha: " + esc(fechaFmt(ev.fecha_evento)) : ""} · ${esc(eventoTipoTexto(ev))}</div>
-        <div class="sub">Total: <b>${asist.length}</b>${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</div>
+        <div class="sub">Total: <b>${asistG.length}</b>${ev.cantidad_esperada ? " / " + esc(ev.cantidad_esperada) : ""} guardias${asistS.length ? " · <b>" + asistS.length + "</b> supervisor" + (asistS.length === 1 ? "" : "es") : ""} · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</div>
         <table><thead><tr>${th}</tr></thead><tbody>${tr || `<tr><td colspan="${cols.length}">Sin guardias registrados.</td></tr>`}</tbody></table>
+        ${bloqueSup}
         <div class="foot">Prefectura O.S.10 Coquimbo · Documento generado desde el sistema de control de guardias.</div>
         <script>window.onload=()=>{window.print()}<\/script>
       </body></html>`;
@@ -1971,7 +2014,10 @@
     function construirPDF(ev, asist) {
       const JsPDF = window.jspdf && window.jspdf.jsPDF;
       if (!JsPDF) return null;
-      const cols = listadoColumnas(ev), rows = detalleRows(ev, asist);
+      const asistG = asist.filter(a => !a.es_supervisor);
+      const asistS = asist.filter(a => a.es_supervisor);
+      const cols = listadoColumnas(ev), rows = detalleRows(ev, asistG);
+      const colsSup = listadoColumnasSup(ev), rowsSup = detalleRows(ev, asistS);
       const landscape = cols.length > 8;
       const doc = new JsPDF({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
       if (typeof doc.autoTable !== "function") return null;
@@ -1980,9 +2026,10 @@
       doc.text(tituloListado(ev), W / 2, 34, { align: "center" });
       doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
       const sub1 = `Empresa: ${ev.empresa}${ev.fecha_evento ? " · Fecha: " + fechaFmt(ev.fecha_evento) : ""} · ${eventoTipoTexto(ev)}`;
-      const sub2 = `Total: ${asist.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`;
+      const sub2 = `Total: ${asistG.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias${asistS.length ? " · " + asistS.length + " supervisor" + (asistS.length === 1 ? "" : "es") : ""} · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`;
       doc.text(sub1, W / 2, 50, { align: "center" });
       doc.text(sub2, W / 2, 63, { align: "center" });
+      const celesteRGB = hexToRgb(CELESTE_SUPERVISOR);
       doc.autoTable({
         startY: 76,
         head: [cols],
@@ -2006,6 +2053,29 @@
           doc.text("Pág. " + doc.internal.getNumberOfPages(), W - 28, H - 18, { align: "right" });
         }
       });
+      // Bloque de supervisores, con encabezado celeste, debajo del listado de guardias.
+      if (asistS.length) {
+        const yAfter = doc.lastAutoTable ? doc.lastAutoTable.finalY : 76;
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(celesteRGB[0], celesteRGB[1], celesteRGB[2]);
+        doc.text(`Supervisores (${asistS.length})`, 28, yAfter + 24);
+        doc.autoTable({
+          startY: yAfter + 32,
+          head: [colsSup],
+          body: rowsSup.map(r => r.cells),
+          theme: "grid",
+          styles: { fontSize: 8, cellPadding: 4, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+          headStyles: { fillColor: celesteRGB, textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+          alternateRowStyles: { fillColor: [224, 242, 254] },
+          columnStyles: { 0: { cellWidth: landscape ? 26 : 22 } },
+          margin: { left: 28, right: 28, bottom: 40 },
+          didParseCell: (d) => {
+            if (d.section === "body") {
+              const r = rowsSup[d.row.index];
+              if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; }
+            }
+          }
+        });
+      }
       return doc;
     }
     function pdfFile(ev, asist) {
@@ -2025,19 +2095,31 @@
 
     // --- Texto resumen para WhatsApp / correo ---
     function listadoTexto(ev, asist) {
+      const asistG = asist.filter(a => !a.es_supervisor);
+      const asistS = asist.filter(a => a.es_supervisor);
       const L = [];
       L.push(tituloListado(ev));
       L.push(`Empresa: ${ev.empresa}`);
       if (ev.fecha_evento) L.push(`Fecha: ${fechaFmt(ev.fecha_evento)}`);
       L.push(eventoTipoTexto(ev));
-      L.push(`Total: ${asist.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias`);
+      L.push(`Total: ${asistG.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias${asistS.length ? " · " + asistS.length + " supervisor" + (asistS.length === 1 ? "" : "es") : ""}`);
       L.push("");
-      asist.forEach((a, i) => {
+      asistG.forEach((a, i) => {
         const g = a.guardia || {};
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
         const v = calcularVigencia(g.fecha_ultimo_examen);
         L.push(`${i + 1}. ${a.rut} — ${nom} — ${v.vigencia} — ${horaFmt(a.hora_ingreso)}`);
       });
+      if (asistS.length) {
+        L.push("");
+        L.push(`🤵 SUPERVISORES (${asistS.length})`);
+        asistS.forEach((a, i) => {
+          const g = a.guardia || {};
+          const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+          const v = calcularVigencia(g.fecha_ultimo_examen);
+          L.push(`${i + 1}. ${a.rut} — ${nom} — ${v.vigencia} — ${horaFmt(a.hora_ingreso)}`);
+        });
+      }
       return L.join("\n");
     }
 
@@ -2519,6 +2601,50 @@
     }
 
     /* ---- Modal Cuenta O.S.10 (Informe para WhatsApp) ---- */
+    // Consultar guardia en Zosepcar dentro de la app (iframe embebido).
+    // Muchos sitios institucionales bloquean el embebido con X-Frame-Options o
+    // Content-Security-Policy frame-ancestors: si eso pasa, mostramos un aviso
+    // y el usuario puede abrir el sitio en una pestaña nueva desde el modal.
+    function modalConsultarGuardia() {
+      const url = "https://zosepcar.cl/consulta_componentes/";
+      openModal(`
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold text-slate-800 flex items-center gap-2 text-base">🔎 Consultar guardia <span class="text-slate-400 font-normal text-xs">Zosepcar</span></h2>
+          <button id="cg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+        </div>
+        <div id="cg_aviso" class="hidden mb-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          ⚠ El sitio de Zosepcar no permite abrirse dentro de esta app. Ábrelo en una pestaña nueva con el botón de abajo.
+        </div>
+        <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-white">
+          <iframe id="cg_iframe" src="${url}" class="w-full block" style="height:min(70vh,700px);border:0;" referrerpolicy="no-referrer"></iframe>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <a href="${url}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm flex items-center justify-center gap-1">🔗 Abrir en pestaña nueva</a>
+          <button id="cg_close" class="btn btn-ghost flex-1 text-sm">Cerrar</button>
+        </div>
+      `);
+      // El modal por defecto es max-w-md; para el iframe conviene mas ancho.
+      const mb = $("#modalBox"); if (mb) mb.className = "card w-full max-w-4xl p-4 max-h-[95vh] overflow-auto";
+      const iframe = $("#cg_iframe"), aviso = $("#cg_aviso");
+      // Deteccion best-effort: si el iframe no dispara "load" en unos segundos
+      // (bloqueado por CSP frame-ancestors sin evento visible) o si carga con
+      // altura cero, mostramos el aviso.
+      let cargado = false;
+      if (iframe) {
+        iframe.addEventListener("load", () => {
+          cargado = true;
+          try {
+            // Si el src fue reescrito a about:blank por el navegador al bloquear, avisar.
+            if (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href === "about:blank") {
+              aviso.classList.remove("hidden");
+            }
+          } catch (_) { /* cross-origin: no podemos leer, es esperable */ }
+        });
+        setTimeout(() => { if (!cargado && aviso) aviso.classList.remove("hidden"); }, 4000);
+      }
+      $("#cg_x").addEventListener("click", closeModal);
+      $("#cg_close").addEventListener("click", closeModal);
+    }
     function modalCuentaOS10(ev, asist) {
       const isPart = esPartido(ev);
       const saved = ev.reporte_os10 || {};
@@ -2533,14 +2659,18 @@
         defaultFecha = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
       }
 
-      const totalGuardias = (asist && asist.length) ? asist.length : (ev.cantidad_esperada || 0);
+      // Los supervisores se cuentan aparte del total de guardias.
+      const asistGuardias = (asist || []).filter(a => !a.es_supervisor);
+      const asistSupervisores = (asist || []).filter(a => a.es_supervisor);
+      const totalGuardias = asistGuardias.length ? asistGuardias.length : (ev.cantidad_esperada || 0);
+      const totalSupervisoresReal = asistSupervisores.length;
 
       const state = {
         fecha: saved.fecha || defaultFecha,
         hora_inicio: saved.hora_inicio || (ev.turno_inicio ? `${ev.turno_inicio} hrs.` : "20:00 hrs."),
         partido_o_nombre: saved.partido_o_nombre || (isPart ? (ev.partido || ev.nombre_evento) : ev.nombre_evento),
         lugar: saved.lugar || (isPart ? "Estadio Francisco Sánchez Rumoroso, Coquimbo." : "Coquimbo."),
-        
+
         resolucion_num: saved.resolucion_num || "N°877",
         resolucion_fecha: saved.resolucion_fecha || "28.08.2026",
         resolucion_entidad: saved.resolucion_entidad || "Delegación Presidencial Regional de Coquimbo.",
@@ -2562,7 +2692,7 @@
         total_ggss: saved.total_ggss != null ? saved.total_ggss : totalGuardias,
         hombres: saved.hombres != null ? saved.hombres : Math.max(0, Math.round(totalGuardias * 0.71)),
         mujeres: saved.mujeres != null ? saved.mujeres : Math.max(0, totalGuardias - Math.round(totalGuardias * 0.71)),
-        supervisores: saved.supervisores || "03",
+        supervisores: saved.supervisores || (totalSupervisoresReal ? String(totalSupervisoresReal).padStart(2, '0') : "03"),
         jefe_seguridad_cant: saved.jefe_seguridad_cant || "01",
         cctv_cant: saved.cctv_cant || "01",
 
