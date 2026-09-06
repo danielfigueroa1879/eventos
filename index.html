@@ -1418,7 +1418,7 @@
         </div>
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" class="fld py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
-          <a href="https://zosepcar.cl/consulta_componentes/" target="_blank" rel="noopener" class="btn btn-ghost text-xs sm:text-sm whitespace-nowrap flex-shrink-0" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</a>
+          <button id="consultarGuardiaBtn" class="btn btn-ghost text-xs sm:text-sm whitespace-nowrap flex-shrink-0" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
         </div>
       </div>
       ${usaT ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
@@ -1501,6 +1501,7 @@
       $("#expPDF").addEventListener("click", () => descargarPDF(ev, asist));
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asist));
       const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asist));
+      const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
       const btnCerrar = $("#cerrarPartido");
       if (btnCerrar) btnCerrar.addEventListener("click", () => {
         if (!asist.length) { toast("No hay guardias en este partido para archivar", false); return; }
@@ -2600,6 +2601,50 @@
     }
 
     /* ---- Modal Cuenta O.S.10 (Informe para WhatsApp) ---- */
+    // Consultar guardia en Zosepcar dentro de la app (iframe embebido).
+    // Muchos sitios institucionales bloquean el embebido con X-Frame-Options o
+    // Content-Security-Policy frame-ancestors: si eso pasa, mostramos un aviso
+    // y el usuario puede abrir el sitio en una pestaña nueva desde el modal.
+    function modalConsultarGuardia() {
+      const url = "https://zosepcar.cl/consulta_componentes/";
+      openModal(`
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold text-slate-800 flex items-center gap-2 text-base">🔎 Consultar guardia <span class="text-slate-400 font-normal text-xs">Zosepcar</span></h2>
+          <button id="cg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+        </div>
+        <div id="cg_aviso" class="hidden mb-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          ⚠ El sitio de Zosepcar no permite abrirse dentro de esta app. Ábrelo en una pestaña nueva con el botón de abajo.
+        </div>
+        <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-white">
+          <iframe id="cg_iframe" src="${url}" class="w-full block" style="height:min(70vh,700px);border:0;" referrerpolicy="no-referrer"></iframe>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <a href="${url}" target="_blank" rel="noopener" class="btn btn-p flex-1 text-sm flex items-center justify-center gap-1">🔗 Abrir en pestaña nueva</a>
+          <button id="cg_close" class="btn btn-ghost flex-1 text-sm">Cerrar</button>
+        </div>
+      `);
+      // El modal por defecto es max-w-md; para el iframe conviene mas ancho.
+      const mb = $("#modalBox"); if (mb) mb.className = "card w-full max-w-4xl p-4 max-h-[95vh] overflow-auto";
+      const iframe = $("#cg_iframe"), aviso = $("#cg_aviso");
+      // Deteccion best-effort: si el iframe no dispara "load" en unos segundos
+      // (bloqueado por CSP frame-ancestors sin evento visible) o si carga con
+      // altura cero, mostramos el aviso.
+      let cargado = false;
+      if (iframe) {
+        iframe.addEventListener("load", () => {
+          cargado = true;
+          try {
+            // Si el src fue reescrito a about:blank por el navegador al bloquear, avisar.
+            if (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href === "about:blank") {
+              aviso.classList.remove("hidden");
+            }
+          } catch (_) { /* cross-origin: no podemos leer, es esperable */ }
+        });
+        setTimeout(() => { if (!cargado && aviso) aviso.classList.remove("hidden"); }, 4000);
+      }
+      $("#cg_x").addEventListener("click", closeModal);
+      $("#cg_close").addEventListener("click", closeModal);
+    }
     function modalCuentaOS10(ev, asist) {
       const isPart = esPartido(ev);
       const saved = ev.reporte_os10 || {};
