@@ -681,7 +681,7 @@
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
         },
         async yaRegistrado(evId, rut) { return get(K.as).find(x => x.evento_id === evId && x.rut === rut) || null; },
-        async createAsistencia(evId, rut) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO() }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
+        async createAsistencia(evId, rut, esSupervisor) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
         async deleteAsistencia(id) { set(K.as, get(K.as).filter(x => x.id !== id)); ping(); },
         async cerrarPartido(ev, asist) {
           const hid = uid();
@@ -731,7 +731,7 @@
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
         },
         async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).limit(1)); return d[0] || null; },
-        async createAsistencia(evId, rut) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO() }).select().single()); },
+        async createAsistencia(evId, rut, esSupervisor) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }).select().single()); },
         async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
         async cerrarPartido(ev, asist) {
           const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
@@ -929,10 +929,16 @@
           <div id="turnoInfo" class="mt-1 font-semibold text-indigo-800"></div>
         </div>
 
+        <label id="g_superWrap" hidden class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 cursor-pointer">
+          <input type="checkbox" id="g_super" class="w-4 h-4 flex-shrink-0">
+          <span>Ingreso como <b>Supervisor</b> <span class="text-slate-400 font-normal">(marca solo si eres supervisor)</span></span>
+        </label>
+
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
       </div>
 
-      <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-3 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" alt="" class="w-5 h-5 rounded-full">Ir a os10coquimbo.cl</a>
+      <a href="https://zosepcar.cl/consulta_componentes/" target="_blank" rel="noopener" class="btn btn-p w-full mt-3 flex items-center justify-center gap-2">🔎 Consultar</a>
+      <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-2 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" alt="" class="w-5 h-5 rounded-full">Ir a os10coquimbo.cl</a>
 
       <p class="text-center text-xs text-slate-400 mt-4">Sistema de fiscalización OS10 · ${USING_SUPABASE ? '' : 'MODO DEMO'}</p>
     </div>
@@ -942,7 +948,8 @@
         turnoBox = $("#turnoBox"), turnoInfo = $("#turnoInfo"),
         submit = $("#g_submit"), rutMsg = $("#rutMsg"),
         nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha"),
-        nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg");
+        nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg"),
+        superWrap = $("#g_superWrap"), superChk = $("#g_super");
       let modo = null, guardiaExiste = false, guardiaCargado = null;
 
       // Fecha del examen: no puede ser futura
@@ -998,6 +1005,7 @@
           return;
         }
         mostrarTurnoActual();
+        if (superWrap) superWrap.hidden = false;
         if (g) {
           guardiaExiste = true; modo = "existe"; guardiaCargado = g;
           extra.hidden = false;
@@ -1096,7 +1104,7 @@
             }
           }
           // 2) Registrar la asistencia y CONFIRMAR que el servidor la escribió (devuelve la fila insertada).
-          const asis = await conTimeout(Data.createAsistencia(ev.id, rutV), TIMEOUT_MS);
+          const asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superChk && superChk.checked)), TIMEOUT_MS);
           if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
           mostrarIngresoExitoso(asis);
@@ -1578,10 +1586,11 @@
       const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
+      const sup = a.es_supervisor ? ` <span class="badge" style="background:#ede9fe;color:#5b21b6;margin-left:4px" title="Supervisor">👔 SUPERVISOR</span>` : '';
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50">
     <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}${pend}</td>
+    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}${sup}${pend}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -1618,12 +1627,13 @@
       const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${esNuevoG ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} ml-1 whitespace-nowrap">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
+      const sup = a.es_supervisor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-800 ml-1 whitespace-nowrap">👔 SUPERVISOR</span>` : '';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50">
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-slate-900 text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${pend}</span>
+        <span class="block font-semibold text-slate-900 text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${pend}</span>
         <span class="block text-[11px] text-slate-600 truncate">${segunda}</span>
       </span>
       ${vigenciaPill(v)}
@@ -1674,7 +1684,7 @@
     </div>
     <div class="text-center mb-3">
       <div class="font-bold text-lg text-slate-800 leading-tight">${esc(nomFull)}</div>
-      <div class="inline-block mt-1.5">${vigenciaPill(v)}</div>
+      <div class="inline-block mt-1.5">${vigenciaPill(v)}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle">👔 SUPERVISOR</span>` : ""}</div>
     </div>
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
@@ -2998,7 +3008,8 @@ ${matchOrLocation}
       <div class="card px-4 py-3 mt-4">
         <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados</div><div class="text-2xl font-bold text-green-700">${asist.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
-        <div class="grid grid-cols-4 gap-2 mt-4 text-center">
+        <div class="grid grid-cols-5 gap-2 mt-4 text-center">
+          ${chip("Total llegaron", asist.length, "azul")}
           ${chip("Vigentes", cont("VIGENTE"), "verde")}
           ${chip("Prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo")}
           ${chip("Vencidos", cont("VENCIDO_SIN_PRORROGA"), "rojo")}
@@ -3019,7 +3030,7 @@ ${matchOrLocation}
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
             <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${asist.length ? asist.map((a, i) => { const g = a.guardia || {}; const v = calcularVigencia(g.fecha_ultimo_examen); const tn = calcularTurno(a.hora_ingreso, ev); const tf = normalizarTelefono(g.telefono); const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—"; return `<tr class="border-b border-slate-50"><td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800 md:whitespace-nowrap">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</td><td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td><td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td><td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`; }).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
+            <tbody>${asist.length ? asist.map((a, i) => { const g = a.guardia || {}; const v = calcularVigencia(g.fecha_ultimo_examen); const tn = calcularTurno(a.hora_ingreso, ev); const tf = normalizarTelefono(g.telefono); const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—"; return `<tr class="border-b border-slate-50"><td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td><td data-label="Nombre" class="pr-2 font-medium text-slate-800 md:whitespace-nowrap">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${a.es_supervisor ? ' <span class="badge" style="background:#ede9fe;color:#5b21b6" title="Supervisor">👔 SUP</span>' : ''}</td><td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td><td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td><td data-label="Vigencia" class="pr-2">${badge(v)}</td><td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td><td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td><td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td></tr>`; }).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
           </table>
         </div>
       </div>
