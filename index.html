@@ -937,8 +937,7 @@
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
       </div>
 
-      <a href="https://zosepcar.cl/consulta_componentes/" target="_blank" rel="noopener" class="btn btn-p w-full mt-3 flex items-center justify-center gap-2">🔎 Consultar</a>
-      <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-2 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" alt="" class="w-5 h-5 rounded-full">Ir a os10coquimbo.cl</a>
+      <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-3 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" alt="" class="w-5 h-5 rounded-full">Ir a os10coquimbo.cl</a>
 
       <p class="text-center text-xs text-slate-400 mt-4">Sistema de fiscalización OS10 · ${USING_SUPABASE ? '' : 'MODO DEMO'}</p>
     </div>
@@ -1378,6 +1377,7 @@
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
+        <a href="https://zosepcar.cl/consulta_componentes/" target="_blank" rel="noopener" class="btn btn-ghost text-sm">🔎 Consultar guardia</a>
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
         <button id="editEv" class="btn btn-ghost text-sm">${esPartido(ev) ? "✎ Cambiar equipos" : "✎ Editar evento"}</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
