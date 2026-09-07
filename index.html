@@ -2726,6 +2726,50 @@
       const btnRut = win.querySelector("#cg_btn_rut");
       const btnRes = win.querySelector("#cg_btn_res");
 
+      // En celular: bloquea el scroll de la página de fondo mientras la ventana
+      // está abierta. Así, al tocar el casillero del RUT y abrirse el teclado,
+      // la pantalla NO se sube ni salta: la ventana queda fija sobre el RUT.
+      const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+      const bodyStyle = document.body.style;
+      const prevBody = { position: bodyStyle.position, top: bodyStyle.top, left: bodyStyle.left, right: bodyStyle.right, width: bodyStyle.width, overflow: bodyStyle.overflow };
+      if (isMobile) {
+        bodyStyle.position = "fixed";
+        bodyStyle.top = `-${scrollY}px`;
+        bodyStyle.left = "0";
+        bodyStyle.right = "0";
+        bodyStyle.width = "100%";
+        bodyStyle.overflow = "hidden";
+      }
+      function restoreBody() {
+        if (!isMobile) return;
+        bodyStyle.position = prevBody.position;
+        bodyStyle.top = prevBody.top;
+        bodyStyle.left = prevBody.left;
+        bodyStyle.right = prevBody.right;
+        bodyStyle.width = prevBody.width;
+        bodyStyle.overflow = prevBody.overflow;
+        window.scrollTo(0, scrollY);
+      }
+
+      // Reposiciona la ventana sobre el teclado usando visualViewport, para que
+      // el casillero del RUT quede siempre visible y enfocado en celular.
+      let userMoved = false; // se activa si el usuario arrastra la ventana a mano
+      const vv = window.visualViewport;
+      const baseMobileH = Math.max(220, Math.min(390, Math.round(window.innerHeight * 0.70)));
+      function positionForKeyboard() {
+        if (!isMobile || !vv || userMoved) return;
+        const margin = 8;
+        win.style.left = "50%";
+        win.style.transform = "translateX(-50%)";
+        win.style.top = (vv.offsetTop + margin) + "px";
+        const maxH = vv.height - margin * 2;
+        win.style.height = Math.max(200, Math.min(baseMobileH, maxH)) + "px";
+      }
+      if (isMobile && vv) {
+        vv.addEventListener("resize", positionForKeyboard);
+        vv.addEventListener("scroll", positionForKeyboard);
+      }
+
       let activeView = "rut"; // "rut" | "resultado"
       let autoTimer = null;
 
@@ -2750,8 +2794,12 @@
 
       // Al interactuar con el iframe (click/focus para ingresar RUT o presionar Consultar),
       // programa el enfoque automático del resultado después de 2.2 segundos.
+      // En celular NO se hace este salto automático: al tocar el casillero del RUT
+      // el foco pasa al iframe (window blur) y el salto movía la pantalla lejos del
+      // RUT. En celular el usuario ve el resultado tocando el botón "📋 Resultado".
       let blurHandled = false;
       const onWindowBlur = () => {
+        if (isMobile) return;
         if (document.activeElement === iframe && !blurHandled && activeView === "rut") {
           blurHandled = true;
           autoTimer = setTimeout(() => {
@@ -2774,7 +2822,9 @@
 
       win.querySelector("#cg_close").addEventListener("click", () => {
         window.removeEventListener("blur", onWindowBlur);
+        if (vv) { vv.removeEventListener("resize", positionForKeyboard); vv.removeEventListener("scroll", positionForKeyboard); }
         if (autoTimer) clearTimeout(autoTimer);
+        restoreBody();
         win.remove();
       });
 
@@ -2786,6 +2836,7 @@
         // Los clicks en los botones del header no inician arrastre.
         if (e.target.closest("a,button")) return;
         dragging = true;
+        userMoved = true; // el usuario tomó control manual: deja de reposicionar por teclado
         // Al arrastrar por primera vez, cambia de translateX centrado a coords absolutas.
         const rect = win.getBoundingClientRect();
         win.style.left = rect.left + "px";
