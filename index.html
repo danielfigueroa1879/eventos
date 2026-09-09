@@ -712,6 +712,7 @@
         async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); set(K.pu, get(K.pu).filter(x => x.evento_id !== id)); const his = get(K.hp).filter(h => h.evento_id === id).map(h => h.id); set(K.hp, get(K.hp).filter(h => h.evento_id !== id)); set(K.hpa, get(K.hpa).filter(x => !his.includes(x.historial_id))); ping(); },
         async getEventoBySlug(slug) { return get(K.ev).find(x => x.slug === slug) || null; },
         async getGuardia(rut) { return get(K.gu).find(x => x.rut === rut) || null; },
+        async listGuardias() { return get(K.gu); },
         async upsertGuardia(g) { const a = get(K.gu); const i = a.findIndex(x => x.rut === g.rut); const rec = { ...g, updated_at: nowISO() }; if (i >= 0) a[i] = { ...a[i], ...rec }; else a.push(rec); set(K.gu, a); ping(); return rec; },
         async bulkUpsertGuardias(arr) { const a = get(K.gu); const by = {}; a.forEach(g => by[g.rut] = g); arr.forEach(g => by[g.rut] = { ...by[g.rut], ...g, updated_at: nowISO() }); set(K.gu, Object.values(by)); ping(); return arr.length; },
         async listAsistencias(evId) {
@@ -761,6 +762,7 @@
         async deleteEvento(id) { ok(await sb.from("eventos").delete().eq("id", id)); },
         async getEventoBySlug(slug) { const d = ok(await sb.from("eventos").select("*").eq("slug", slug).limit(1)); return d[0] || null; },
         async getGuardia(rut) { const d = ok(await sb.from("guardias_central").select("*").eq("rut", rut).limit(1)); return d[0] || null; },
+        async listGuardias() { return ok(await sb.from("guardias_central").select("*")); },
         async upsertGuardia(g) { return ok(await sb.from("guardias_central").upsert({ ...g, updated_at: nowISO() }).select().single()); },
         async bulkUpsertGuardias(arr) { let n = 0; for (let i = 0; i < arr.length; i += 150) { const chunk = arr.slice(i, i + 150).map(g => ({ ...g, updated_at: nowISO() })); const r = await sb.from("guardias_central").upsert(chunk); if (r.error) throw r.error; n += chunk.length; } return n; },
         async listAsistencias(evId) {
@@ -864,6 +866,7 @@
       if (dist) return renderDistPublica(dist);
       const emp = params.get("empresa");
       if (emp) return renderEmpresa(emp);
+      if (params.has("admin")) return renderMasterGate();
       return renderAdminGate();
     }
     function empresaLink(slug) { return location.origin + location.pathname.replace(/index\.html$/, "") + "?empresa=" + encodeURIComponent(slug); }
@@ -3638,6 +3641,139 @@ ${matchOrLocation}
       };
       await paint();
       Data.onChange(paint);
+    }
+
+    /* =========================================================================
+       PANEL MAESTRO (Importación/Exportación Inteligente)
+       ========================================================================= */
+    function renderMasterGate() {
+      app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6">
+    <div class="card p-6 w-full max-w-sm text-center border-t-4 border-indigo-600">
+      <div class="text-4xl mb-3">🔐</div>
+      <h1 class="font-bold text-lg text-slate-800">Panel Maestro Oculto</h1>
+      <p class="text-slate-500 text-sm mb-4">Solo para administrador maestro</p>
+      <input id="masterPin" type="password" inputmode="numeric" class="fld text-center tracking-widest text-lg" placeholder="••••"/>
+      <button id="masterPinBtn" class="btn btn-p w-full mt-3" style="background:#4f46e5;color:white">Entrar</button>
+      <a href="?" class="text-xs text-indigo-500 hover:underline mt-4 block">Ir al panel normal</a>
+    </div></div>`;
+      const go = () => { if ($("#masterPin").value === "4040") renderMasterPanel(); else toast("PIN incorrecto", false); };
+      $("#masterPinBtn").addEventListener("click", go);
+      $("#masterPin").addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+    }
+
+    function renderMasterPanel() {
+      app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-4 bg-slate-100">
+      <div class="card p-6 w-full max-w-lg shadow-xl">
+        <div class="flex justify-between items-center mb-6">
+          <h1 class="font-bold text-xl text-slate-800">🛠 Panel Maestro</h1>
+          <a href="?" class="text-xs text-slate-400 hover:underline">Salir</a>
+        </div>
+        <div class="space-y-4">
+          <button id="btnImp" class="btn btn-p w-full shadow-md flex items-center justify-center gap-2" style="background:#4f46e5;color:white;padding:1rem;font-size:1.1rem">📥 Subir Actualización (CSV)</button>
+          <button id="btnExp" class="btn w-full flex items-center justify-center gap-2" style="background:white;color:#4f46e5;border:2px solid #4f46e5;padding:1rem;font-size:1.1rem">📤 Descargar Base de Datos (CSV)</button>
+        </div>
+        <div class="mt-6 text-xs text-slate-500 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <b>ℹ️ Importación Inteligente:</b> Al subir un CSV, el sistema <b>no duplicará</b> guardias. Agregará los nuevos y, para los existentes, conservará la información más completa y la fecha de examen más reciente.
+        </div>
+      </div>
+      </div>`;
+      $("#btnImp").addEventListener("click", modalImportar);
+      $("#btnExp").addEventListener("click", exportarGuardias);
+    }
+
+    function modalImportar() {
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📥 Importar guardias</h2>
+    <p class="text-sm text-slate-500 mb-3">Sube un archivo <b>CSV</b>. Debe tener las columnas <b>RUT</b> y <b>NOMBRE</b> (opcional FONO y FECHA).</p>
+    <input id="imp_file" type="file" accept=".csv,text/csv" class="fld mb-2">
+    <div id="imp_prev" class="text-xs text-slate-500 mt-2 min-h-[1.5rem]"></div>
+    <div class="flex gap-2 mt-4">
+      <button id="imp_cancel" class="btn btn-ghost flex-1">Cancelar</button>
+      <button id="imp_go" class="btn btn-p flex-1" style="background:#4f46e5" disabled>Importar</button>
+    </div>`);
+      let rows = null; const prev = $("#imp_prev"), go = $("#imp_go");
+      $("#imp_cancel").addEventListener("click", closeModal);
+      $("#imp_file").addEventListener("change", async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        try {
+          const text = await file.text();
+          const all = parseCSV(text).filter(r => r.some(c => c && c.trim()));
+          if (!all.length) { prev.textContent = "Archivo vacío."; go.disabled = true; return; }
+          const head = all.shift().map(h => (h || "").trim().toUpperCase());
+          const idx = (re) => head.findIndex(h => re.test(h));
+          const iR = idx(/RUT/), iN = idx(/NOMBRE/), iT = idx(/FONO|TELEF/), iF = idx(/FECHA|EXAMEN|CURSO/);
+          if (iR < 0 || iN < 0) { prev.innerHTML = '<span class="text-red-600 font-bold">Error: El CSV debe tener columnas RUT y NOMBRE.</span>'; go.disabled = true; return; }
+          const map = {};
+          all.forEach(r => { const rut = formatRut(r[iR] || ""); if (rut.length < 3) return; const [nom, ape] = splitNombre(r[iN] || ""); map[rut] = { rut, nombres: nom, apellidos: ape, telefono: iT >= 0 ? (r[iT] || "").trim() : "", fecha_ultimo_examen: iF >= 0 ? fechaISO(r[iF]) : null }; });
+          rows = Object.values(map);
+          prev.innerHTML = `Listo para procesar <b>${rows.length}</b> guardias.`;
+          go.disabled = rows.length === 0;
+        } catch (err) { prev.innerHTML = '<span class="text-red-600">Error leyendo el archivo.</span>'; }
+      });
+      go.addEventListener("click", async () => {
+        if (!rows || !rows.length) return;
+        go.disabled = true; go.textContent = "Analizando e Importando…";
+        try {
+          const actuales = await Data.listGuardias();
+          const mapActuales = {};
+          actuales.forEach(g => mapActuales[g.rut] = g);
+
+          const mergedRows = rows.map(csv => {
+            const db = mapActuales[csv.rut];
+            if (!db) return csv;
+            
+            const nombres = (db.nombres && db.nombres.trim() !== "") ? db.nombres : csv.nombres;
+            const apellidos = (db.apellidos && db.apellidos.trim() !== "") ? db.apellidos : csv.apellidos;
+            const telefono = (db.telefono && db.telefono.trim() !== "") ? db.telefono : csv.telefono;
+            
+            let fecha_ultimo_examen = db.fecha_ultimo_examen;
+            if (csv.fecha_ultimo_examen) {
+              if (!db.fecha_ultimo_examen || new Date(csv.fecha_ultimo_examen) > new Date(db.fecha_ultimo_examen)) {
+                fecha_ultimo_examen = csv.fecha_ultimo_examen;
+              }
+            }
+            
+            return { rut: csv.rut, nombres, apellidos, telefono, fecha_ultimo_examen };
+          });
+
+          const n = await Data.bulkUpsertGuardias(mergedRows);
+          closeModal(); toast(`✔ ${n} guardias subidos con éxito (sin duplicados)`, true, 4000);
+        }
+        catch (err) { toast("Error al importar: " + (err.message || err), false); go.disabled = false; go.textContent = "Importar"; }
+      });
+    }
+
+    async function exportarGuardias() {
+      try {
+        const btn = $("#btnExp");
+        if(btn) { btn.disabled = true; btn.textContent = "Preparando archivo..."; }
+        
+        const list = await Data.listGuardias();
+        if (!list || !list.length) { toast("No hay guardias para exportar", false); if(btn) { btn.disabled = false; btn.innerHTML = "📤 Descargar Base de Datos (CSV)"; } return; }
+        
+        const headers = ["RUT", "NOMBRE", "FONO", "FECHA"];
+        const rows = list.map(g => [
+          g.rut || "",
+          ((g.nombres || "") + " " + (g.apellidos || "")).trim(),
+          g.telefono || "",
+          g.fecha_ultimo_examen || ""
+        ].map(col => '"' + String(col).replace(/"/g, '""') + '"').join(","));
+        
+        const csvContent = headers.join(",") + "\n" + rows.join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "guardias_central_" + new Date().toISOString().split("T")[0] + ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        if(btn) { btn.disabled = false; btn.innerHTML = "📤 Descargar Base de Datos (CSV)"; }
+        toast("Descarga iniciada", true);
+      } catch (err) {
+        toast("Error al exportar: " + (err.message || err), false);
+        const btn = $("#btnExp");
+        if(btn) { btn.disabled = false; btn.innerHTML = "📤 Descargar Base de Datos (CSV)"; }
+      }
     }
 
     /* ===== Semilla de demo (solo la primera vez en modo demo) ===== */
