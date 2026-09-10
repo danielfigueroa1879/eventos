@@ -1282,7 +1282,8 @@
        ========================================================================= */
     let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true };
     // Estado propio de la VISTA EMPRESA (solo lectura). Se conserva entre repintados en tiempo real.
-    let EMPRESA_STATE = { showQR: false };
+    // Ambos paneles arrancan abiertos y se repliegan solos a los 7 s (igual que el Resumen del admin).
+    let EMPRESA_STATE = { showQR: true, showResumen: true };
 
     async function renderAdmin() {
       app.innerHTML = `
@@ -3780,8 +3781,8 @@ ${matchOrLocation}
         asistGuardiasE.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMapE[tn.clave]) turnosMapE[tn.clave] = { ...tn, count: 0 }; turnosMapE[tn.clave].count++; } });
         const turnosArrE = Object.values(turnosMapE).sort((x, y) => x.clave - y.clave);
         app.innerHTML = `
-    <div class="min-h-screen p-3 md:p-6 max-w-7xl mx-auto">
-      <div class="brand-bg rounded-2xl p-5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
+    <div class="min-h-screen px-3 pt-2 pb-3 md:px-6 md:pt-4 md:pb-6 max-w-7xl mx-auto">
+      <div class="brand-bg rounded-2xl px-5 py-3.5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
         ${esPartido(ev) ? `<span aria-hidden="true" class="pointer-events-none select-none absolute left-1/3 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/10 leading-none" style="font-size:8rem">⚽</span>` : ""}
         <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" title="Ir a os10coquimbo.cl" class="relative flex-shrink-0"><img src="images/logo-os10-original.webp" class="w-14 h-14 rounded-full bg-white/90" alt="OS10 Coquimbo"></a>
         <div class="flex-1 min-w-0 relative">
@@ -3813,16 +3814,24 @@ ${matchOrLocation}
           </div>
         </div>
       </div>
-      <div class="card px-4 py-3 mt-4">
-        <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</div><div class="text-2xl font-bold text-green-700">${asistGuardiasE.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
-        <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
-        <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mt-4 text-center">
-          ${chip("Guardias Total", asistGuardiasE.length, "azul")}
-          ${chip("Guardias vigentes", cont("VIGENTE"), "verde")}
-          ${chip("Guardias prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo")}
-          ${chip("Guardias vencidos", cont("VENCIDO_SIN_PRORROGA"), "rojo")}
-          ${chip("Sin curso", cont("SIN_CURSO"), "gris")}
-          ${chip("Supervisores", nSupE, "celeste")}
+      <div class="card mt-4 overflow-hidden">
+        <button id="empToggleResumen" class="w-full px-4 py-2.5 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+          <span>Guardias ingresados${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</span>
+          <span class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-xl font-bold text-green-700">${asistGuardiasE.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></span>
+            <span id="empResumenChevron" class="text-slate-400 transition-transform duration-300" style="${EMPRESA_STATE.showResumen ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+          </span>
+        </button>
+        <div id="empResumenPanel" class="px-4 pb-3 border-t border-slate-100" ${EMPRESA_STATE.showResumen ? "" : "hidden"}>
+          <div class="w-full bg-slate-100 rounded-full h-3 mt-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
+          <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mt-4 text-center">
+            ${chip("Guardias Total", asistGuardiasE.length, "azul")}
+            ${chip("Guardias vigentes", cont("VIGENTE"), "verde")}
+            ${chip("Guardias prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo")}
+            ${chip("Guardias vencidos", cont("VENCIDO_SIN_PRORROGA"), "rojo")}
+            ${chip("Sin curso", cont("SIN_CURSO"), "gris")}
+            ${chip("Supervisores", nSupE, "celeste")}
+          </div>
         </div>
       </div>
       <div class="card mt-4">
@@ -3863,13 +3872,20 @@ ${matchOrLocation}
       </div>
       <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" class="w-5 h-5 opacity-60" alt="">O.S.10 Coquimbo · Vista de solo lectura</p>
     </div>`;
-        // QR y estado del evento (solo lectura): plegable + QR + PNG/Imprimir/Link.
-        const eqp = $("#empQrPanel"), eqc = $("#empQrChevron");
-        $("#empToggleQR").addEventListener("click", () => {
-          EMPRESA_STATE.showQR = !EMPRESA_STATE.showQR;
-          eqp.hidden = !EMPRESA_STATE.showQR;
-          eqc.style.transform = EMPRESA_STATE.showQR ? "rotate(180deg)" : "";
-        });
+        // Paneles plegables con auto-repliegue a los 7 s (igual que el "Resumen" del admin).
+        const autoRepliegue = (btnId, panelId, chevId, key) => {
+          const btn = $("#" + btnId), panel = $("#" + panelId), chev = $("#" + chevId);
+          if (!btn || !panel || !chev) return;
+          let timer = EMPRESA_STATE[key] ? setTimeout(() => { EMPRESA_STATE[key] = false; panel.hidden = true; chev.style.transform = ""; }, 7000) : null;
+          btn.addEventListener("click", () => {
+            if (timer) { clearTimeout(timer); timer = null; }
+            EMPRESA_STATE[key] = !EMPRESA_STATE[key];
+            panel.hidden = !EMPRESA_STATE[key];
+            chev.style.transform = EMPRESA_STATE[key] ? "rotate(180deg)" : "";
+          });
+        };
+        autoRepliegue("empToggleResumen", "empResumenPanel", "empResumenChevron", "showResumen");
+        autoRepliegue("empToggleQR", "empQrPanel", "empQrChevron", "showQR");
         renderQRConLogo($("#qrbox"), guardLink(ev.slug));
         $("#qrDl").addEventListener("click", () => dlQR(ev));
         $("#qrPr").addEventListener("click", () => prQR(ev));
