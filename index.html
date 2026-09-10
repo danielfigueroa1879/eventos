@@ -79,6 +79,16 @@
       background: linear-gradient(135deg, #0a3d18 0%, #0f5323 55%, #15662f 100%)
     }
 
+    /* Título "Resumen de acreditaciones": versión corta en celular y completa en pantallas
+       medianas o más. Se usa CSS propio (no las variantes sm: de Tailwind) para que el
+       cambio sea 100% confiable en cualquier dispositivo. */
+    .res-full { display: none; }
+    .res-short { display: inline; }
+    @media (min-width: 640px) {
+      .res-full { display: inline; }
+      .res-short { display: none; }
+    }
+
     ::-webkit-scrollbar {
       width: 10px;
       height: 10px
@@ -904,6 +914,8 @@
       if (!ev) {
         app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 max-w-sm text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-lg text-slate-800">Evento no encontrado</h1><p class="text-slate-500 text-sm mt-1">El código QR no corresponde a un evento activo.</p></div></div>`; return;
       }
+      // Candado de edición: si el evento está CERRADO, el guardia no puede modificar sus datos.
+      const registroAbierto = ev.registro_abierto === true;
       app.innerHTML = `
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
@@ -1052,9 +1064,15 @@
           guardiaExiste = true; modo = "existe"; guardiaCargado = g;
           extra.hidden = false;
           nombres.value = g.nombres || ""; apellidos.value = g.apellidos || ""; tel.value = g.telefono || ""; fecha.value = g.fecha_ultimo_examen || "";
-          // El guardia puede corregir sus datos (nombres, apellidos, teléfono o curso) una sola vez, en el momento de su ingreso al partido.
-          [nombres, apellidos, tel, fecha].forEach(i => i.removeAttribute("readonly"));
-          rutMsg.innerHTML = `<span class="text-green-700 font-medium">✔ Datos encontrados. Si algo está mal, corrígelo y confirma tu ingreso.</span>`;
+          if (registroAbierto) {
+            // Edición ABIERTA: el guardia puede corregir sus datos (nombres, apellidos, teléfono o curso) al registrar su ingreso.
+            [nombres, apellidos, tel, fecha].forEach(i => i.removeAttribute("readonly"));
+            rutMsg.innerHTML = `<span class="text-green-700 font-medium">✔ Datos encontrados. Si algo está mal, corrígelo y confirma tu ingreso.</span>`;
+          } else {
+            // Edición CERRADA: nadie puede modificar los datos; solo se confirma el ingreso.
+            [nombres, apellidos, tel, fecha].forEach(i => i.setAttribute("readonly", "readonly"));
+            rutMsg.innerHTML = `<span class="text-green-700 font-medium">✔ Datos encontrados. Confirma tu ingreso.</span><span class="block text-slate-500 mt-0.5">🔒 La edición de datos está cerrada. Si algo está mal, avisa al administrador.</span>`;
+          }
           mostrarVigencia(fecha.value);
           avisoNombres(); avisoApellidos(); avisoFecha();
           submit.disabled = false; submit.textContent = "✔ Confirmar ingreso"; actualizarBtn();
@@ -1128,7 +1146,7 @@
           // 1) Guardar/actualizar los datos del guardia (con límite de tiempo).
           if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
             await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' }), TIMEOUT_MS);
-          } else if (modo === "existe") {
+          } else if (modo === "existe" && registroAbierto) {
             const g0 = guardiaCargado || {};
             const nom = formatNombre(nombres.value).trim(), ape = formatNombre(apellidos.value).trim(), telf = tel.value.trim();
             // Detecta corrección en cualquiera de los cuatro campos: nombres, apellidos, teléfono o curso (fecha).
@@ -1145,6 +1163,7 @@
               await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value }), TIMEOUT_MS);
             }
           }
+          // Si la edición está CERRADA (registroAbierto=false), no se modifica el guardia: solo se registra la asistencia.
           // 2) Registrar la asistencia y CONFIRMAR que el servidor la escribió (devuelve la fila insertada).
           const asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superChk && superChk.checked)), TIMEOUT_MS);
           if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
@@ -1388,6 +1407,11 @@
       const nH = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "H").length;
       const nM = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "M").length;
 
+      // Candado de edición del evento: ABIERTO (verde) = los guardias pueden corregir sus datos;
+      // CERRADO (gris) = nadie puede modificar los datos al registrar su ingreso.
+      const registroAbierto = ev.registro_abierto === true;
+      const lockBtnHTML = (id, cls) => `<button id="${id}" class="btn ${cls} text-xs px-3 py-2 font-extrabold items-center gap-1 shadow-md rounded-xl transition-all whitespace-nowrap" style="${registroAbierto ? "background:#16a34a;border-color:#16a34a;color:#fff" : "background:#e2e8f0;border-color:#cbd5e1;color:#475569"}" title="${registroAbierto ? "Edición ABIERTA — los guardias pueden corregir sus datos. Toca para CERRAR." : "Edición CERRADA — los guardias no pueden modificar sus datos. Toca para ABRIR."}">${registroAbierto ? "🔓 Abierto" : "🔒 Cerrado"}</button>`;
+
       main.innerHTML = `
     <div class="flex items-start justify-between gap-2 mb-3">
       <div class="min-w-0">
@@ -1396,6 +1420,7 @@
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0 items-center">
+        ${lockBtnHTML("lockTopBtn", "hidden md:flex")}
         <button id="btnCuentaOS10Top" class="btn text-xs md:text-sm px-3 py-2 text-white font-extrabold hidden md:flex items-center gap-1.5 shadow-md hover:brightness-110 rounded-xl transition-all" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta O.S.10</button>
         <button id="expExcel" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar Excel"><span class="font-bold text-green-700">XLS</span></button>
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
@@ -1404,13 +1429,13 @@
     </div>
 
     <div class="card mb-3 overflow-hidden">
-      <button id="toggleResumen" class="w-full px-3 py-2.5 flex items-center justify-between text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-        <div class="flex flex-wrap items-center gap-2">
-          <span>Resumen de acreditaciones</span>
-          <span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${asistGuardias.length} registrados</span>
-          ${nSup > 0 ? `<span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${nSup} SUPERVISORES</span>` : ""}
-          ${totalProrrogas > 0 ? `<span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${totalProrrogas} PRÓRROGAS</span>` : ""}
-          <span class="text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80">${totalVencidos} VENCIDOS</span>
+      <button id="toggleResumen" class="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-[13px] sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+        <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 min-w-0">
+          <span class="leading-tight"><span class="res-short">Resumen acreditaciones</span><span class="res-full">Resumen de acreditaciones</span></span>
+          <span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${asistGuardias.length} reg.</span>
+          ${nSup > 0 ? `<span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${nSup} SUP.</span>` : ""}
+          ${totalProrrogas > 0 ? `<span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${totalProrrogas} PRÓRR.</span>` : ""}
+          <span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${totalVencidos} VENC.</span>
         </div>
         <span id="resumenChevron" class="text-slate-400 transition-transform duration-300 flex-shrink-0" style="${ADMIN_STATE.showResumen ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
       </button>
@@ -1466,6 +1491,7 @@
             ${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? `<span class="text-indigo-600 font-normal text-xs ml-0.5">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 md:hidden">
+            ${lockBtnHTML("lockMovilBtn", "flex")}
             <button id="cuentaMovil" class="btn text-xs px-3 py-2 text-white font-extrabold flex items-center gap-1 shadow-md hover:brightness-110 rounded-xl transition-all" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta</button>
             <button id="compartirMovil" class="btn btn-ghost !py-1 !px-2 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
           </div>
@@ -1590,6 +1616,23 @@
       const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asist));
+      // Candado ABIERTO/CERRADO: alterna si los guardias pueden corregir sus datos al registrarse.
+      const toggleLock = async (btn) => {
+        if (!btn) return;
+        const nuevo = !registroAbierto;
+        btn.disabled = true;
+        try {
+          await Data.updateEvento(ev.id, { registro_abierto: nuevo });
+          ev.registro_abierto = nuevo;
+          toast(nuevo ? "🔓 Edición ABIERTA: los guardias ya pueden corregir sus datos." : "🔒 Edición CERRADA: los guardias no podrán modificar sus datos.", true, 3500);
+          await refreshAdmin();
+        } catch (e) {
+          btn.disabled = false;
+          toast("No se pudo cambiar el estado: " + (e.message || e), "danger", 4000);
+        }
+      };
+      const bL1 = $("#lockTopBtn"); if (bL1) bL1.addEventListener("click", () => toggleLock(bL1));
+      const bL2 = $("#lockMovilBtn"); if (bL2) bL2.addEventListener("click", () => toggleLock(bL2));
       const btnHist = $("#histPartidos");
       if (btnHist) btnHist.addEventListener("click", () => modalHistorialPartidos(ev));
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
