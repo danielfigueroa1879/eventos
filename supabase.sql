@@ -26,6 +26,9 @@ alter table eventos add column if not exists turno_inicio text    default '08:00
 alter table eventos add column if not exists tipo         text    default 'evento';
 alter table eventos add column if not exists partido      text;
 alter table eventos add column if not exists usa_turnos   boolean default true;
+-- Candado de edición: false = CERRADO (los guardias no pueden modificar sus datos),
+-- true = ABIERTO (los guardias sí pueden corregir sus datos al registrar su ingreso).
+alter table eventos add column if not exists registro_abierto boolean default false;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9
