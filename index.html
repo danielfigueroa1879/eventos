@@ -3781,7 +3781,7 @@ ${matchOrLocation}
         asistGuardiasE.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMapE[tn.clave]) turnosMapE[tn.clave] = { ...tn, count: 0 }; turnosMapE[tn.clave].count++; } });
         const turnosArrE = Object.values(turnosMapE).sort((x, y) => x.clave - y.clave);
         app.innerHTML = `
-    <div class="min-h-screen px-3 pt-2 pb-3 md:px-4 md:pt-4 md:pb-6 max-w-[116rem] mx-auto">
+    <div class="min-h-screen px-3 pt-2 pb-3 md:px-4 md:pt-4 md:pb-6 max-w-[130rem] mx-auto">
       <div class="brand-bg rounded-2xl px-5 py-3.5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
         ${esPartido(ev) ? `<span aria-hidden="true" class="pointer-events-none select-none absolute left-1/3 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/10 leading-none" style="font-size:8rem">⚽</span>` : ""}
         <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" title="Ir a os10coquimbo.cl" class="relative flex-shrink-0"><img src="images/logo-os10-original.webp" class="w-14 h-14 rounded-full bg-white/90" alt="OS10 Coquimbo"></a>
