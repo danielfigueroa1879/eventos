@@ -338,6 +338,17 @@
     #listaEventos.evReordering .evItem { pointer-events: none; }  /* al arrastrar no se dispara el click de selección */
     html[data-theme="dark"] #listaEventos .evHandle { color: #6b7280; }
     html[data-theme="dark"] #listaEventos .evHandle:hover { color: #9ca3af; background: rgba(148, 163, 184, .14); }
+    /* En celular: asa angosta y pegada a la izquierda; las tarjetas ganan ancho a ambos lados */
+    @media (max-width: 767px) {
+      #listaEventos { margin-left: -.4rem; margin-right: -.45rem; }
+      #listaEventos .evRow { gap: .1rem; }
+      #listaEventos .evHandle {
+        width: 20px;
+        font-size: 20px;
+        background: rgba(148, 163, 184, .10);
+      }
+      html[data-theme="dark"] #listaEventos .evHandle { background: rgba(148, 163, 184, .12); }
+    }
 
     /* =========================================================================
        MODO OSCURO — tonos grises (no negro puro), para PC y celular
@@ -909,6 +920,8 @@
     function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }); }
     // Fecha en formato día/mes/año (acepta 'YYYY-MM-DD' o 'YYYY-MM-DDT...')
     function fechaFmt(s) { if (!s) return "—"; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s)); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s); }
+    // Formatea la fecha de vencimiento (objeto Date que devuelve calcularVigencia) como dd/mm/aaaa.
+    function fechaVenceFmt(d) { if (!(d instanceof Date) || isNaN(d)) return "—"; const p = n => String(n).padStart(2, "0"); return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`; }
     function guardLink(slug) { return location.origin + location.pathname + "?e=" + encodeURIComponent(slug); }
 
     /* =========================================================================
@@ -1283,7 +1296,7 @@
     <div id="drawerBk" class="fixed inset-0 bg-black/40 z-40 md:hidden hidden"></div>
 
     <!-- Sidebar / Drawer -->
-    <aside id="sidebar" class="bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 w-72 max-w-[85%] -translate-x-full transition-transform duration-300 overflow-y-auto shadow-2xl md:static md:translate-x-0 md:max-w-none md:min-h-screen md:overflow-visible md:shadow-none md:transition-none md:z-auto">
+    <aside id="sidebar" class="bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 w-80 max-w-[92%] -translate-x-full transition-transform duration-300 overflow-y-auto shadow-2xl md:static md:translate-x-0 md:w-72 md:max-w-none md:min-h-screen md:overflow-visible md:shadow-none md:transition-none md:z-auto">
       <div class="brand-bg text-white p-4 flex items-center gap-3">
         <img src="images/logo-os10-original.webp" class="w-11 h-11 rounded-full bg-white/90" alt="OS10">
         <div class="flex-1">
@@ -1360,6 +1373,16 @@
     // a la izquierda de cada tarjeta. Funciona con dedo (celular) y con mouse (PC).
     function habilitarReordenEventos(cont) {
       const filas = () => Array.from(cont.querySelectorAll(".evRow"));
+      // Contenedor que hace scroll: el drawer (#sidebar) en celular, o la ventana en PC.
+      const buscarScroller = () => {
+        let n = cont.parentElement;
+        while (n && n !== document.body) {
+          const oy = getComputedStyle(n).overflowY;
+          if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight + 4) return n;
+          n = n.parentElement;
+        }
+        return null; // usar window
+      };
       cont.querySelectorAll(".evHandle").forEach(asa => {
         asa.addEventListener("pointerdown", (ev) => {
           ev.preventDefault();
@@ -1369,8 +1392,11 @@
           fila.classList.add("evDragging");
           try { asa.setPointerCapture(ev.pointerId); } catch (_) { }
 
-          const mover = (e) => {
-            const y = e.clientY;
+          const sc = buscarScroller();
+          let lastY = ev.clientY;
+          let rafId = null;
+
+          const reordenar = (y) => {
             let ref = null;
             for (const s of filas()) {
               if (s === fila) continue;
@@ -1380,10 +1406,36 @@
             if (ref) { if (ref !== fila.nextElementSibling) cont.insertBefore(fila, ref); }
             else if (fila !== cont.lastElementChild) cont.appendChild(fila);
           };
+
+          // Auto-scroll: si el dedo se acerca al borde de arriba/abajo, la lista se
+          // desplaza sola para poder mover el evento a posiciones fuera de la vista.
+          const EDGE = 64;      // franja sensible (px)
+          const MAXV = 14;      // velocidad máxima por frame (px)
+          const autoScroll = () => {
+            const y = lastY;
+            let dy = 0, top, bottom;
+            if (sc) { const r = sc.getBoundingClientRect(); top = r.top; bottom = r.bottom; }
+            else { top = 0; bottom = window.innerHeight; }
+            if (y < top + EDGE) dy = -Math.min(MAXV, Math.ceil((top + EDGE - y) / 4));
+            else if (y > bottom - EDGE) dy = Math.min(MAXV, Math.ceil((y - (bottom - EDGE)) / 4));
+            if (dy) {
+              if (sc) sc.scrollTop += dy; else window.scrollBy(0, dy);
+              reordenar(y);
+            }
+            rafId = requestAnimationFrame(autoScroll);
+          };
+          rafId = requestAnimationFrame(autoScroll);
+
+          // IMPORTANTE: escuchamos en `document`, no en el asa. Al reordenar movemos la
+          // fila (y con ella el asa) dentro del DOM; eso puede soltar la captura del puntero
+          // y hacer que los "pointermove" dejen de llegar al asa → el evento "se queda pegado".
+          // document siempre recibe los eventos, así el arrastre nunca se corta.
+          const mover = (e) => { lastY = e.clientY; reordenar(lastY); };
           const soltar = () => {
-            asa.removeEventListener("pointermove", mover);
-            asa.removeEventListener("pointerup", soltar);
-            asa.removeEventListener("pointercancel", soltar);
+            if (rafId) cancelAnimationFrame(rafId);
+            document.removeEventListener("pointermove", mover);
+            document.removeEventListener("pointerup", soltar);
+            document.removeEventListener("pointercancel", soltar);
             try { asa.releasePointerCapture(ev.pointerId); } catch (_) { }
             fila.classList.remove("evDragging");
             cont.classList.remove("evReordering");
@@ -1391,9 +1443,9 @@
             setTimeout(() => { ADMIN_STATE._reordenando = false; }, 60);
             guardarOrdenEventos(cont);
           };
-          asa.addEventListener("pointermove", mover);
-          asa.addEventListener("pointerup", soltar);
-          asa.addEventListener("pointercancel", soltar);
+          document.addEventListener("pointermove", mover);
+          document.addEventListener("pointerup", soltar);
+          document.addEventListener("pointercancel", soltar);
         });
       });
     }
@@ -1521,7 +1573,7 @@
       // Candado de edición del evento: ABIERTO (verde) = los guardias pueden corregir sus datos;
       // CERRADO (gris) = nadie puede modificar los datos al registrar su ingreso.
       const registroAbierto = ev.registro_abierto === true;
-      const lockBtnHTML = (id, cls) => `<button id="${id}" class="btn ${cls} text-xs px-3 py-2 font-extrabold items-center gap-1 shadow-md rounded-xl transition-all whitespace-nowrap" style="${registroAbierto ? "background:#16a34a;border-color:#16a34a;color:#fff" : "background:#e2e8f0;border-color:#cbd5e1;color:#475569"}" title="${registroAbierto ? "Edición ABIERTA — los guardias pueden corregir sus datos. Toca para CERRAR." : "Edición CERRADA — los guardias no pueden modificar sus datos. Toca para ABRIR."}">${registroAbierto ? "🔓 Abierto" : "🔒 Cerrado"}</button>`;
+      const lockBtnHTML = (id, cls) => `<button id="${id}" class="btn btn-ghost ${cls} h-9 !py-0 px-2.5 sm:px-3 text-xs font-extrabold items-center justify-center gap-1 whitespace-nowrap${registroAbierto ? " text-green-700" : ""}" title="${registroAbierto ? "Edición ABIERTA — los guardias pueden corregir sus datos. Toca para CERRAR." : "Edición CERRADA — los guardias no pueden modificar sus datos. Toca para ABRIR."}">${registroAbierto ? "Abierto" : "Cerrado"}</button>`;
 
       main.innerHTML = `
     <div class="flex items-start justify-between gap-2 mb-3">
@@ -1603,13 +1655,13 @@
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 md:hidden">
             ${lockBtnHTML("lockMovilBtn", "flex")}
-            <button id="cuentaMovil" class="btn text-xs px-3 py-2 text-white font-extrabold flex items-center gap-1 shadow-md hover:brightness-110 rounded-xl transition-all" style="background:#25D366;border-color:#25D366" title="Informe Cuenta O.S.10">📋 Cuenta</button>
-            <button id="compartirMovil" class="btn btn-ghost !py-1 !px-2 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+            <button id="cuentaMovil" class="btn btn-ghost h-9 !py-0 px-2.5 sm:px-3 text-xs font-extrabold flex items-center justify-center gap-1 whitespace-nowrap" title="Informe Cuenta O.S.10">Cuenta</button>
+            <button id="compartirMovil" class="btn btn-ghost h-9 !py-0 !px-2.5 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
           </div>
         </div>
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
-          <input id="buscar" class="fld h-10 py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
-          <button id="consultarGuardiaBtn" class="btn h-10 text-sm sm:text-base px-4 sm:px-5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1.5 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
+          <input id="buscar" class="fld h-9 py-1.5 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
+          <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
         </div>
       </div>
       ${usaT ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
@@ -1989,14 +2041,14 @@
     </div>
     <div class="text-center mb-3">
       <div class="font-bold text-lg text-slate-800 leading-tight">${esc(nomFull)}</div>
-      <div class="inline-block mt-1.5">${vigenciaPill(v)}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}</div>
+      <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}</div>
     </div>
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
-      ${telHTML}
       ${detalleFila("📅", a.es_supervisor ? "Fecha de autorización de la resolución" : "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
+      ${telHTML}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
