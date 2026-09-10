@@ -1281,6 +1281,8 @@
        PANEL ADMIN
        ========================================================================= */
     let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true };
+    // Estado propio de la VISTA EMPRESA (solo lectura). Se conserva entre repintados en tiempo real.
+    let EMPRESA_STATE = { showQR: false };
 
     async function renderAdmin() {
       app.innerHTML = `
@@ -3790,6 +3792,27 @@ ${matchOrLocation}
         <img src="images/aniversario1.webp" class="w-20 h-20 object-contain flex-shrink-0 hidden sm:block relative" alt="Centenario">
       </div>
       ${esPartido(ev) ? `<div class="mt-3"><button id="empDist" class="btn btn-p w-full relative flex items-center justify-center gap-2">🗺️ Distribución de facciones <svg class="absolute right-4" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button></div>` : ""}
+      <div class="card mt-4 overflow-hidden">
+        <button id="empToggleQR" class="w-full px-3 py-2.5 flex items-center justify-between text-sm font-semibold text-slate-700">
+          <span>🔳 QR y estado del evento</span>
+          <span id="empQrChevron" class="text-slate-400 transition-transform flex-shrink-0" style="${EMPRESA_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+        </button>
+        <div id="empQrPanel" class="p-3 border-t border-slate-100" ${EMPRESA_STATE.showQR ? "" : "hidden"}>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</div>
+            <div class="text-xl font-bold text-green-700">${asistGuardiasE.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2.5 mb-3"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
+          <div class="flex flex-col items-center">
+            <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
+            <div class="flex gap-2 mt-2 w-full max-w-xs">
+              <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
+              <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
+              <button id="qrCp" class="btn btn-ghost text-xs flex-1">🔗 Link</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="card px-4 py-3 mt-4">
         <div class="flex items-center justify-between mb-2"><div class="font-semibold text-slate-700">Guardias ingresados${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</div><div class="text-2xl font-bold text-green-700">${asistGuardiasE.length}<span class="text-base text-slate-400"> / ${total || "—"}</span></div></div>
         <div class="w-full bg-slate-100 rounded-full h-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
@@ -3840,6 +3863,17 @@ ${matchOrLocation}
       </div>
       <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" class="w-5 h-5 opacity-60" alt="">O.S.10 Coquimbo · Vista de solo lectura</p>
     </div>`;
+        // QR y estado del evento (solo lectura): plegable + QR + PNG/Imprimir/Link.
+        const eqp = $("#empQrPanel"), eqc = $("#empQrChevron");
+        $("#empToggleQR").addEventListener("click", () => {
+          EMPRESA_STATE.showQR = !EMPRESA_STATE.showQR;
+          eqp.hidden = !EMPRESA_STATE.showQR;
+          eqc.style.transform = EMPRESA_STATE.showQR ? "rotate(180deg)" : "";
+        });
+        renderQRConLogo($("#qrbox"), guardLink(ev.slug));
+        $("#qrDl").addEventListener("click", () => dlQR(ev));
+        $("#qrPr").addEventListener("click", () => prQR(ev));
+        $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLink(ev.slug)).then(() => toast("Link copiado")); });
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
