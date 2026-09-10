@@ -29,6 +29,9 @@ alter table eventos add column if not exists usa_turnos   boolean default true;
 -- Candado de edición: false = CERRADO (los guardias no pueden modificar sus datos),
 -- true = ABIERTO (los guardias sí pueden corregir sus datos al registrar su ingreso).
 alter table eventos add column if not exists registro_abierto boolean default false;
+-- Orden manual de los eventos en el panel del administrador (se arrastra cada tarjeta
+-- para ordenarla de arriba a abajo). Menor número = más arriba. NULL = al final.
+alter table eventos add column if not exists orden integer;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9

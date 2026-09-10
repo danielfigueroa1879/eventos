@@ -306,6 +306,40 @@
     }
 
     /* =========================================================================
+       ORDENAR EVENTOS — asa de arrastre (los puntos a la izquierda de cada tarjeta)
+       ========================================================================= */
+    #listaEventos .evRow {
+      display: flex;
+      align-items: stretch;
+      gap: .25rem;
+    }
+    #listaEventos .evRow .evItem { flex: 1 1 auto; min-width: 0; }
+    #listaEventos .evHandle {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      align-self: stretch;
+      border-radius: .5rem;
+      color: #94a3b8;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;            /* clave: el asa arrastra, no hace scroll en el celular */
+      font-size: 18px;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    #listaEventos .evHandle:hover { color: #64748b; background: rgba(148, 163, 184, .12); }
+    #listaEventos .evHandle:active { cursor: grabbing; }
+    #listaEventos .evRow.evDragging { opacity: .65; }
+    #listaEventos .evRow.evDragging .evItem { box-shadow: 0 8px 20px -6px rgba(2, 6, 23, .35); }
+    #listaEventos.evReordering .evItem { pointer-events: none; }  /* al arrastrar no se dispara el click de selección */
+    html[data-theme="dark"] #listaEventos .evHandle { color: #6b7280; }
+    html[data-theme="dark"] #listaEventos .evHandle:hover { color: #9ca3af; background: rgba(148, 163, 184, .14); }
+
+    /* =========================================================================
        MODO OSCURO — tonos grises (no negro puro), para PC y celular
        ========================================================================= */
     #themeToggle {
@@ -522,7 +556,7 @@
     const FECHA_TOPE_PRORROGA = new Date(2027, 4, 28, 23, 59, 59); // 28-may-2027 (tope prórroga)
 
     const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-    const APP_VERSION = "v3.1";
+    const APP_VERSION = "v3.2";
     // En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
     if (USING_SUPABASE) { try { ["os10_eventos", "os10_guardias", "os10_asistencias", "os10_seeded"].forEach(k => localStorage.removeItem(k)); } catch (e) { } }
 
@@ -704,6 +738,18 @@
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
     function nowISO() { return new Date().toISOString(); }
 
+    // Ordena los eventos por el orden manual del administrador (columna "orden").
+    // Los que aún no tienen orden asignado van al final, y entre iguales manda la
+    // fecha de creación (así el comportamiento por defecto no cambia).
+    function ordenarEventos(arr) {
+      return (arr || []).slice().sort((a, b) => {
+        const oa = (a.orden == null ? Infinity : a.orden);
+        const ob = (b.orden == null ? Infinity : b.orden);
+        if (oa !== ob) return oa - ob;
+        return (a.created_at || "") < (b.created_at || "") ? -1 : 1;
+      });
+    }
+
     /* ---- Adaptador LocalStorage (DEMO) ---- */
     const Local = (() => {
       const K = { ev: "os10_eventos", gu: "os10_guardias", as: "os10_asistencias", hp: "os10_hist_partidos", hpa: "os10_hist_asist", pu: "os10_puestos" };
@@ -716,7 +762,7 @@
         onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
         // MODO DEMO (sin servidor): claves solo para probar en local. En producción se usa Supabase (ver adaptador Remote).
         async verificarClave(nombre, clave) { const demo = { admin: "0000", eliminar: "0000" }; return clave === demo[nombre]; },
-        async listEventos() { return get(K.ev).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)); },
+        async listEventos() { return ordenarEventos(get(K.ev)); },
         async createEvento(e) { const ev = { ...e, id: uid(), created_at: nowISO(), activo: true }; const a = get(K.ev); a.push(ev); set(K.ev, a); ping(); return ev; },
         async updateEvento(id, patch) { const a = get(K.ev).map(x => x.id === id ? { ...x, ...patch } : x); set(K.ev, a); ping(); },
         async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); set(K.pu, get(K.pu).filter(x => x.evento_id !== id)); const his = get(K.hp).filter(h => h.evento_id === id).map(h => h.id); set(K.hp, get(K.hp).filter(h => h.evento_id !== id)); set(K.hpa, get(K.hpa).filter(x => !his.includes(x.historial_id))); ping(); },
@@ -766,7 +812,7 @@
         onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
         // Verifica la clave EN EL SERVIDOR (función RPC). La contraseña real vive en Supabase, no en este código.
         async verificarClave(nombre, clave) { const { data, error } = await sb.rpc("verificar_clave", { p_nombre: nombre, p_clave: clave }); if (error) throw error; return data === true; },
-        async listEventos() { return ok(await sb.from("eventos").select("*").order("created_at", { ascending: true })); },
+        async listEventos() { return ordenarEventos(ok(await sb.from("eventos").select("*").order("created_at", { ascending: true }))); },
         async createEvento(e) { return ok(await sb.from("eventos").insert({ ...e, activo: true }).select().single()); },
         async updateEvento(id, patch) { ok(await sb.from("eventos").update(patch).eq("id", id)); },
         async deleteEvento(id) { ok(await sb.from("eventos").delete().eq("id", id)); },
@@ -1295,15 +1341,80 @@
       const ec = $("#evCount"); if (ec) ec.textContent = ADMIN_STATE.eventos.length;
       cont.innerHTML = ADMIN_STATE.eventos.map(e => {
         const act = e.id === ADMIN_STATE.selected;
-        return `<button data-id="${e.id}" class="evItem w-full text-left rounded-lg px-3 py-2 border-l-4 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
+        return `<div class="evRow" data-id="${e.id}">
+      <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
+      <button data-id="${e.id}" class="evItem text-left rounded-lg px-3 py-2 border-l-4 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
       <div class="font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight">${esc(e.nombre_evento)}</div>
       <div class="text-xs ${act ? 'text-green-800/70' : 'text-slate-500'}">Empresa: ${esc(e.empresa)}</div>
       <div class="text-[11px] ${act ? 'text-green-700/70' : 'text-slate-400'} mt-0.5" data-count="${e.id}">…</div>
-    </button>`;
+    </button>
+    </div>`;
       }).join("");
-      cont.querySelectorAll(".evItem").forEach(b => b.addEventListener("click", () => { ADMIN_STATE.selected = b.dataset.id; ADMIN_STATE.turnoFiltro = "all"; if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); refreshAdmin(); }));
+      cont.querySelectorAll(".evItem").forEach(b => b.addEventListener("click", () => { if (ADMIN_STATE._reordenando) return; ADMIN_STATE.selected = b.dataset.id; ADMIN_STATE.turnoFiltro = "all"; if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); refreshAdmin(); }));
+      habilitarReordenEventos(cont);
       // contadores
       ADMIN_STATE.eventos.forEach(async e => { const as = await Data.listAsistencias(e.id); const el = $(`[data-count="${e.id}"]`); if (el) el.textContent = `${as.length} / ${e.cantidad_esperada || "—"} guardias`; });
+    }
+
+    // Permite al administrador reordenar los eventos arrastrando el asa (los puntos ⠿)
+    // a la izquierda de cada tarjeta. Funciona con dedo (celular) y con mouse (PC).
+    function habilitarReordenEventos(cont) {
+      const filas = () => Array.from(cont.querySelectorAll(".evRow"));
+      cont.querySelectorAll(".evHandle").forEach(asa => {
+        asa.addEventListener("pointerdown", (ev) => {
+          ev.preventDefault();
+          const fila = asa.closest(".evRow"); if (!fila) return;
+          ADMIN_STATE._reordenando = true;
+          cont.classList.add("evReordering");
+          fila.classList.add("evDragging");
+          try { asa.setPointerCapture(ev.pointerId); } catch (_) { }
+
+          const mover = (e) => {
+            const y = e.clientY;
+            let ref = null;
+            for (const s of filas()) {
+              if (s === fila) continue;
+              const r = s.getBoundingClientRect();
+              if (y < r.top + r.height / 2) { ref = s; break; }
+            }
+            if (ref) { if (ref !== fila.nextElementSibling) cont.insertBefore(fila, ref); }
+            else if (fila !== cont.lastElementChild) cont.appendChild(fila);
+          };
+          const soltar = () => {
+            asa.removeEventListener("pointermove", mover);
+            asa.removeEventListener("pointerup", soltar);
+            asa.removeEventListener("pointercancel", soltar);
+            try { asa.releasePointerCapture(ev.pointerId); } catch (_) { }
+            fila.classList.remove("evDragging");
+            cont.classList.remove("evReordering");
+            // liberar el "candado" del click tras un instante (evita seleccionar al soltar)
+            setTimeout(() => { ADMIN_STATE._reordenando = false; }, 60);
+            guardarOrdenEventos(cont);
+          };
+          asa.addEventListener("pointermove", mover);
+          asa.addEventListener("pointerup", soltar);
+          asa.addEventListener("pointercancel", soltar);
+        });
+      });
+    }
+
+    // Toma el orden visual actual de las tarjetas y lo guarda (columna "orden").
+    async function guardarOrdenEventos(cont) {
+      const ids = Array.from(cont.querySelectorAll(".evRow")).map(r => r.dataset.id);
+      const porId = {}; ADMIN_STATE.eventos.forEach(e => porId[e.id] = e);
+      const nuevos = ids.map(id => porId[id]).filter(Boolean);
+      if (nuevos.length !== ADMIN_STATE.eventos.length) return;
+      // ¿cambió realmente el orden?
+      const cambios = [];
+      nuevos.forEach((e, i) => { if (e.orden !== i) { e.orden = i; cambios.push(e); } });
+      if (!cambios.length) return;
+      ADMIN_STATE.eventos = nuevos;   // UI optimista: se ve reordenado al instante
+      let fallo = false;
+      for (const e of cambios) {
+        try { await Data.updateEvento(e.id, { orden: e.orden }); }
+        catch (err) { fallo = true; console.warn("No se pudo guardar el orden:", err); }
+      }
+      if (fallo) toast("No se pudo guardar el nuevo orden en el servidor. Si usas Supabase, ejecuta la migración de la columna 'orden' (supabase.sql).", false, 6000);
     }
 
     // Detecta y avisa (toast) cuando ingresa un guardia nuevo o se modifican datos de un guardia.
