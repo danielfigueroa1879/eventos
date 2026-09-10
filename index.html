@@ -3781,7 +3781,7 @@ ${matchOrLocation}
         asistGuardiasE.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMapE[tn.clave]) turnosMapE[tn.clave] = { ...tn, count: 0 }; turnosMapE[tn.clave].count++; } });
         const turnosArrE = Object.values(turnosMapE).sort((x, y) => x.clave - y.clave);
         app.innerHTML = `
-    <div class="min-h-screen w-full px-3 pt-2 pb-3 md:px-4 md:pt-4 md:pb-6 max-w-[112rem] mx-auto">
+    <div class="min-h-screen w-full px-3 pt-2 pb-3 md:px-4 md:pt-4 md:pb-6 max-w-[104rem] mx-auto">
       <!-- Los 3 primeros contenedores van mucho más angostos (banner, QR, Guardias ingresados) -->
       <div class="max-w-[62rem] mx-auto">
       <div class="brand-bg rounded-2xl px-5 py-3.5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
