@@ -2013,10 +2013,11 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="badge" style="background:#e0f2fe;color:#075985;margin-left:4px" title="Supervisor">🤵 SUPERVISOR</span>` : '';
+      const spd = g.spd ? ` <span class="badge" style="background:#ede9fe;color:#6d28d9;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>` : '';
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50">
     <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}${sup}${pend}</td>
+    <td data-label="Nombre" class="pr-2 font-medium text-slate-800">${esc(nom || "—")}${sup}${spd}${pend}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2054,12 +2055,13 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${esNuevoG ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} ml-1 whitespace-nowrap">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 ml-1 whitespace-nowrap">🤵 SUPERVISOR</span>` : '';
+      const spd = g.spd ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-800 ml-1 whitespace-nowrap" title="Autorizado por SPD">SPD</span>` : '';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50">
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-slate-900 text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${pend}</span>
+        <span class="block font-semibold text-slate-900 text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${pend}</span>
         <span class="block text-[11px] text-slate-600 truncate">${segunda}</span>
       </span>
       ${vigenciaPill(v)}
@@ -2074,11 +2076,12 @@
       const tf = normalizarTelefono(g.telefono);
       const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—";
       const sup = a.es_supervisor ? ' <span class="badge" style="background:#e0f2fe;color:#075985" title="Supervisor">🤵 SUP</span>' : '';
+      const spd = g.spd ? ' <span class="badge" style="background:#ede9fe;color:#6d28d9" title="Autorizado por SPD">SPD</span>' : '';
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
       return `<tr class="border-b border-slate-50">
         <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td>
-        <td data-label="Nombre" class="pr-2 font-medium text-slate-800 md:whitespace-nowrap">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}</td>
+        <td data-label="Nombre" class="pr-2 font-medium text-slate-800 md:whitespace-nowrap">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
         <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2131,7 +2134,7 @@
     </div>
     <div class="text-center mb-3">
       <div class="font-bold text-lg text-slate-800 leading-tight">${esc(nomFull)}</div>
-      <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}</div>
+      <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
@@ -3731,6 +3734,10 @@ ${matchOrLocation}
       <div><label class="text-sm font-semibold text-slate-700">Apellidos</label><input id="e_ape" class="fld" value="${esc(g.apellidos || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Teléfono</label><input id="e_tel" class="fld" value="${esc(g.telefono || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">${rotuloFecha}</label><input id="e_fec" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
+      <label class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 cursor-pointer">
+        <input type="checkbox" id="e_spd" class="w-4 h-4 flex-shrink-0" ${g.spd ? "checked" : ""}>
+        <span>Autorizado por <b>SPD</b> <span class="text-slate-400 font-normal">(Subsecretaría de Prevención del Delito — presenta resolución)</span></span>
+      </label>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="e_cancel" class="btn btn-ghost flex-1">Cancelar</button>
@@ -3743,7 +3750,7 @@ ${matchOrLocation}
         const fx = $("#e_fec").value;
         if (fx) { const d = parseFecha(fx); if (d && startOfDay(d).getTime() > startOfDay(new Date()).getTime()) { toast("La fecha del examen no puede ser futura", false); return; } }
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null, aprobado: true, revision_tipo: null });
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, aprobado: true, revision_tipo: null });
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
