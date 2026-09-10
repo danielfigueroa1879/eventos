@@ -925,6 +925,67 @@
     function guardLink(slug) { return location.origin + location.pathname + "?e=" + encodeURIComponent(slug); }
 
     /* =========================================================================
+       QR ROTATIVO (anti-envío remoto) — el código cambia cada cierto tiempo.
+       Objetivo: que el guardia/supervisor tenga que escanear el QR EN EL LUGAR.
+       Si alguien fotografía el QR y se lo envía a otra persona por teléfono, para
+       cuando esa persona lo abra el código ya cambió y queda inválido.
+       La verificación es en el propio navegador (sin servidor): el token depende
+       del id del evento (que no viaja en el enlace, solo el slug) y de la ventana
+       de tiempo. Nota: es un disuasivo contra el reenvío casual de la foto del QR,
+       no una barrera criptográfica contra un atacante técnico.
+       ========================================================================= */
+    const QR_VENTANA_SEG = 30;   // el código cambia cada 30 s
+    const QR_TOLERANCIA  = 2;    // ventanas de gracia (cubre desfase de reloj y demora al escanear)
+    // ¿Este evento usa QR rotativo? Los eventos CON turnos (>12 h) lo usan por defecto.
+    // qr_rotativo === true/false lo fuerza; null (evento antiguo sin definir) = según turnos.
+    function qrRotativo(ev) { return !!ev && (ev.qr_rotativo == null ? eventoUsaTurnos(ev) : ev.qr_rotativo === true); }
+    function qrVentanaActual() { return Math.floor(Date.now() / 1000 / QR_VENTANA_SEG); }
+    // Hash determinista pequeño (cyrb53) — mismo resultado en el panel y en la vista del guardia.
+    function qrHash(str) {
+      let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+      for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
+    }
+    function qrToken(ev, w) { return qrHash((ev.id || ev.slug) + ":" + w).slice(0, 10); }
+    // Enlace del guardia. Si el evento es rotativo, agrega ventana (w) y token (k) vigentes.
+    function guardLinkVigente(ev) { let u = guardLink(ev.slug); if (qrRotativo(ev)) { const w = qrVentanaActual(); u += "&w=" + w + "&k=" + qrToken(ev, w); } return u; }
+    // Valida el token del QR: la ventana debe ser reciente (± tolerancia) y el token coincidir.
+    function qrTokenVigente(ev, w, k) {
+      w = parseInt(w, 10);
+      if (!Number.isFinite(w) || !k) return false;
+      if (Math.abs(qrVentanaActual() - w) > QR_TOLERANCIA) return false;
+      return qrToken(ev, w) === k;
+    }
+    // Botones/aviso bajo el QR según si el evento es rotativo (código presencial) o no.
+    function qrBotonesHTML(ev, opts) {
+      const conLink = !!(opts && opts.conLink);
+      if (qrRotativo(ev)) {
+        return `<div class="mt-2 text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 max-w-xs leading-snug">🔒 <b>Código presencial:</b> cambia cada ${QR_VENTANA_SEG} s. Debe escanearse <b>en el lugar</b> — no sirve enviarlo por foto.</div>`;
+      }
+      return `<div class="flex gap-2 mt-2 w-full max-w-xs">
+        <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
+        <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
+        ${conLink ? `<button id="qrCp" class="btn btn-ghost text-xs flex-1">🔗 Link</button>` : ""}
+      </div>`;
+    }
+    // Monta el QR en el contenedor. Si es rotativo, lo refresca solo cada ventana de tiempo.
+    let _qrTimer = null;
+    function montarQR(container, ev) {
+      if (_qrTimer) { clearInterval(_qrTimer); _qrTimer = null; }
+      if (!container) return;
+      renderQRConLogo(container, guardLinkVigente(ev));
+      if (qrRotativo(ev)) {
+        _qrTimer = setInterval(() => {
+          const c = document.querySelector("#qrbox");
+          if (!c) { clearInterval(_qrTimer); _qrTimer = null; return; }
+          renderQRConLogo(c, guardLinkVigente(ev));
+        }, QR_VENTANA_SEG * 1000);
+      }
+    }
+
+    /* =========================================================================
        ROUTER
        ========================================================================= */
     function route() {
@@ -972,6 +1033,22 @@
       let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (err) { console.error(err); }
       if (!ev) {
         app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 max-w-sm text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-lg text-slate-800">Evento no encontrado</h1><p class="text-slate-500 text-sm mt-1">El código QR no corresponde a un evento activo.</p></div></div>`; return;
+      }
+      // QR ROTATIVO: si el evento exige código presencial, el enlace debe traer un token
+      // vigente (ventana w + token k). Si falta o ya venció (foto reenviada, código viejo),
+      // se bloquea el registro y se pide escanear el código actual en el lugar.
+      if (qrRotativo(ev)) {
+        const qp = new URLSearchParams(location.search);
+        if (!qrTokenVigente(ev, qp.get("w"), qp.get("k"))) {
+          app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 max-w-sm text-center">
+            <div class="text-5xl mb-2">⛔</div>
+            <h1 class="font-bold text-lg text-slate-800">Código QR vencido</h1>
+            <p class="text-slate-600 text-sm mt-2">Este evento exige registrarse <b>en el lugar</b>. El código QR cambia cada ${QR_VENTANA_SEG} segundos, y el que abriste ya no es válido.</p>
+            <p class="text-slate-500 text-sm mt-3">👉 Acércate al punto de control y <b>escanea nuevamente</b> el código QR que se muestra en pantalla. No es válido si te lo enviaron por foto o mensaje.</p>
+            <div class="text-[11px] text-slate-400 mt-4"><b>${esc(ev.nombre_evento)}</b> · ${esc(ev.empresa)}</div>
+          </div></div>`;
+          return;
+        }
       }
       // Candado de edición: si el evento está CERRADO, el guardia no puede modificar sus datos.
       const registroAbierto = ev.registro_abierto === true;
@@ -1630,11 +1707,7 @@
       <div class="w-full bg-slate-100 rounded-full h-2.5 mb-3"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
       <div class="flex flex-col items-center">
         <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
-        <div class="flex gap-2 mt-2 w-full max-w-xs">
-          <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
-          <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
-          <button id="qrCp" class="btn btn-ghost text-xs flex-1">🔗 Link</button>
-        </div>
+        ${qrBotonesHTML(ev, { conLink: true })}
       </div>
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
@@ -1743,10 +1816,10 @@
       });
 
       // QR (con logo O.S.10 al centro y margen blanco)
-      renderQRConLogo($("#qrbox"), guardLink(ev.slug));
-      $("#qrDl").addEventListener("click", () => dlQR(ev));
-      $("#qrPr").addEventListener("click", () => prQR(ev));
-      $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLink(ev.slug)).then(() => toast("Link copiado")); });
+      montarQR($("#qrbox"), ev);
+      if ($("#qrDl")) $("#qrDl").addEventListener("click", () => dlQR(ev));
+      if ($("#qrPr")) $("#qrPr").addEventListener("click", () => prQR(ev));
+      if ($("#qrCp")) $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLinkVigente(ev)).then(() => toast("Link copiado")); });
       const statsBtn = $("#toggleStats"), statsBox = $("#statsBox");
       const pintarStats = () => {
         if (ADMIN_STATE.showStats) {
@@ -3560,11 +3633,17 @@ ${matchOrLocation}
         </div>
         <p class="text-[11px] text-slate-400">La asistencia se separa automáticamente por turno según la hora de ingreso.</p>
       </div>
+      <label class="flex items-start gap-2 text-sm text-slate-700 select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 cursor-pointer">
+        <input type="checkbox" id="m_qr_rot" class="w-4 h-4 flex-shrink-0 mt-0.5">
+        <span>🔒 <b>QR rotativo</b> (código presencial)<br><span class="text-[11px] text-slate-400 font-normal">El código QR cambia cada ${QR_VENTANA_SEG} s y solo sirve escaneándolo en el lugar. Recomendado en eventos con turnos.</span></span>
+      </label>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="m_cancel" class="btn btn-ghost flex-1">Cancelar</button>
       <button id="m_save" class="btn btn-p flex-1">${edit ? "Guardar" : "Crear evento"}</button>
     </div>`);
+      // QR rotativo: por defecto activo si el evento usa turnos (o según lo ya guardado al editar).
+      $("#m_qr_rot").checked = edit ? qrRotativo(ev) : true;
       // Selector de duración de turno: mostrar campo personalizado cuando corresponde
       const selTurno = $("#m_turno"), customWrap = $("#m_turno_custom_wrap"), customInput = $("#m_turno_custom");
       const presets = ["12", "8", "6", "24"];
@@ -3616,7 +3695,8 @@ ${matchOrLocation}
         const campos = {
           nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha,
           tipo: esPart ? "partido" : "evento", partido: esPart ? partidoTxt : null,
-          usa_turnos: usaTurnos, turno_horas: turnoHoras, turno_inicio: turnoInicio
+          usa_turnos: usaTurnos, turno_horas: turnoHoras, turno_inicio: turnoInicio,
+          qr_rotativo: $("#m_qr_rot").checked
         };
         try {
           if (edit) { await Data.updateEvento(ev.id, campos); }
@@ -3808,11 +3888,7 @@ ${matchOrLocation}
           <div class="w-full bg-slate-100 rounded-full h-2.5 mb-3"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
           <div class="flex flex-col items-center">
             <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
-            <div class="flex gap-2 mt-2 w-full max-w-xs">
-              <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
-              <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
-              <button id="qrCp" class="btn btn-ghost text-xs flex-1">🔗 Link</button>
-            </div>
+            ${qrBotonesHTML(ev, { conLink: false })}
           </div>
         </div>
       </div>
@@ -3889,10 +3965,9 @@ ${matchOrLocation}
         };
         autoRepliegue("empToggleResumen", "empResumenPanel", "empResumenChevron", "showResumen");
         autoRepliegue("empToggleQR", "empQrPanel", "empQrChevron", "showQR");
-        renderQRConLogo($("#qrbox"), guardLink(ev.slug));
-        $("#qrDl").addEventListener("click", () => dlQR(ev));
-        $("#qrPr").addEventListener("click", () => prQR(ev));
-        $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLink(ev.slug)).then(() => toast("Link copiado")); });
+        montarQR($("#qrbox"), ev);
+        if ($("#qrDl")) $("#qrDl").addEventListener("click", () => dlQR(ev));
+        if ($("#qrPr")) $("#qrPr").addEventListener("click", () => prQR(ev));
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
