@@ -23,6 +23,7 @@
     }
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1725,8 +1726,7 @@
       </div>
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
-        <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel, con los datos de la empresa">⬇ Excel de eventos</button>
-        <button id="expEventosPdf" class="btn text-sm px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en PDF (hoja oficio horizontal, se ve bien en celular y PC)">📄 PDF de eventos</button>
+        <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel (.xlsx) o PDF (hoja oficio horizontal)">⬇ Descargar eventos</button>
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
@@ -1870,8 +1870,7 @@
       });
       const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
-      const bEvXls = $("#expEventosXls"); if (bEvXls) bEvXls.addEventListener("click", descargarExcelEventos);
-      const bEvPdf = $("#expEventosPdf"); if (bEvPdf) bEvPdf.addEventListener("click", descargarPDFEventos);
+      const bEvXls = $("#expEventosXls"); if (bEvXls) bEvXls.addEventListener("click", modalExportEventos);
       const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asist));
       // Candado ABIERTO/CERRADO: alterna si los guardias pueden corregir sus datos al registrarse.
       const toggleLock = async (btn) => {
@@ -2385,10 +2384,51 @@
       return new File(["﻿" + html], `Eventos-${fecha}.xls`, { type: "application/vnd.ms-excel;charset=utf-8;" });
     }
 
-    async function descargarExcelEventos() {
-      const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
-      if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
-      toast("Preparando el Excel de eventos…");
+    // --- Excel REAL (.xlsx con SheetJS): se abre sin errores en Excel, Google Sheets y celulares ---
+    function xlsxEventos(eventos, conteos) {
+      if (!window.XLSX) return false;
+      const cols = ["N°", "Evento", "Empresa", "Tipo", "Fecha", "Estado", "Esperados", "Registrados", "Supervisores", "Link de registro"];
+      const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
+      const totalReg = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).guardias || 0), 0);
+      const totalSup = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).supervisores || 0), 0);
+      const gen = new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" });
+      const aoa = [
+        ["Listado de eventos"],
+        [`${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${gen}`],
+        [],
+        cols,
+      ];
+      eventos.forEach((ev, i) => {
+        const c = conteos[ev.id] || { guardias: 0, supervisores: 0 };
+        aoa.push([
+          i + 1,
+          ev.nombre_evento || "",
+          ev.empresa || "",
+          eventoTipoTexto(ev),
+          ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
+          ev.activo === false ? "Inactivo" : "Activo",
+          ev.cantidad_esperada || 0,
+          c.guardias,
+          c.supervisores,
+          guardLink(ev.slug),
+        ]);
+      });
+      aoa.push(["", "TOTALES", "", "", "", "", totalEsp, totalReg, totalSup, ""]);
+      const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 14 }, { wch: 48 }];
+      const nc = cols.length - 1;
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: nc } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: nc } },
+      ];
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "Eventos");
+      const fecha = new Date().toISOString().slice(0, 10);
+      window.XLSX.writeFile(wb, `Eventos-${fecha}.xlsx`);
+      return true;
+    }
+
+    async function cargarConteosEventos(eventos) {
       const conteos = {};
       await Promise.all(eventos.map(async ev => {
         try {
@@ -2399,7 +2439,16 @@
           };
         } catch (_) { conteos[ev.id] = { guardias: 0, supervisores: 0 }; }
       }));
-      descargarArchivo(xlsFileEventos(eventos, conteos));
+      return conteos;
+    }
+
+    async function descargarExcelEventos() {
+      const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
+      if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
+      toast("Preparando el Excel de eventos…");
+      const conteos = await cargarConteosEventos(eventos);
+      // Excel real (.xlsx); si la librería no cargó, respaldo al .xls con formato.
+      if (!xlsxEventos(eventos, conteos)) descargarArchivo(xlsFileEventos(eventos, conteos));
     }
 
     // --- PDF de TODOS los eventos, en hoja OFICIO HORIZONTAL (se abre en cualquier celular y PC) ---
@@ -2476,20 +2525,28 @@
       const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
       if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
       toast("Preparando el PDF de eventos…");
-      const conteos = {};
-      await Promise.all(eventos.map(async ev => {
-        try {
-          const as = await Data.listAsistencias(ev.id);
-          conteos[ev.id] = {
-            guardias: as.filter(a => !a.es_supervisor).length,
-            supervisores: as.filter(a => a.es_supervisor).length,
-          };
-        } catch (_) { conteos[ev.id] = { guardias: 0, supervisores: 0 }; }
-      }));
+      const conteos = await cargarConteosEventos(eventos);
       const fecha = new Date().toISOString().slice(0, 10);
       const doc = construirPDFEventos(eventos, conteos);
       if (doc) { doc.save(`Eventos-${fecha}.pdf`); return; }
       toast("No se pudo generar el PDF", false);
+    }
+
+    // Menú del botón "Exportar eventos": Excel real (.xlsx) o PDF (hoja oficio horizontal).
+    function modalExportEventos() {
+      const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
+      if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">⬇ Descargar eventos</h2>
+    <p class="text-sm text-slate-500 mb-3">Descarga el listado de <b>${eventos.length} evento${eventos.length === 1 ? "" : "s"}</b> con los datos de la empresa. Ambos formatos se abren en celular y PC.</p>
+    <div class="grid grid-cols-2 gap-2">
+      <button id="exp_xls" class="btn btn-p text-sm py-3 flex items-center justify-center gap-1" style="background:#15803d;border-color:#15803d">📊 Excel (.xlsx)</button>
+      <button id="exp_pdf" class="btn btn-p text-sm py-3 flex items-center justify-center gap-1" style="background:#b91c1c;border-color:#b91c1c">📄 PDF (hoja oficio)</button>
+    </div>
+    <p class="text-[11px] text-slate-400 mt-3">El PDF usa hoja oficio horizontal para que quepan todas las columnas y se vea bien en cualquier dispositivo.</p>
+    <div class="mt-3"><button id="exp_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
+      $("#exp_xls").addEventListener("click", () => { closeModal(); descargarExcelEventos(); });
+      $("#exp_pdf").addEventListener("click", () => { closeModal(); descargarPDFEventos(); });
+      $("#exp_close").addEventListener("click", closeModal);
     }
 
     // --- PDF (ventana de impresión → Guardar como PDF), con colores de la tabla ---
