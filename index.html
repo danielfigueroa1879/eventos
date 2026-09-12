@@ -2333,9 +2333,53 @@
         <body><table>${meta}${header}${body}${bloqueSup}</table></body></html>`;
       return new File(["﻿" + html], `Listado-${ev.slug}.xls`, { type: "application/vnd.ms-excel;charset=utf-8;" });
     }
+    // Empaqueta un workbook de SheetJS como File .xlsx (para descargar o compartir en celular)
+    function xlsxToFile(wb, name) {
+      const out = window.XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      return new File([out], name, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    }
+    // --- Excel REAL (.xlsx) del listado de un evento: se abre sin errores en Excel, Sheets y celulares ---
+    function xlsxFileListado(ev, asist) {
+      if (!window.XLSX) return null;
+      const asistG = asist.filter(a => !a.es_supervisor);
+      const asistS = asist.filter(a => a.es_supervisor);
+      const cols = listadoColumnas(ev), rows = detalleRows(ev, asistG);
+      const colsSup = listadoColumnasSup(ev), rowsSup = detalleRows(ev, asistS);
+      const nCols = Math.max(cols.length, colsSup.length);
+      const gen = new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" });
+      const aoa = [
+        [tituloListado(ev)],
+        [`Empresa: ${ev.empresa}${ev.fecha_evento ? " · Fecha: " + fechaFmt(ev.fecha_evento) : ""} · ${eventoTipoTexto(ev)}`],
+        [`Total: ${asistG.length}${ev.cantidad_esperada ? " / " + ev.cantidad_esperada : ""} guardias${asistS.length ? " · " + asistS.length + " supervisor" + (asistS.length === 1 ? "" : "es") : ""} · Generado ${gen}`],
+        [],
+        cols,
+      ];
+      rows.forEach(r => aoa.push(r.cells.slice()));
+      const merges = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: nCols - 1 } },
+      ];
+      if (asistS.length) {
+        aoa.push([]);
+        aoa.push([`SUPERVISORES (${asistS.length})`]);
+        merges.push({ s: { r: aoa.length - 1, c: 0 }, e: { r: aoa.length - 1, c: nCols - 1 } });
+        aoa.push(colsSup.slice());
+        rowsSup.forEach(r => aoa.push(r.cells.slice()));
+      }
+      const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+      ws["!merges"] = merges;
+      ws["!cols"] = cols.map((c, i) => ({ wch: i === 0 ? 5 : (i === 2 ? 28 : 16) }));
+      const wb = window.XLSX.utils.book_new();
+      const hoja = String(ev.nombre_evento || "Listado").replace(/[:\\\/?*\[\]]/g, " ").trim().slice(0, 28) || "Listado";
+      window.XLSX.utils.book_append_sheet(wb, ws, hoja);
+      return xlsxToFile(wb, `Listado-${ev.slug}.xlsx`);
+    }
     function descargarExcel(ev, asist) {
       if (!asist.length) { toast("No hay guardias para exportar", false); return; }
-      descargarArchivo(xlsFile(ev, asist));
+      // Excel real (.xlsx); si la librería no cargó, respaldo al .xls con formato.
+      const f = xlsxFileListado(ev, asist);
+      descargarArchivo(f || xlsFile(ev, asist));
     }
 
     // --- Excel de TODOS los eventos (en el orden del panel) con los datos de la empresa ---
@@ -2712,7 +2756,7 @@
     // Comparte (o descarga como respaldo) el listado como PDF o Excel
     async function compartirComo(ev, asist, tipo) {
       if (!asist.length) { toast("No hay guardias para compartir", false); return; }
-      const file = tipo === "pdf" ? pdfFile(ev, asist) : xlsFile(ev, asist);
+      const file = tipo === "pdf" ? pdfFile(ev, asist) : (xlsxFileListado(ev, asist) || xlsFile(ev, asist));
       if (!file) { // jsPDF no disponible → respaldo
         if (tipo === "pdf") descargarPDF(ev, asist); else descargarExcel(ev, asist);
         return;
