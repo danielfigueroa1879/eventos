@@ -3278,7 +3278,7 @@
         detec_metales: saved.detec_metales || "29 de 25.",
         ambulancias: saved.ambulancias || "02",
 
-        empresa_nombre: saved.empresa_nombre || (ev.empresa ? `${ev.empresa} Sc Spa.` : "North Security Sc Spa."),
+        empresa_nombre: saved.empresa_nombre || (isPart ? (ev.empresa ? `${ev.empresa} Sc Spa.` : "North Security Sc Spa.") : (ev.empresa || "")),
         empresa_rut: saved.empresa_rut || "77.671.725-8",
         ddff_num: saved.ddff_num || "N°78",
         ddff_fecha: saved.ddff_fecha || "25.08.2026",
@@ -3326,8 +3326,8 @@ ${matchOrLocation}
 *📋 DATOS ADMINISTRATIVOS*
 ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
    de la ${state.resolucion_entidad}
-` : ``}* Categoría: ${state.categoria}
-* Aforo: ${state.aforo}
+* Categoría: ${state.categoria}
+` : ``}* Aforo: ${state.aforo}
 * Detec. Metales: ${state.detec_metales}
 * Ambulancias 🚑: ${state.ambulancias}
 
@@ -3408,7 +3408,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
               </div>
               <div><label class="font-medium text-slate-600">Entidad Emisora</label><input id="r_res_entidad" class="fld text-xs py-1" value="${esc(state.resolucion_entidad)}"/></div>` : ""}
               <div class="grid grid-cols-2 gap-2">
-                <div><label class="font-medium text-slate-600">Categoría</label><input id="r_cat" class="fld text-xs py-1" value="${esc(state.categoria)}"/></div>
+                ${isPart ? `<div><label class="font-medium text-slate-600">Categoría</label><input id="r_cat" class="fld text-xs py-1" value="${esc(state.categoria)}"/></div>` : ""}
                 <div><label class="font-medium text-slate-600">Aforo</label><input id="r_aforo" class="fld text-xs py-1" value="${esc(state.aforo)}"/></div>
               </div>
               <div class="grid grid-cols-2 gap-2">
@@ -3422,7 +3422,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
                 <div><label class="font-medium text-slate-600">RUT Empresa</label><input id="r_emp_rut" class="fld text-xs py-1" value="${esc(state.empresa_rut)}"/></div>
               </div>
               <div class="grid grid-cols-2 gap-2">
-                <div><label class="font-medium text-slate-600">DD.FF. N°</label><input id="r_ddff_num" class="fld text-xs py-1" value="${esc(state.ddff_num)}"/></div>
+                <div><label class="font-medium text-slate-600">DD.FF. N° <span class="font-normal text-slate-400">(Directiva de Funcionamiento)</span></label><input id="r_ddff_num" class="fld text-xs py-1" value="${esc(state.ddff_num)}"/></div>
                 <div><label class="font-medium text-slate-600">Fecha DD.FF.</label><input id="r_ddff_fecha" class="fld text-xs py-1" value="${esc(state.ddff_fecha)}"/></div>
               </div>
 
@@ -3471,7 +3471,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const _resNum = $("#r_res_num"); if (_resNum) state.resolucion_num = _resNum.value.trim();
         const _resFecha = $("#r_res_fecha"); if (_resFecha) state.resolucion_fecha = _resFecha.value.trim();
         const _resEnt = $("#r_res_entidad"); if (_resEnt) state.resolucion_entidad = _resEnt.value.trim();
-        state.categoria = $("#r_cat").value.trim();
+        const _cat = $("#r_cat"); if (_cat) state.categoria = _cat.value.trim();
         state.aforo = $("#r_aforo").value.trim();
         state.detec_metales = $("#r_metales").value.trim();
         state.ambulancias = $("#r_amb").value.trim();
@@ -3608,7 +3608,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
             }
 
             const catMatch = text.match(/Categoría\s*([A-Z])/i);
-            if (catMatch) $("#r_cat").value = "Cat. " + catMatch[1];
+            if (catMatch && $("#r_cat")) $("#r_cat").value = "Cat. " + catMatch[1];
 
             const aforoMatch = text.match(/aforo autorizado.*?es de\s*([0-9.]+)\s*personas/i);
             if (aforoMatch) $("#r_aforo").value = aforoMatch[1] + " personas";
