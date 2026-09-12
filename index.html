@@ -24,6 +24,8 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Fork con estilos (encabezados con color, bordes, etc.); define el mismo objeto XLSX. Si no carga, queda el SheetJS de arriba y el Excel funciona igual sin estilos. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx-js-style/1.2.0/xlsx.bundle.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -2299,6 +2301,34 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     }
 
+    // ---- Estilos para el Excel .xlsx (requieren xlsx-js-style; con SheetJS normal se ignoran sin error) ----
+    const XL_BORDE = { style: "thin", color: { rgb: "CBD5E1" } };
+    const XL_BORDER = { top: XL_BORDE, bottom: XL_BORDE, left: XL_BORDE, right: XL_BORDE };
+    const XL_ST = {
+      titulo: { font: { bold: true, sz: 14, color: { rgb: "0F5323" } }, alignment: { horizontal: "center", vertical: "center" } },
+      sub: { font: { sz: 10, color: { rgb: "5A5A5A" } }, alignment: { horizontal: "center", vertical: "center" } },
+      head: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } }, fill: { patternType: "solid", fgColor: { rgb: "0F5323" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: XL_BORDER },
+      headSup: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } }, fill: { patternType: "solid", fgColor: { rgb: "0369A1" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: XL_BORDER },
+      bandaSup: { font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } }, fill: { patternType: "solid", fgColor: { rgb: "0369A1" } }, alignment: { horizontal: "center", vertical: "center" }, border: XL_BORDER },
+      celda: { font: { sz: 10 }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: XL_BORDER },
+      celdaIzq: { font: { sz: 10 }, alignment: { horizontal: "left", vertical: "center", wrapText: true }, border: XL_BORDER },
+      link: { font: { sz: 10, color: { rgb: "1D4ED8" }, underline: true }, alignment: { horizontal: "left", vertical: "center" }, border: XL_BORDER },
+      total: { font: { bold: true, sz: 10 }, fill: { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, alignment: { horizontal: "center", vertical: "center" }, border: XL_BORDER },
+    };
+    // Devuelve un enlace tel: si el valor parece un teléfono (>= 8 dígitos), o null.
+    function telHref(v) {
+      const d = String(v || "").replace(/[^\d+]/g, "");
+      return d.replace(/\D/g, "").length >= 8 ? "tel:" + d : null;
+    }
+    // Aplica estilo (y opcionalmente hipervínculo) a una celda por fila/columna.
+    function xlSet(ws, r, c, style, link) {
+      const ref = window.XLSX.utils.encode_cell({ r, c });
+      const cell = ws[ref];
+      if (!cell) return;
+      if (style) cell.s = style;
+      if (link) { cell.l = { Target: link, Tooltip: "Abrir enlace" }; }
+    }
+
     // --- Excel real (.xls con formato: encabezado verde, texto centrado, columnas autoajustadas) ---
     function xlsFile(ev, asist) {
       const asistG = asist.filter(a => !a.es_supervisor);
@@ -2354,22 +2384,53 @@
         [],
         cols,
       ];
+      const rHead = aoa.length - 1;            // fila del encabezado de guardias
+      const rBody0 = aoa.length;               // primera fila de datos de guardias
       rows.forEach(r => aoa.push(r.cells.slice()));
       const merges = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } },
         { s: { r: 2, c: 0 }, e: { r: 2, c: nCols - 1 } },
       ];
+      let rBanda = -1, rHeadSup = -1, rBodySup0 = -1;
       if (asistS.length) {
         aoa.push([]);
-        aoa.push([`SUPERVISORES (${asistS.length})`]);
-        merges.push({ s: { r: aoa.length - 1, c: 0 }, e: { r: aoa.length - 1, c: nCols - 1 } });
-        aoa.push(colsSup.slice());
+        rBanda = aoa.length; aoa.push([`SUPERVISORES (${asistS.length})`]);
+        merges.push({ s: { r: rBanda, c: 0 }, e: { r: rBanda, c: nCols - 1 } });
+        rHeadSup = aoa.length; aoa.push(colsSup.slice());
+        rBodySup0 = aoa.length;
         rowsSup.forEach(r => aoa.push(r.cells.slice()));
       }
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
       ws["!merges"] = merges;
       ws["!cols"] = cols.map((c, i) => ({ wch: i === 0 ? 5 : (i === 2 ? 28 : 16) }));
+      // Estilos: títulos, encabezados con color, bordes, colores de vigencia y teléfonos con enlace tel:
+      const telIdx = 3;
+      const telLink = telHref;
+      xlSet(ws, 0, 0, XL_ST.titulo); xlSet(ws, 1, 0, XL_ST.sub); xlSet(ws, 2, 0, XL_ST.sub);
+      cols.forEach((c, j) => xlSet(ws, rHead, j, XL_ST.head));
+      rows.forEach((r, i) => {
+        const rr = rBody0 + i;
+        r.cells.forEach((v, j) => {
+          const base = j === 2 ? XL_ST.celdaIzq : XL_ST.celda;
+          if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0F5323").replace("#", "") } } });
+          else if (j === telIdx && telLink(v)) xlSet(ws, rr, j, XL_ST.link, telLink(v));
+          else xlSet(ws, rr, j, base);
+        });
+      });
+      if (asistS.length) {
+        xlSet(ws, rBanda, 0, XL_ST.bandaSup);
+        colsSup.forEach((c, j) => xlSet(ws, rHeadSup, j, XL_ST.headSup));
+        rowsSup.forEach((r, i) => {
+          const rr = rBodySup0 + i;
+          r.cells.forEach((v, j) => {
+            const base = j === 2 ? XL_ST.celdaIzq : XL_ST.celda;
+            if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0369A1").replace("#", "") } } });
+            else if (j === telIdx && telLink(v)) xlSet(ws, rr, j, XL_ST.link, telLink(v));
+            else xlSet(ws, rr, j, base);
+          });
+        });
+      }
       const wb = window.XLSX.utils.book_new();
       const hoja = String(ev.nombre_evento || "Listado").replace(/[:\\\/?*\[\]]/g, " ").trim().slice(0, 28) || "Listado";
       window.XLSX.utils.book_append_sheet(wb, ws, hoja);
@@ -2457,14 +2518,28 @@
           guardLink(ev.slug),
         ]);
       });
+      const rHead = 3, rBody0 = 4;
       aoa.push(["", "TOTALES", "", "", "", "", totalEsp, totalReg, totalSup, ""]);
+      const rTot = aoa.length - 1;
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
       ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 14 }, { wch: 48 }];
       const nc = cols.length - 1;
       ws["!merges"] = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: nc } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: nc } },
+        { s: { r: rTot, c: 0 }, e: { r: rTot, c: 5 } },
       ];
+      // Estilos + hipervínculo activo en la columna "Link de registro"
+      xlSet(ws, 0, 0, XL_ST.titulo); xlSet(ws, 1, 0, XL_ST.sub);
+      cols.forEach((c, j) => xlSet(ws, rHead, j, XL_ST.head));
+      eventos.forEach((ev, i) => {
+        const rr = rBody0 + i;
+        for (let j = 0; j <= nc; j++) {
+          if (j === nc) xlSet(ws, rr, j, XL_ST.link, guardLink(ev.slug));
+          else xlSet(ws, rr, j, (j === 1 || j === 2) ? XL_ST.celdaIzq : XL_ST.celda);
+        }
+      });
+      for (let j = 0; j <= nc; j++) xlSet(ws, rTot, j, XL_ST.total);
       const wb = window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb, ws, "Eventos");
       const fecha = new Date().toISOString().slice(0, 10);
@@ -2553,6 +2628,17 @@
           if (d.section === "body" && d.row.index === lastIdx) {
             d.cell.styles.fontStyle = "bold";
             d.cell.styles.fillColor = [226, 232, 240];
+          }
+          // Columna de link en azul (salvo la fila de totales)
+          if (d.section === "body" && d.column.index === 9 && d.row.index !== lastIdx) {
+            d.cell.styles.textColor = [29, 78, 216];
+          }
+        },
+        didDrawCell: (d) => {
+          // Hace clickeable toda la celda del link → abre el registro del evento
+          if (d.section === "body" && d.column.index === 9 && d.row.index < eventos.length) {
+            const url = guardLink(eventos[d.row.index].slug);
+            if (url) doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url });
           }
         },
         didDrawPage: () => {
@@ -2674,6 +2760,14 @@
           if (d.section === "body") {
             const r = rows[d.row.index];
             if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; }
+            if (r && d.column.index === 3 && telHref(r.cells[3])) d.cell.styles.textColor = [29, 78, 216];
+          }
+        },
+        didDrawCell: (d) => {
+          if (d.section === "body") {
+            const r = rows[d.row.index];
+            const href = r && d.column.index === 3 && telHref(r.cells[3]);
+            if (href) doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url: href });
           }
         },
         didDrawPage: () => {
@@ -2702,6 +2796,14 @@
             if (d.section === "body") {
               const r = rowsSup[d.row.index];
               if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; }
+              if (r && d.column.index === 3 && telHref(r.cells[3])) d.cell.styles.textColor = [29, 78, 216];
+            }
+          },
+          didDrawCell: (d) => {
+            if (d.section === "body") {
+              const r = rowsSup[d.row.index];
+              const href = r && d.column.index === 3 && telHref(r.cells[3]);
+              if (href) doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url: href });
             }
           }
         });
