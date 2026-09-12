@@ -1725,6 +1725,7 @@
       </div>
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
+        <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel, con los datos de la empresa">⬇ Excel de eventos</button>
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
@@ -1868,6 +1869,7 @@
       });
       const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
+      const bEvXls = $("#expEventosXls"); if (bEvXls) bEvXls.addEventListener("click", descargarExcelEventos);
       const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asist));
       // Candado ABIERTO/CERRADO: alterna si los guardias pueden corregir sus datos al registrarse.
       const toggleLock = async (btn) => {
@@ -2333,6 +2335,69 @@
     function descargarExcel(ev, asist) {
       if (!asist.length) { toast("No hay guardias para exportar", false); return; }
       descargarArchivo(xlsFile(ev, asist));
+    }
+
+    // --- Excel de TODOS los eventos (en el orden del panel) con los datos de la empresa ---
+    function xlsFileEventos(eventos, conteos) {
+      const cols = ["N°", "Evento", "Empresa", "Tipo", "Fecha", "Estado", "Esperados", "Registrados", "Supervisores", "Link de registro"];
+      const thS = `background:${VERDE_PAGINA};color:#ffffff;font-weight:bold;text-align:center;border:1px solid #0a3d18;padding:6px 10px;white-space:nowrap;`;
+      const tdS = `border:1px solid #cbd5e1;padding:5px 10px;mso-number-format:'\\@';`;
+      const tdC = tdS + "text-align:center;";
+      const header = `<tr>${cols.map(c => `<th style="${thS}">${esc(c)}</th>`).join("")}</tr>`;
+      const body = eventos.map((ev, i) => {
+        const c = conteos[ev.id] || { guardias: 0, supervisores: 0 };
+        const cells = [
+          i + 1,
+          ev.nombre_evento || "",
+          ev.empresa || "",
+          eventoTipoTexto(ev),
+          ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
+          ev.activo === false ? "Inactivo" : "Activo",
+          ev.cantidad_esperada || 0,
+          c.guardias,
+          c.supervisores,
+          guardLink(ev.slug),
+        ];
+        return `<tr>${cells.map((v, j) => `<td style="${j === 1 || j === 2 || j === 9 ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
+      }).join("");
+      const nCols = cols.length;
+      const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
+      const totalReg = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).guardias || 0), 0);
+      const totalSup = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).supervisores || 0), 0);
+      const meta = `
+        <tr><td colspan="${nCols}" style="font-weight:bold;font-size:14px;text-align:center;padding:6px;">Listado de eventos</td></tr>
+        <tr><td colspan="${nCols}" style="text-align:center;padding:2px;">${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</td></tr>
+        <tr><td colspan="${nCols}" style="padding:2px;"></td></tr>`;
+      const totalRow = `<tr>
+        <td style="${tdC}font-weight:bold;" colspan="6">TOTALES</td>
+        <td style="${tdC}font-weight:bold;">${totalEsp}</td>
+        <td style="${tdC}font-weight:bold;">${totalReg}</td>
+        <td style="${tdC}font-weight:bold;">${totalSup}</td>
+        <td style="${tdS}"></td>
+      </tr>`;
+      const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
+        <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Eventos</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+        <style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}</style></head>
+        <body><table>${meta}${header}${body}${totalRow}</table></body></html>`;
+      const fecha = new Date().toISOString().slice(0, 10);
+      return new File(["﻿" + html], `Eventos-${fecha}.xls`, { type: "application/vnd.ms-excel;charset=utf-8;" });
+    }
+
+    async function descargarExcelEventos() {
+      const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
+      if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
+      toast("Preparando el Excel de eventos…");
+      const conteos = {};
+      await Promise.all(eventos.map(async ev => {
+        try {
+          const as = await Data.listAsistencias(ev.id);
+          conteos[ev.id] = {
+            guardias: as.filter(a => !a.es_supervisor).length,
+            supervisores: as.filter(a => a.es_supervisor).length,
+          };
+        } catch (_) { conteos[ev.id] = { guardias: 0, supervisores: 0 }; }
+      }));
+      descargarArchivo(xlsFileEventos(eventos, conteos));
     }
 
     // --- PDF (ventana de impresión → Guardar como PDF), con colores de la tabla ---
