@@ -3324,9 +3324,9 @@ ${header}
 ${matchOrLocation}
 
 *📋 DATOS ADMINISTRATIVOS*
-* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
+${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
    de la ${state.resolucion_entidad}
-* Categoría: ${state.categoria}
+` : ``}* Categoría: ${state.categoria}
 * Aforo: ${state.aforo}
 * Detec. Metales: ${state.detec_metales}
 * Ambulancias 🚑: ${state.ambulancias}
@@ -3401,12 +3401,12 @@ ${matchOrLocation}
               <div><label class="font-medium text-slate-600">${isPart ? "Partido / Equipos" : "Nombre del Evento"}</label><input id="r_partido" class="fld text-xs py-1" value="${esc(state.partido_o_nombre)}"/></div>
               <div><label class="font-medium text-slate-600">Lugar / Estadio</label><input id="r_lugar" class="fld text-xs py-1" value="${esc(state.lugar)}"/></div>
 
-              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">📋 Datos Administrativos (Resolución siempre editable)</div>
-              <div class="grid grid-cols-2 gap-2">
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">📋 Datos Administrativos${isPart ? " (Resolución siempre editable)" : " <span class='font-normal text-slate-400'>(sin resolución: este evento no es partido)</span>"}</div>
+              ${isPart ? `<div class="grid grid-cols-2 gap-2">
                 <div><label class="font-medium text-slate-600">Resolución N°</label><input id="r_res_num" class="fld text-xs py-1" value="${esc(state.resolucion_num)}"/></div>
                 <div><label class="font-medium text-slate-600">Fecha Res.</label><input id="r_res_fecha" class="fld text-xs py-1" value="${esc(state.resolucion_fecha)}"/></div>
               </div>
-              <div><label class="font-medium text-slate-600">Entidad Emisora</label><input id="r_res_entidad" class="fld text-xs py-1" value="${esc(state.resolucion_entidad)}"/></div>
+              <div><label class="font-medium text-slate-600">Entidad Emisora</label><input id="r_res_entidad" class="fld text-xs py-1" value="${esc(state.resolucion_entidad)}"/></div>` : ""}
               <div class="grid grid-cols-2 gap-2">
                 <div><label class="font-medium text-slate-600">Categoría</label><input id="r_cat" class="fld text-xs py-1" value="${esc(state.categoria)}"/></div>
                 <div><label class="font-medium text-slate-600">Aforo</label><input id="r_aforo" class="fld text-xs py-1" value="${esc(state.aforo)}"/></div>
@@ -3468,9 +3468,9 @@ ${matchOrLocation}
         state.partido_o_nombre = $("#r_partido").value.trim();
         state.lugar = $("#r_lugar").value.trim();
 
-        state.resolucion_num = $("#r_res_num").value.trim();
-        state.resolucion_fecha = $("#r_res_fecha").value.trim();
-        state.resolucion_entidad = $("#r_res_entidad").value.trim();
+        const _resNum = $("#r_res_num"); if (_resNum) state.resolucion_num = _resNum.value.trim();
+        const _resFecha = $("#r_res_fecha"); if (_resFecha) state.resolucion_fecha = _resFecha.value.trim();
+        const _resEnt = $("#r_res_entidad"); if (_resEnt) state.resolucion_entidad = _resEnt.value.trim();
         state.categoria = $("#r_cat").value.trim();
         state.aforo = $("#r_aforo").value.trim();
         state.detec_metales = $("#r_metales").value.trim();
@@ -3561,10 +3561,10 @@ ${matchOrLocation}
 
             // --- EXTRACCIÓN CON REGEX ---
             const resMatch = text.match(/RESOLUCIÓN EXENTA N°\s*(\d+)/i);
-            if (resMatch) $("#r_res_num").value = resMatch[1].trim();
+            if (resMatch && $("#r_res_num")) $("#r_res_num").value = resMatch[1].trim();
 
             const fechaResMatch = text.match(/LA SERENA,?\s*(\d{1,2} de [a-zA-Z]+ de \d{4})/i) || text.match(/(\d{1,2} de [a-zA-Z]+ de \d{4})/i);
-            if (fechaResMatch) $("#r_res_fecha").value = toShortDate(fechaResMatch[1].trim());
+            if (fechaResMatch && $("#r_res_fecha")) $("#r_res_fecha").value = toShortDate(fechaResMatch[1].trim());
 
             // Detalles del evento (equipos, fecha, hora, lugar)
             const eventoDetailsMatch = text.match(/equipos\s+([A-Za-zñÑáéíóúÁÉÍÓÚ\s]+?)\s*,\s*el d[ií]a\s+([a-zA-Z]+\s+\d{1,2}\s+de\s+[a-zA-Z]+\s+de\s+\d{4})\s+a las\s+(\d{1,2}[:.]\d{2})\s+horas.*?(?:en el\s+)?(Estadio\s+[A-Za-z\s]+)(?:.|\,)/i);
