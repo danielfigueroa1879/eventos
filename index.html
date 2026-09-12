@@ -2462,7 +2462,7 @@
           ev.cantidad_esperada || 0,
           c.guardias,
           c.supervisores,
-          guardLink(ev.slug),
+          guardLinkVigente(ev),
         ];
         return `<tr>${cells.map((v, j) => `<td style="${j === 1 || j === 2 || j === 9 ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
       }).join("");
@@ -2515,7 +2515,7 @@
           ev.cantidad_esperada || 0,
           c.guardias,
           c.supervisores,
-          guardLink(ev.slug),
+          guardLinkVigente(ev),
         ]);
       });
       const rHead = 3, rBody0 = 4;
@@ -2535,7 +2535,7 @@
       eventos.forEach((ev, i) => {
         const rr = rBody0 + i;
         for (let j = 0; j <= nc; j++) {
-          if (j === nc) xlSet(ws, rr, j, XL_ST.link, guardLink(ev.slug));
+          if (j === nc) xlSet(ws, rr, j, XL_ST.link, guardLinkVigente(ev));
           else xlSet(ws, rr, j, (j === 1 || j === 2) ? XL_ST.celdaIzq : XL_ST.celda);
         }
       });
@@ -2598,7 +2598,7 @@
           String(ev.cantidad_esperada || 0),
           String(c.guardias),
           String(c.supervisores),
-          guardLink(ev.slug),
+          guardLinkVigente(ev),
         ];
       });
       body.push(["", "TOTALES", "", "", "", "", String(totalEsp), String(totalReg), String(totalSup), ""]);
@@ -2637,7 +2637,7 @@
         didDrawCell: (d) => {
           // Hace clickeable toda la celda del link → abre el registro del evento
           if (d.section === "body" && d.column.index === 9 && d.row.index < eventos.length) {
-            const url = guardLink(eventos[d.row.index].slug);
+            const url = guardLinkVigente(eventos[d.row.index]);
             if (url) doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url });
           }
         },
