@@ -4375,19 +4375,23 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         document.body.appendChild(ov);
         const colocar = () => {
           const mb = $("#modalBox");
-          if (window.innerWidth >= 640) {
-            // PC: barra inferior ANCHA (a casi todo el ancho), sin tocar la ficha de arriba.
+          if (window.innerWidth >= 640 && mb) {
+            // PC: panel ancho pero no a pantalla completa, anclado justo donde termina Editar guardia.
+            const r = mb.getBoundingClientRect();
+            const w = Math.min(window.innerWidth - 24, 1100);
+            const left = Math.round((window.innerWidth - w) / 2);
+            const top = Math.min(r.bottom + 8, window.innerHeight - 140);
             ov.className = "fixed inset-0 z-[70]";
             ov.style.pointerEvents = "none";
             box.className = "card p-4 sm:p-5 overflow-auto shadow-2xl";
             box.style.pointerEvents = "auto";
             box.style.position = "fixed";
-            box.style.left = "12px";
-            box.style.right = "12px";
-            box.style.width = "auto";
-            box.style.bottom = "12px";
-            box.style.top = "auto";
-            box.style.maxHeight = "62vh";
+            box.style.left = left + "px";
+            box.style.right = "auto";
+            box.style.width = w + "px";
+            box.style.top = top + "px";
+            box.style.bottom = "auto";
+            box.style.maxHeight = (window.innerHeight - top - 12) + "px";
           } else {
             ov.className = "fixed inset-0 bg-black/40 z-[70] flex items-start justify-center p-4 overflow-auto";
             ov.style.pointerEvents = "";
