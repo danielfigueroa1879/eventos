@@ -201,23 +201,14 @@
       outline-offset: -2px
     }
 
-    /* Mujeres: fondo rosado claro (PC un poco más visible, celular más tenue) y marca roja al pasar el mouse / tocar */
+    /* Mujeres: fondo rosado claro (PC un poco más visible, celular más tenue) */
     .row-mujer {
       background: #fdeef6
-    }
-
-    .row-mujer:hover {
-      background: #f4b8d2
     }
 
     @media (max-width: 767px) {
       .row-mujer {
         background: #fef7fb
-      }
-
-      .row-mujer:hover,
-      .row-mujer:active {
-        background: #f4b8d2
       }
     }
 
@@ -2296,7 +2287,7 @@
       <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
     </div>
     <div class="text-center mb-3">
-      <div class="font-bold text-lg ${tieneFicha(g) ? 'text-red-700' : (sexoGuardia(g) === 'M' ? 'text-rose-800' : 'text-slate-800')} leading-tight">${esc(nomFull)}</div>
+      <div class="font-bold text-lg ${tieneFicha(g) ? 'text-red-700' : 'text-slate-800'} leading-tight">${esc(nomFull)}</div>
       <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
@@ -3375,7 +3366,7 @@
         return state.asist.filter(a => a.puesto_id === pid).map(a => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
-          return nom || a.rut;
+          return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M" };
         });
       }
       function iconFor(p) {
@@ -3409,7 +3400,7 @@
         }
         const nombres = guardiasDePuesto(p.id);
         const listaHTML = nombres.length
-          ? nombres.map((n, i) => `<div style="padding:1px 0">${i + 1}. ${esc(n)}</div>`).join("")
+          ? nombres.map((n, i) => `<div style="padding:1px 0${n.mujer ? ";color:#b91c1c;font-weight:700" : ""}">${i + 1}. ${esc(n.nombre)}</div>`).join("")
           : `<div style="color:#94a3b8;padding:2px 0">Sin guardias asignados</div>`;
         return `<div style="font:600 11px system-ui,sans-serif;color:#111;max-width:220px"><div style="font-weight:800;color:${colorAnillo(p.anillo)};margin-bottom:3px">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div><div style="font-weight:500;color:#334155">${listaHTML}</div></div>`;
       }
@@ -3545,7 +3536,7 @@
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
-        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; return `<div class="text-sm text-slate-700 py-1 border-b border-slate-50"><span class="text-slate-400 mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-rose-800 font-semibold" : "text-slate-700"}"><span class="${mujer ? "text-rose-400" : "text-slate-400"} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = readonly ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
             <button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
