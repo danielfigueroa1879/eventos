@@ -1583,13 +1583,13 @@
         sigActual.set(sig, { tipo: g.revision_tipo, nombre });
       });
 
-      // Infractores fichados que están presentes (registrados) en el evento — por RUT.
-      const infractoresAct = new Map(); // rut -> { nombre, etiqueta, motivo, fecha }
+      // Guardias con observaciones (infractor/detenido) presentes en el evento — por RUT.
+      const infractoresAct = new Map(); // rut -> { nombre, registros }
       (asist || []).forEach(a => {
         const g = a.guardia;
-        if (g && g.infractor) {
+        if (g && tieneFicha(g)) {
           const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
-          infractoresAct.set(a.rut, { nombre, etiqueta: fichaFrase(g), detenido: fichaEsDetenido(g), fecha: g.infractor_fecha ? fechaFmt(g.infractor_fecha) : "" });
+          infractoresAct.set(a.rut, { nombre, registros: getInfracciones(g) });
         }
       });
 
@@ -1629,14 +1629,16 @@
       try { if (typeof sonarIngreso === "function") sonarIngreso(); } catch (_) {}
       const lista = items.map(it => `<div class="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-left">
           <div class="font-bold text-red-800">${esc(it.nombre)}</div>
-          <div class="text-red-700 text-xs font-bold mt-0.5">${it.detenido ? "🚔" : "🚩"} ${esc(it.etiqueta)}</div>
-          ${it.fecha ? `<div class="text-red-500 text-[11px] mt-0.5">📅 ${esc(it.fecha)}</div>` : ""}
+          ${(it.registros || []).map(r => `<div class="mt-0.5">
+            <div class="text-red-700 text-xs font-bold">${recEsDetenido(r) ? "🚔" : "🚩"} ${esc(recFrase(r))}</div>
+            ${recDetalle(r) ? `<div class="text-red-500 text-[11px]">${esc(recDetalle(r))}</div>` : ""}
+          </div>`).join("")}
         </div>`).join("");
       const titulo = items.length === 1 ? "⚠ Alerta de ingreso" : `⚠ Alerta de ingreso (${items.length})`;
       // Si ya hay una ventana abierta, no la interrumpimos: mostramos un aviso rojo persistente.
       const modalAbierto = (() => { const m = $("#modal"); return m && getComputedStyle(m).display !== "none"; })();
       if (modalAbierto) {
-        toast(`⚠ ${items.map(i => i.nombre + " — " + i.etiqueta).join("   ·   ")}`, false, 9000);
+        toast(`⚠ ${items.map(i => i.nombre + " — " + (i.registros[i.registros.length - 1] ? recFrase(i.registros[i.registros.length - 1]) : "")).join("   ·   ")}`, false, 9000);
         return;
       }
       openModal(`<div class="text-center">
@@ -2060,31 +2062,32 @@
     }
     // Leyes disponibles para fichar a un guardia como infractor (además de "Detenido").
     const LEYES_INFRACCION = ["Ley 20.000", "Ley 19.327", "Ley 18.314", "Ley 19.913", "Ley 12.927"];
-    function fichaEsDetenido(g) { return !!(g && g.infractor && /detenid/i.test(g.infractor_tipo || "")); }
-    // Texto corto del badge: "🚔 DETENIDO" o "🚩 INFRACTOR LEY 20.000".
-    function fichaLabel(g) {
-      if (!g || !g.infractor) return "";
-      const t = (g.infractor_tipo || "").trim();
-      if (fichaEsDetenido(g)) return "🚔 DETENIDO";
-      return "🚩 INFRACTOR" + (t ? ` ${t.toUpperCase()}` : "");
+    // Lista normalizada de infracciones/detenciones de un guardia (soporta el formato antiguo de campos sueltos).
+    function getInfracciones(g) {
+      if (!g) return [];
+      let arr = g.infracciones;
+      if (typeof arr === "string") { try { arr = JSON.parse(arr); } catch (_) { arr = null; } }
+      if (Array.isArray(arr) && arr.length) return arr;
+      if (g.infractor && (g.infractor_tipo || g.infractor_motivo || g.infractor_fecha || g.infractor_lugar))
+        return [{ tipo: g.infractor_tipo || "", motivo: g.infractor_motivo || "", fecha: g.infractor_fecha || "", lugar: g.infractor_lugar || "" }];
+      return [];
     }
-    // Frase descriptiva: "Infractor Ley 20.000" o "Detenido por <motivo>".
-    function fichaFrase(g) {
-      if (!g || !g.infractor) return "";
-      const t = (g.infractor_tipo || "").trim();
-      if (fichaEsDetenido(g)) return "Detenido" + (g.infractor_motivo ? ` por ${g.infractor_motivo}` : "");
-      return "Infractor" + (t ? ` ${t}` : "");
-    }
-    // Colores del badge según sea Detenido (rojo sólido) o Infractor (rojo claro).
-    function fichaColor(g) { return fichaEsDetenido(g) ? { bg: "#dc2626", fg: "#ffffff" } : { bg: "#fee2e2", fg: "#b91c1c" }; }
-    function fichaTitle(g) {
-      if (!g || !g.infractor) return "";
-      const p = [];
-      if (g.infractor_tipo) p.push(g.infractor_tipo);
-      if (g.infractor_motivo) p.push(g.infractor_motivo);
-      if (g.infractor_fecha) p.push("Fecha: " + fechaFmt(g.infractor_fecha));
-      return p.join(" · ");
-    }
+    function tieneFicha(g) { return getInfracciones(g).length > 0; }
+    // Helpers a nivel de UN registro
+    function recEsDetenido(r) { return !!(r && /detenid/i.test(r.tipo || "")); }
+    function recFrase(r) { if (!r) return ""; const t = (r.tipo || "").trim(); return recEsDetenido(r) ? ("Detenido" + (r.motivo ? ` por ${r.motivo}` : "")) : ("Infractor" + (t ? ` ${t}` : "")); }
+    function recLabel(r) { if (!r) return ""; if (recEsDetenido(r)) return "🚔 DETENIDO"; const t = (r.tipo || "").trim(); return "🚩 INFRACTOR" + (t ? ` ${t.toUpperCase()}` : ""); }
+    function recDetalle(r) { const p = []; if (r && r.lugar) p.push("📍 " + r.lugar); if (r && r.fecha) p.push("📅 " + fechaFmt(r.fecha)); return p.join(" · "); }
+    // Registro más reciente (el último agregado) = principal para el badge.
+    function fichaPrincipal(g) { const a = getInfracciones(g); return a[a.length - 1] || null; }
+    function fichaTieneDetenido(g) { return getInfracciones(g).some(recEsDetenido); }
+    // Texto corto del badge, con "+N" si hay más de una.
+    function fichaLabel(g) { const a = getInfracciones(g); if (!a.length) return ""; return recLabel(a[a.length - 1]) + (a.length > 1 ? ` +${a.length - 1}` : ""); }
+    // Frase descriptiva del registro principal.
+    function fichaFrase(g) { const a = getInfracciones(g); if (!a.length) return ""; return recFrase(a[a.length - 1]) + (a.length > 1 ? ` (+${a.length - 1} más)` : ""); }
+    // Rojo sólido si hay alguna detención; rojo claro si solo infracciones.
+    function fichaColor(g) { return fichaTieneDetenido(g) ? { bg: "#dc2626", fg: "#ffffff" } : { bg: "#fee2e2", fg: "#b91c1c" }; }
+    function fichaTitle(g) { return getInfracciones(g).map(r => { const d = recDetalle(r); return recFrase(r) + (d ? ` (${d})` : ""); }).join(" | "); }
     function fila(a, i, ev, rutCount, nomCount, usaT) {
       const g = a.guardia || {};
       const v = calcularVigencia(g.fecha_ultimo_examen);
@@ -2096,11 +2099,12 @@
       const sup = a.es_supervisor ? ` <span class="badge" style="background:#e0f2fe;color:#075985;margin-left:4px" title="Supervisor">🤵 SUPERVISOR</span>` : '';
       const spd = g.spd ? ` <span class="badge" style="background:#ede9fe;color:#6d28d9;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>` : '';
       const infC = fichaColor(g);
-      const inf = g.infractor ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
-      return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50"${g.infractor ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
+      const tieneInf = tieneFicha(g);
+      const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
+      return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50"${tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
     <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium ${g.infractor ? 'text-red-700' : 'text-slate-800'}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
+    <td data-label="Nombre" class="pr-2 font-medium ${tieneInf ? 'text-red-700' : 'text-slate-800'}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2140,13 +2144,14 @@
       const sup = a.es_supervisor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 ml-1 whitespace-nowrap">🤵 SUPERVISOR</span>` : '';
       const spd = g.spd ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-800 ml-1 whitespace-nowrap" title="Autorizado por SPD">SPD</span>` : '';
       const infC = fichaColor(g);
-      const inf = g.infractor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
+      const tieneInf = tieneFicha(g);
+      const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
-      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50"${g.infractor ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
+      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50"${tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
       <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-sm truncate flex items-center ${g.infractor ? 'text-red-700' : 'text-slate-900'}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
+        <span class="block font-semibold text-sm truncate flex items-center ${tieneInf ? 'text-red-700' : 'text-slate-900'}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
         <span class="block text-[11px] text-slate-600 truncate">${segunda}</span>
       </span>
       ${vigenciaPill(v)}
@@ -2221,10 +2226,12 @@
       <div class="font-bold text-lg ${g.infractor ? 'text-red-700' : 'text-slate-800'} leading-tight">${esc(nomFull)}</div>
       <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
-    ${g.infractor ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3 text-center">
-      <div class="text-red-700 font-extrabold text-sm">${fichaEsDetenido(g) ? "🚔" : "🚩"} ${esc(fichaFrase(g))}</div>
-      ${(!fichaEsDetenido(g) && g.infractor_motivo) ? `<div class="text-red-600 text-xs mt-0.5">${esc(g.infractor_motivo)}</div>` : ""}
-      ${g.infractor_fecha ? `<div class="text-red-500 text-[11px] mt-0.5">📅 ${esc(fechaFmt(g.infractor_fecha))}</div>` : ""}
+    ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
+      <div class="text-center text-red-700 font-extrabold text-xs mb-1">⚠ ${getInfracciones(g).length === 1 ? "OBSERVACIÓN" : getInfracciones(g).length + " OBSERVACIONES"}</div>
+      ${getInfracciones(g).map(r => `<div class="text-center py-1 border-t border-red-200 first:border-0">
+        <div class="text-red-700 font-bold text-sm">${recEsDetenido(r) ? "🚔" : "🚩"} ${esc(recFrase(r))}</div>
+        ${recDetalle(r) ? `<div class="text-red-500 text-[11px] mt-0.5">${esc(recDetalle(r))}</div>` : ""}
+      </div>`).join("")}
     </div>` : ""}
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
@@ -4169,22 +4176,12 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <span>Autorizado por <b>SPD</b> <span class="text-slate-400 font-normal">(Subsecretaría de Prevención del Delito — presenta resolución)</span></span>
       </label>
       <div class="rounded-xl border border-red-300 bg-red-50 px-3 py-2">
-        <label for="e_infractor_tipo" class="text-sm font-semibold text-red-700">🚩 Situación (infractor / detenido)</label>
-        <select id="e_infractor_tipo" class="fld mt-1">
-          <option value="">Sin observación (normal)</option>
-          ${LEYES_INFRACCION.map(l => `<option value="${esc(l)}" ${g.infractor && (g.infractor_tipo || "") === l ? "selected" : ""}>Infractor — ${esc(l)}</option>`).join("")}
-          <option value="Detenido" ${fichaEsDetenido(g) ? "selected" : ""}>Detenido</option>
-        </select>
-        <div id="e_infractor_det" class="mt-2 space-y-2" ${g.infractor ? "" : "hidden"}>
-          <div>
-            <label class="text-xs font-semibold text-slate-600">Motivo / detalle <span class="text-slate-400 font-normal">(opcional)</span></label>
-            <input id="e_infractor_motivo" class="fld" placeholder="Ej: sorprendido fumando marihuana" value="${esc(g.infractor_motivo || "")}"/>
-          </div>
-          <div id="e_infractor_fecha_box" ${fichaEsDetenido(g) ? "" : "hidden"}>
-            <label class="text-xs font-semibold text-slate-600">Fecha (detención / hecho)</label>
-            <input id="e_infractor_fecha" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld" value="${esc(g.infractor_fecha || "")}"/>
-          </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-semibold text-red-700">🚩 Infracciones / Detenciones</span>
+          <button type="button" id="e_inf_add" class="text-xs font-bold text-red-700 border border-red-300 rounded-lg px-2 py-1 bg-white">➕ Agregar</button>
         </div>
+        <div id="e_inf_list" class="mt-2 space-y-2"></div>
+        <p class="text-[11px] text-slate-400 mt-1">Puedes registrar varias. Deja la lista vacía si no tiene observaciones.</p>
       </div>
     </div>
     <div class="flex gap-2 mt-4">
@@ -4198,24 +4195,45 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const lbl = $("#e_fec_lbl");
         if (lbl) lbl.textContent = e.target.checked ? "Fecha de autorización de la resolución" : "Fecha último examen";
       });
-      // Muestra/oculta el detalle y la fecha según la situación elegida.
-      $("#e_infractor_tipo").addEventListener("change", e => {
-        const t = e.target.value;
-        const det = $("#e_infractor_det"), fbox = $("#e_infractor_fecha_box");
-        if (det) det.hidden = !t;
-        if (fbox) fbox.hidden = !/detenid/i.test(t);
-      });
+      // ---- Lista dinámica de infracciones / detenciones ----
+      const hoyISO = new Date().toISOString().slice(0, 10);
+      function infRowHTML(rec) {
+        rec = rec || {};
+        const opts = ['<option value="">— Tipo —</option>']
+          .concat(LEYES_INFRACCION.map(l => `<option value="${esc(l)}" ${rec.tipo === l ? "selected" : ""}>Infractor — ${esc(l)}</option>`))
+          .concat([`<option value="Detenido" ${/detenid/i.test(rec.tipo || "") ? "selected" : ""}>Detenido</option>`]).join("");
+        return `<div class="inf-row rounded-lg border border-red-200 bg-white p-2 space-y-1.5">
+          <div class="flex gap-2 items-center">
+            <select class="fld inf-tipo flex-1">${opts}</select>
+            <button type="button" class="inf-del text-red-600 text-lg px-1 flex-shrink-0" title="Quitar">🗑</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="text-[11px] font-semibold text-slate-500">Fecha</label><input type="date" max="${hoyISO}" class="fld inf-fecha" value="${esc(rec.fecha || "")}"/></div>
+            <div><label class="text-[11px] font-semibold text-slate-500">Lugar</label><input class="fld inf-lugar" placeholder="Lugar del hecho" value="${esc(rec.lugar || "")}"/></div>
+          </div>
+          <div><label class="text-[11px] font-semibold text-slate-500">Motivo / detalle</label><input class="fld inf-motivo" placeholder="Ej: sorprendido fumando marihuana" value="${esc(rec.motivo || "")}"/></div>
+        </div>`;
+      }
+      const infList = $("#e_inf_list");
+      getInfracciones(g).forEach(r => infList.insertAdjacentHTML("beforeend", infRowHTML(r)));
+      $("#e_inf_add").addEventListener("click", () => infList.insertAdjacentHTML("beforeend", infRowHTML()));
+      infList.addEventListener("click", e => { const b = e.target.closest(".inf-del"); if (b) b.closest(".inf-row").remove(); });
+
       $("#e_cancel").addEventListener("click", closeModal);
       $("#e_save").addEventListener("click", async () => {
         const fx = $("#e_fec").value;
         if (fx) { const d = parseFecha(fx); if (d && startOfDay(d).getTime() > startOfDay(new Date()).getTime()) { toast("La fecha del examen no puede ser futura", false); return; } }
         const nuevoSup = !!$("#e_super").checked;
-        const tipo = $("#e_infractor_tipo").value;
-        const esInfractor = !!tipo;
-        const motivo = esInfractor ? ($("#e_infractor_motivo").value.trim() || null) : null;
-        const infFecha = (esInfractor && /detenid/i.test(tipo)) ? ($("#e_infractor_fecha").value || null) : null;
+        const infracciones = Array.from(infList.querySelectorAll(".inf-row")).map(row => ({
+          tipo: row.querySelector(".inf-tipo").value,
+          fecha: row.querySelector(".inf-fecha").value || null,
+          lugar: row.querySelector(".inf-lugar").value.trim(),
+          motivo: row.querySelector(".inf-motivo").value.trim(),
+        })).filter(r => r.tipo); // descarta filas sin tipo elegido
+        const esInfractor = infracciones.length > 0;
+        const prim = infracciones[infracciones.length - 1] || {};
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infractor_tipo: esInfractor ? tipo : null, infractor_motivo: motivo, infractor_fecha: infFecha, aprobado: true, revision_tipo: null });
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
           if (nuevoSup !== esSup && a.id) await Data.setAsistenciaSupervisor(a.id, nuevoSup);
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
