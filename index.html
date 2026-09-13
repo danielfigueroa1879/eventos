@@ -4373,17 +4373,17 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
             <td class="px-2 py-1 whitespace-nowrap">${esc(r.fecha ? fechaFmt(r.fecha) : "—")}</td>
           </tr>`).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-4">Este guardia no tiene infracciones ni detenciones registradas.</td></tr>`;
         const contenido = `
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <h2 class="font-bold text-base text-red-700">📋 Registros de ${esc(nom)} <span class="text-slate-400 font-normal">(${regs.length})</span></h2>
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <h2 class="font-bold text-sm text-red-700">📋 Registros de ${esc(nom)} <span class="text-slate-400 font-normal">(${regs.length})</span></h2>
             <button id="rg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
           </div>
           <div class="overflow-x-auto rounded-lg border border-slate-200">
-            <table class="w-full text-sm" style="min-width:560px">
+            <table class="w-full text-xs" style="min-width:540px">
               <thead><tr class="text-white" style="background:#0f5323">${th("N°")}${th("Situación")}${th("Ley / Tipo")}${th("Motivo / detalle")}${th("Lugar")}${th("Fecha")}</tr></thead>
               <tbody>${cuerpo}</tbody>
             </table>
           </div>
-          <button id="rg_close" class="btn btn-ghost w-full mt-3">Cerrar</button>`;
+          <button id="rg_close" class="btn btn-ghost w-full mt-2 py-1.5 text-sm">Cerrar</button>`;
         // Overlay propio: en PC se ancla DEBAJO de la ventana de Editar guardia; en celular va centrado.
         const ov = document.createElement("div");
         const box = document.createElement("div");
@@ -4395,12 +4395,12 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           if (window.innerWidth >= 640 && mb) {
             // PC: panel ancho pero no a pantalla completa, anclado justo donde termina Editar guardia.
             const r = mb.getBoundingClientRect();
-            const w = Math.min(window.innerWidth - 24, 1040);
+            const w = Math.min(window.innerWidth - 24, 960);
             const left = Math.round((window.innerWidth - w) / 2);
-            const top = Math.min(r.bottom + 4, window.innerHeight - 120);
+            const top = Math.min(r.bottom - 6, window.innerHeight - 130);
             ov.className = "fixed inset-0 z-[70]";
             ov.style.pointerEvents = "none";
-            box.className = "card p-3 overflow-auto shadow-2xl";
+            box.className = "card p-2.5 overflow-auto shadow-2xl";
             box.style.pointerEvents = "auto";
             box.style.position = "fixed";
             box.style.left = left + "px";
