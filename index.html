@@ -921,15 +921,6 @@
     function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     // Modal ancho (para tablas tipo escritorio); en celular ocupa todo el ancho disponible.
     function openModalWide(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
-    // Overlay secundario independiente (se apila SOBRE el modal actual sin reemplazarlo).
-    function abrirOverlay(html, maxW = "max-w-3xl") {
-      const ov = document.createElement("div");
-      ov.className = "fixed inset-0 bg-black/40 z-[70] flex items-start sm:items-center justify-center p-4 overflow-auto";
-      ov.innerHTML = `<div class="card w-full ${maxW} p-4 sm:p-5 max-h-[92vh] overflow-auto my-auto">${html}</div>`;
-      ov.addEventListener("click", e => { if (e.target === ov) ov.remove(); });
-      document.body.appendChild(ov);
-      return ov;
-    }
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
@@ -4364,7 +4355,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
             <td class="px-2 py-1.5">${esc(r.lugar || "—")}</td>
             <td class="px-2 py-1.5 whitespace-nowrap">${esc(r.fecha ? fechaFmt(r.fecha) : "—")}</td>
           </tr>`).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-4">Este guardia no tiene infracciones ni detenciones registradas.</td></tr>`;
-        const ov = abrirOverlay(`
+        const contenido = `
           <div class="flex items-center justify-between gap-2 mb-2">
             <h2 class="font-bold text-base text-red-700">📋 Registros de ${esc(nom)} <span class="text-slate-400 font-normal">(${regs.length})</span></h2>
             <button id="rg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
@@ -4375,9 +4366,41 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
               <tbody>${cuerpo}</tbody>
             </table>
           </div>
-          <button id="rg_close" class="btn btn-ghost w-full mt-3">Cerrar</button>`);
-        ov.querySelector("#rg_x").addEventListener("click", () => ov.remove());
-        ov.querySelector("#rg_close").addEventListener("click", () => ov.remove());
+          <button id="rg_close" class="btn btn-ghost w-full mt-3">Cerrar</button>`;
+        // Overlay propio: en PC se ancla DEBAJO de la ventana de Editar guardia; en celular va centrado.
+        const ov = document.createElement("div");
+        const box = document.createElement("div");
+        box.innerHTML = contenido;
+        ov.appendChild(box);
+        document.body.appendChild(ov);
+        const colocar = () => {
+          const mb = $("#modalBox");
+          if (window.innerWidth >= 640 && mb) {
+            const r = mb.getBoundingClientRect();
+            ov.className = "fixed inset-0 z-[70]";
+            ov.style.pointerEvents = "none";
+            box.className = "card p-4 sm:p-5 overflow-auto shadow-2xl";
+            box.style.pointerEvents = "auto";
+            box.style.position = "fixed";
+            box.style.left = r.left + "px";
+            box.style.width = r.width + "px";
+            const top = Math.min(r.bottom + 8, window.innerHeight - 120);
+            box.style.top = top + "px";
+            box.style.maxHeight = (window.innerHeight - top - 12) + "px";
+          } else {
+            ov.className = "fixed inset-0 bg-black/40 z-[70] flex items-start justify-center p-4 overflow-auto";
+            ov.style.pointerEvents = "";
+            box.className = "card w-full max-w-3xl p-4 sm:p-5 max-h-[92vh] overflow-auto my-auto";
+            box.style.pointerEvents = "";
+            box.style.position = box.style.left = box.style.width = box.style.top = box.style.maxHeight = "";
+          }
+        };
+        colocar();
+        const cerrar = () => { window.removeEventListener("resize", colocar); ov.remove(); };
+        window.addEventListener("resize", colocar);
+        ov.addEventListener("click", e => { if (e.target === ov) cerrar(); });
+        box.querySelector("#rg_x").addEventListener("click", cerrar);
+        box.querySelector("#rg_close").addEventListener("click", cerrar);
       });
 
       $("#e_cancel").addEventListener("click", closeModal);
