@@ -4299,14 +4299,14 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div class="rounded-xl border border-red-300 bg-red-50 px-3 py-2">
         <button type="button" id="e_inf_head" class="w-full flex items-center justify-between">
           <span class="text-sm font-semibold text-red-700">🚩 Infracciones / Detenciones <span id="e_inf_count" class="text-slate-400 font-normal"></span></span>
-          <span id="e_inf_chev" class="text-slate-400 text-lg leading-none">▾</span>
+          <svg id="e_inf_chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400 flex-shrink-0" style="transition:transform .2s"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div id="e_inf_body" hidden>
           <div class="flex justify-end mt-2">
             <button type="button" id="e_inf_add" class="text-xs font-bold text-red-700 border border-red-300 rounded-lg px-2 py-1 bg-white">➕ Agregar</button>
           </div>
           <div id="e_inf_list" class="mt-2 space-y-2"></div>
-          <p class="text-[11px] text-slate-400 mt-1">Puedes registrar varias. Deja la lista vacía si no tiene observaciones.</p>
+          <p class="text-[11px] text-slate-400 mt-1">Agrega aquí una nueva observación. El historial completo está en "Registros del guardia".</p>
         </div>
       </div>
     </div>
@@ -4342,16 +4342,21 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         </div>`;
       }
       const infList = $("#e_inf_list");
-      getInfracciones(g).forEach(r => infList.insertAdjacentHTML("beforeend", infRowHTML(r)));
-      // Sección plegable de Infracciones / Detenciones.
+      // Los casilleros arrancan VACÍOS: no se precargan las infracciones existentes (están en "Registros").
+      // Sección plegable de Infracciones / Detenciones, SIEMPRE retraída al abrir.
       const infBody = $("#e_inf_body"), infChev = $("#e_inf_chev"), infCount = $("#e_inf_count");
-      const actualizarConteoInf = () => { const n = infList.querySelectorAll(".inf-row").length; infCount.textContent = n ? `(${n})` : ""; };
-      const setInfAbierto = ab => { infBody.hidden = !ab; infChev.textContent = ab ? "▾" : "▸"; };
-      actualizarConteoInf();
-      setInfAbierto(getInfracciones(g).length > 0); // abierta si ya tiene registros; plegada si no
-      $("#e_inf_head").addEventListener("click", () => setInfAbierto(infBody.hidden));
-      $("#e_inf_add").addEventListener("click", () => { infList.insertAdjacentHTML("beforeend", infRowHTML()); actualizarConteoInf(); });
-      infList.addEventListener("click", e => { const b = e.target.closest(".inf-del"); if (b) { b.closest(".inf-row").remove(); actualizarConteoInf(); } });
+      const existentes = getInfracciones(g);
+      infCount.textContent = existentes.length ? `(${existentes.length})` : "";
+      const setInfAbierto = ab => { infBody.hidden = !ab; infChev.style.transform = ab ? "rotate(180deg)" : ""; };
+      setInfAbierto(false); // siempre retraída
+      $("#e_inf_head").addEventListener("click", () => {
+        const abrir = infBody.hidden;
+        // Al abrir por primera vez sin filas, deja una fila lista para completar.
+        if (abrir && !infList.querySelector(".inf-row")) infList.insertAdjacentHTML("beforeend", infRowHTML());
+        setInfAbierto(abrir);
+      });
+      $("#e_inf_add").addEventListener("click", () => infList.insertAdjacentHTML("beforeend", infRowHTML()));
+      infList.addEventListener("click", e => { const b = e.target.closest(".inf-del"); if (b) b.closest(".inf-row").remove(); });
 
       // Botón "Registros": abre una ventana APARTE (sin deformar Editar guardia) con el
       // historial de infracciones/detenciones SOLO de este guardia.
@@ -4425,12 +4430,14 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const fx = $("#e_fec").value;
         if (fx) { const d = parseFecha(fx); if (d && startOfDay(d).getTime() > startOfDay(new Date()).getTime()) { toast("La fecha del examen no puede ser futura", false); return; } }
         const nuevoSup = !!$("#e_super").checked;
-        const infracciones = Array.from(infList.querySelectorAll(".inf-row")).map(row => ({
+        // Las filas del formulario son NUEVAS observaciones: se SUMAN al historial existente.
+        const nuevas = Array.from(infList.querySelectorAll(".inf-row")).map(row => ({
           tipo: row.querySelector(".inf-tipo").value,
           fecha: row.querySelector(".inf-fecha").value || null,
           lugar: row.querySelector(".inf-lugar").value.trim(),
           motivo: row.querySelector(".inf-motivo").value.trim(),
         })).filter(r => r.tipo); // descarta filas sin tipo elegido
+        const infracciones = existentes.concat(nuevas);
         const esInfractor = infracciones.length > 0;
         const prim = infracciones[infracciones.length - 1] || {};
         try {
