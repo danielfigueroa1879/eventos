@@ -2145,11 +2145,11 @@
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       // Prioridad de fondo: infractor (rojo) por sobre mujer (rosado claro con hover rojo).
-      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : '';
+      const rowStyle = tieneInf ? ' style="background:#f1f5f9;box-shadow:inset 3px 0 0 #94a3b8"' : '';
       const claseMujer = (esMujer && !tieneInf) ? ' row-mujer' : '';
-      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-400');   // N°
-      const rCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : '');                  // RUT
-      const nomCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-800');  // Nombre
+      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : 'text-slate-400');   // N°
+      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : '');                  // RUT
+      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : 'text-slate-800');  // Nombre
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseMujer} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
@@ -2196,10 +2196,10 @@
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
-      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : '';
+      const rowStyle = tieneInf ? ' style="background:#f1f5f9;box-shadow:inset 3px 0 0 #94a3b8"' : '';
       const claseMujer = (esMujer && !tieneInf) ? ' row-mujer' : ' active:bg-slate-50';
-      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-600');
-      const nomCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-900');
+      const nCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-800' : 'text-slate-600');
+      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : 'text-slate-900');
       const segCls = esMujer && !tieneInf ? 'text-red-700' : 'text-slate-600';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
@@ -2227,11 +2227,11 @@
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
       const esMujer = sexoGuardia(g) === "M";
-      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : '';
+      const rowStyle = tieneInf ? ' style="background:#f1f5f9;box-shadow:inset 3px 0 0 #94a3b8"' : '';
       const claseMujer = (esMujer && !tieneInf) ? ' row-mujer' : '';
-      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-400');
-      const rCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : '');
-      const nomClsE = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-800');
+      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : 'text-slate-400');
+      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : '');
+      const nomClsE = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : 'text-slate-800');
       return `<tr class="border-b border-slate-50${claseMujer}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}">${esc(a.rut)}</td>
@@ -2287,7 +2287,7 @@
       <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
     </div>
     <div class="text-center mb-3">
-      <div class="font-bold text-lg ${(tieneFicha(g) || sexoGuardia(g) === 'M') ? 'text-red-800' : 'text-slate-800'} leading-tight">${esc(nomFull)}</div>
+      <div class="font-bold text-lg ${(sexoGuardia(g) === 'M' && !tieneFicha(g)) ? 'text-red-800' : 'text-slate-800'} leading-tight">${esc(nomFull)}</div>
       <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
