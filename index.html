@@ -2167,11 +2167,14 @@
       const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—";
       const sup = a.es_supervisor ? ' <span class="badge" style="background:#e0f2fe;color:#075985" title="Supervisor">🤵 SUP</span>' : '';
       const spd = g.spd ? ' <span class="badge" style="background:#ede9fe;color:#6d28d9" title="Autorizado por SPD">SPD</span>' : '';
+      const infC = fichaColor(g);
+      const tieneInf = tieneFicha(g);
+      const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
-      return `<tr class="border-b border-slate-50">
+      return `<tr class="border-b border-slate-50"${tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
         <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td>
-        <td data-label="Nombre" class="pr-2 font-medium text-slate-800 md:whitespace-nowrap">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}</td>
+        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${tieneInf ? 'text-red-700' : 'text-slate-800'}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
         <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
