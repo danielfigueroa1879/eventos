@@ -2156,9 +2156,9 @@
       // Prioridad de fondo: infractor (gris) por sobre sexo (mujer rojo / hombre azul).
       const rowStyle = tieneInf ? ' style="background:#f1f5f9;box-shadow:inset 3px 0 0 #94a3b8"' : '';
       const claseSexo = tieneInf ? '' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : ''));
-      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-400'));   // N°
-      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : ''));                  // RUT
-      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-800'));  // Nombre
+      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : 'text-slate-400'));   // N°
+      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : ''));                  // RUT
+      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : 'text-slate-800'));  // Nombre
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseSexo} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
@@ -2208,8 +2208,8 @@
       const esHombre = sexoGuardia(g) === "H";
       const rowStyle = tieneInf ? ' style="background:#f1f5f9;box-shadow:inset 3px 0 0 #94a3b8"' : '';
       const claseSexo = tieneInf ? ' active:bg-slate-50' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : ' active:bg-slate-50'));
-      const nCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-600'));
-      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-900'));
+      const nCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : 'text-slate-600'));
+      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : 'text-slate-900'));
       const segCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-700' : (esHombre ? 'text-blue-700' : 'text-slate-600'));
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
@@ -2240,9 +2240,9 @@
       const esHombre = sexoGuardia(g) === "H";
       const rowStyle = tieneInf ? ' style="background:#f1f5f9;box-shadow:inset 3px 0 0 #94a3b8"' : '';
       const claseSexo = tieneInf ? '' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : ''));
-      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-400'));
-      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : ''));
-      const nomClsE = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-800'));
+      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : 'text-slate-400'));
+      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : ''));
+      const nomClsE = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-800' : 'text-slate-800'));
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}">${esc(a.rut)}</td>
@@ -2278,6 +2278,12 @@
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+      // Color y caja del nombre según sexo (hombre azul / mujer rojo); infractor sin caja.
+      const _sexG = sexoGuardia(g);
+      const nameColor = tieneFicha(g) ? 'text-slate-800' : (_sexG === 'M' ? 'text-red-800' : (_sexG === 'H' ? 'text-blue-900' : 'text-slate-800'));
+      const nameBox = (!tieneFicha(g) && _sexG === 'H') ? 'background:#eff6ff;border:1px solid #bfdbfe'
+        : (!tieneFicha(g) && _sexG === 'M') ? 'background:#fef2f2;border:1px solid #fecaca'
+        : '';
       const telHTML = (() => {
         const tf = normalizarTelefono(g.telefono);
         if (!tf) return detalleFila("📞", "Teléfono", "—");
@@ -2298,7 +2304,7 @@
       <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
     </div>
     <div class="text-center mb-3">
-      <div class="font-bold text-lg ${tieneFicha(g) ? 'text-slate-800' : (sexoGuardia(g) === 'M' ? 'text-red-800' : (sexoGuardia(g) === 'H' ? 'text-blue-900' : 'text-slate-800'))} leading-tight">${esc(nomFull)}</div>
+      <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1' : ''}"${nameBox ? ` style="${nameBox}"` : ''}>${esc(nomFull)}</span></div>
       <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
@@ -3378,7 +3384,7 @@
         return state.asist.filter(a => a.puesto_id === pid).map(a => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
-          return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M" };
+          return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M", hombre: sexoGuardia(g) === "H" };
         });
       }
       function iconFor(p) {
@@ -3412,7 +3418,7 @@
         }
         const nombres = guardiasDePuesto(p.id);
         const listaHTML = nombres.length
-          ? nombres.map((n, i) => `<div style="padding:1px 0${n.mujer ? ";color:#b91c1c;font-weight:700" : ""}">${i + 1}. ${esc(n.nombre)}</div>`).join("")
+          ? nombres.map((n, i) => `<div style="padding:1px 0${n.mujer ? ";color:#991b1b;font-weight:700" : (n.hombre ? ";color:#1e3a8a;font-weight:700" : "")}">${i + 1}. ${esc(n.nombre)}</div>`).join("")
           : `<div style="color:#94a3b8;padding:2px 0">Sin guardias asignados</div>`;
         return `<div style="font:600 11px system-ui,sans-serif;color:#111;max-width:220px"><div style="font-weight:800;color:${colorAnillo(p.anillo)};margin-bottom:3px">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div><div style="font-weight:500;color:#334155">${listaHTML}</div></div>`;
       }
@@ -3548,7 +3554,7 @@
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
-        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : "text-slate-700"}"><span class="${mujer ? "text-red-400" : "text-slate-400"} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = readonly ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
             <button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
