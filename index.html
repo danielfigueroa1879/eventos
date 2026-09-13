@@ -1816,6 +1816,7 @@
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
         <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel (.xlsx) o PDF (hoja oficio horizontal)">⬇ Descargar eventos</button>
         <button id="expInfractores" class="btn text-sm px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold shadow-md rounded-xl" title="Descargar en Excel el registro de todos los guardias infractores / detenidos">🚩 Infractores</button>
+        <button id="revSexo" class="btn text-sm px-4 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold shadow-md rounded-xl" title="Revisar y corregir el sexo (H/M) de los guardias para que el conteo sea exacto">👥 Sexo</button>
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
@@ -1961,6 +1962,7 @@
       const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bEvXls = $("#expEventosXls"); if (bEvXls) bEvXls.addEventListener("click", modalExportEventos);
       const bInf = $("#expInfractores"); if (bInf) bInf.addEventListener("click", modalInfractores);
+      const bSexo = $("#revSexo"); if (bSexo) bSexo.addEventListener("click", modalRevisarSexo);
       const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asist));
       // Candado ABIERTO/CERRADO: alterna si los guardias pueden corregir sus datos al registrarse.
       const toggleLock = async (btn) => {
@@ -2773,6 +2775,87 @@
       $("#inf_x").addEventListener("click", closeModal);
       $("#inf_close").addEventListener("click", closeModal);
       infractoresWire();
+    }
+
+    // --- Revisar / corregir el sexo (H/M) de los guardias para que el conteo sea exacto ---
+    async function modalRevisarSexo() {
+      toast("Cargando guardias…");
+      let guardias = [];
+      try { guardias = await Data.listGuardias(); } catch (_) { guardias = []; }
+      guardias = (guardias || []).slice().sort((a, b) => {
+        const na = ((a.nombres || "") + " " + (a.apellidos || "")).trim();
+        const nb = ((b.nombres || "") + " " + (b.apellidos || "")).trim();
+        return na.localeCompare(nb, "es");
+      });
+      const filaHTML = (g, i) => {
+        const s = sexoGuardia(g); // valor actual (guardado o inferido)
+        const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+        const explicito = g.sexo && /^[HM]/i.test(g.sexo);
+        return `<tr class="border-b border-slate-100" data-s="${esc((g.rut + " " + nom).toLowerCase())}">
+          <td class="px-2 py-1.5 text-slate-400">${i + 1}</td>
+          <td class="px-2 py-1.5 font-mono whitespace-nowrap">${esc(g.rut)}</td>
+          <td class="px-2 py-1.5 whitespace-nowrap">${esc(nom)}${explicito ? "" : ' <span class="text-[10px] text-amber-600" title="Sexo inferido por el nombre; confírmalo">(auto)</span>'}</td>
+          <td class="px-2 py-1.5 whitespace-nowrap">
+            <div class="inline-flex rounded-lg overflow-hidden border border-slate-300" data-rut="${esc(g.rut)}" data-orig="${explicito ? s : ''}" data-sel="${s || ''}">
+              <button type="button" data-sx="H" class="sx-btn px-3 py-1 text-sm font-bold ${s === 'H' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600'}">H</button>
+              <button type="button" data-sx="M" class="sx-btn px-3 py-1 text-sm font-bold border-l border-slate-300 ${s === 'M' ? 'bg-pink-600 text-white' : 'bg-white text-slate-600'}">M</button>
+            </div>
+          </td>
+        </tr>`;
+      };
+      const cuerpo = guardias.length ? guardias.map(filaHTML).join("") : `<tr><td colspan="4" class="text-center text-slate-400 py-6">No hay guardias.</td></tr>`;
+      openModalWide(`
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <h2 class="font-bold text-lg text-indigo-700">👥 Revisar sexo de guardias</h2>
+          <button id="sx_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">Marca <b>H</b> o <b>M</b> para cada guardia. Los marcados <span class="text-amber-600">(auto)</span> están inferidos por el nombre; confírmalos. Al guardar, el conteo será exacto.</p>
+        <input id="sx_buscar" class="fld h-9 text-sm w-full mb-2" placeholder="Buscar por RUT o nombre…" autocomplete="off">
+        <div class="overflow-x-auto rounded-lg border border-slate-200" style="max-height:60vh">
+          <table class="w-full text-sm">
+            <thead><tr class="text-white sticky top-0" style="background:#3730a3"><th class="px-2 py-2 text-left">N°</th><th class="px-2 py-2 text-left">RUT</th><th class="px-2 py-2 text-left">Nombre</th><th class="px-2 py-2 text-left">Sexo</th></tr></thead>
+            <tbody id="sx_tbody">${cuerpo}</tbody>
+          </table>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button id="sx_cancel" class="btn btn-ghost flex-1">Cerrar</button>
+          <button id="sx_save" class="btn btn-p flex-1">Guardar cambios</button>
+        </div>`);
+      $("#sx_x").addEventListener("click", closeModal);
+      $("#sx_cancel").addEventListener("click", closeModal);
+      // Selección H/M por fila
+      $("#sx_tbody").addEventListener("click", e => {
+        const b = e.target.closest(".sx-btn"); if (!b) return;
+        const cont = b.closest("[data-rut]"); const sx = b.dataset.sx;
+        cont.dataset.sel = sx;
+        cont.querySelectorAll(".sx-btn").forEach(x => {
+          const on = x.dataset.sx === sx;
+          x.className = "sx-btn px-3 py-1 text-sm font-bold " + (x.dataset.sx === "M" ? "border-l border-slate-300 " : "") + (on ? (sx === "H" ? "bg-sky-600 text-white" : "bg-pink-600 text-white") : "bg-white text-slate-600");
+        });
+      });
+      // Buscador
+      $("#sx_buscar").addEventListener("input", e => {
+        const q = e.target.value.trim().toLowerCase();
+        document.querySelectorAll("#sx_tbody tr[data-s]").forEach(tr => { tr.hidden = q && !tr.dataset.s.includes(q); });
+      });
+      // Guardar: solo los que quedaron marcados y cambiaron respecto al valor explícito original.
+      $("#sx_save").addEventListener("click", async () => {
+        const cambios = [];
+        document.querySelectorAll("#sx_tbody [data-rut]").forEach(cont => {
+          const sel = cont.dataset.sel || "";        // lo que eligió el usuario en esta sesión
+          const orig = cont.dataset.orig || "";       // sexo explícito previo (vacío si era inferido)
+          const rut = cont.dataset.rut;
+          // Guarda si eligió algo y difiere de lo ya guardado (incluye confirmar los "auto").
+          if (sel && sel !== orig) cambios.push({ rut, sexo: sel });
+        });
+        if (!cambios.length) { toast("No hay cambios para guardar", false); return; }
+        const btn = $("#sx_save"); btn.disabled = true; btn.textContent = "Guardando…";
+        try {
+          await Data.bulkUpsertGuardias(cambios);
+          closeModal(); refreshAdmin();
+          toast(`✔ Sexo actualizado en ${cambios.length} guardia${cambios.length === 1 ? "" : "s"}`);
+        } catch (err) { btn.disabled = false; btn.textContent = "Guardar cambios"; toast("Error: " + (err.message || err), false); }
+      });
     }
 
     // --- Excel (.xlsx) con TODOS los guardias infractores / detenidos, enumerado y con formato ---
