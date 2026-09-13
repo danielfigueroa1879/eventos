@@ -921,6 +921,15 @@
     function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     // Modal ancho (para tablas tipo escritorio); en celular ocupa todo el ancho disponible.
     function openModalWide(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
+    // Overlay secundario independiente (se apila SOBRE el modal actual sin reemplazarlo).
+    function abrirOverlay(html, maxW = "max-w-3xl") {
+      const ov = document.createElement("div");
+      ov.className = "fixed inset-0 bg-black/40 z-[70] flex items-start sm:items-center justify-center p-4 overflow-auto";
+      ov.innerHTML = `<div class="card w-full ${maxW} p-4 sm:p-5 max-h-[92vh] overflow-auto my-auto">${html}</div>`;
+      ov.addEventListener("click", e => { if (e.target === ov) ov.remove(); });
+      document.body.appendChild(ov);
+      return ov;
+    }
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
@@ -4305,7 +4314,6 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <p class="text-[11px] text-slate-400 mt-1">Puedes registrar varias. Deja la lista vacía si no tiene observaciones.</p>
       </div>
       <button type="button" id="e_reg_toggle" class="btn btn-ghost w-full text-sm">📋 Registros del guardia</button>
-      <div id="e_reg_panel" hidden></div>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="e_cancel" class="btn btn-ghost flex-1">Cancelar</button>
@@ -4342,39 +4350,34 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       $("#e_inf_add").addEventListener("click", () => infList.insertAdjacentHTML("beforeend", infRowHTML()));
       infList.addEventListener("click", e => { const b = e.target.closest(".inf-del"); if (b) b.closest(".inf-row").remove(); });
 
-      // Botón "Registros": despliega SOLO las infracciones/detenciones de ESTE guardia.
-      const regBtn = $("#e_reg_toggle"), regPanel = $("#e_reg_panel");
-      let regCargado = false;
-      regBtn.addEventListener("click", () => {
-        const abrir = regPanel.hidden;
-        if (abrir) {
-          if (!regCargado) {
-            const regs = getInfracciones(g);
-            const th = t => `<th class="px-2 py-1.5 text-left font-bold whitespace-nowrap">${t}</th>`;
-            const cuerpo = regs.length ? regs.map((r, i) => `<tr class="border-b border-red-100" ${recEsDetenido(r) ? 'style="background:#fef2f2"' : ""}>
-                <td class="px-2 py-1.5 text-slate-400">${i + 1}</td>
-                <td class="px-2 py-1.5 font-bold ${recEsDetenido(r) ? "text-red-700" : "text-red-600"} whitespace-nowrap">${recEsDetenido(r) ? "🚔 Detenido" : "🚩 Infractor"}</td>
-                <td class="px-2 py-1.5 whitespace-nowrap">${esc(recEsDetenido(r) ? "—" : (r.tipo || "—"))}</td>
-                <td class="px-2 py-1.5">${esc(r.motivo || "—")}</td>
-                <td class="px-2 py-1.5">${esc(r.lugar || "—")}</td>
-                <td class="px-2 py-1.5 whitespace-nowrap">${esc(r.fecha ? fechaFmt(r.fecha) : "—")}</td>
-              </tr>`).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-4">Este guardia no tiene infracciones ni detenciones registradas.</td></tr>`;
-            regPanel.innerHTML = `<div class="rounded-xl border border-red-200 bg-red-50/40 p-2 mt-1">
-              <div class="font-bold text-red-700 text-sm mb-2">📋 Registros de ${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut)} <span class="text-slate-400 font-normal">(${regs.length})</span></div>
-              <div class="overflow-x-auto rounded-lg border border-red-100">
-                <table class="w-full text-sm" style="min-width:560px">
-                  <thead><tr class="text-white" style="background:#0f5323">${th("N°")}${th("Situación")}${th("Ley / Tipo")}${th("Motivo / detalle")}${th("Lugar")}${th("Fecha")}</tr></thead>
-                  <tbody>${cuerpo}</tbody>
-                </table>
-              </div></div>`;
-            regCargado = true;
-          }
-          regPanel.hidden = false;
-          regBtn.textContent = "📋 Ocultar registros";
-        } else {
-          regPanel.hidden = true;
-          regBtn.textContent = "📋 Registros del guardia";
-        }
+      // Botón "Registros": abre una ventana APARTE (sin deformar Editar guardia) con el
+      // historial de infracciones/detenciones SOLO de este guardia.
+      $("#e_reg_toggle").addEventListener("click", () => {
+        const regs = getInfracciones(g);
+        const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
+        const th = t => `<th class="px-2 py-1.5 text-left font-bold whitespace-nowrap">${t}</th>`;
+        const cuerpo = regs.length ? regs.map((r, i) => `<tr class="border-b border-red-100" ${recEsDetenido(r) ? 'style="background:#fef2f2"' : ""}>
+            <td class="px-2 py-1.5 text-slate-400">${i + 1}</td>
+            <td class="px-2 py-1.5 font-bold ${recEsDetenido(r) ? "text-red-700" : "text-red-600"} whitespace-nowrap">${recEsDetenido(r) ? "🚔 Detenido" : "🚩 Infractor"}</td>
+            <td class="px-2 py-1.5 whitespace-nowrap">${esc(recEsDetenido(r) ? "—" : (r.tipo || "—"))}</td>
+            <td class="px-2 py-1.5">${esc(r.motivo || "—")}</td>
+            <td class="px-2 py-1.5">${esc(r.lugar || "—")}</td>
+            <td class="px-2 py-1.5 whitespace-nowrap">${esc(r.fecha ? fechaFmt(r.fecha) : "—")}</td>
+          </tr>`).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-4">Este guardia no tiene infracciones ni detenciones registradas.</td></tr>`;
+        const ov = abrirOverlay(`
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <h2 class="font-bold text-base text-red-700">📋 Registros de ${esc(nom)} <span class="text-slate-400 font-normal">(${regs.length})</span></h2>
+            <button id="rg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+          </div>
+          <div class="overflow-x-auto rounded-lg border border-slate-200">
+            <table class="w-full text-sm" style="min-width:560px">
+              <thead><tr class="text-white" style="background:#0f5323">${th("N°")}${th("Situación")}${th("Ley / Tipo")}${th("Motivo / detalle")}${th("Lugar")}${th("Fecha")}</tr></thead>
+              <tbody>${cuerpo}</tbody>
+            </table>
+          </div>
+          <button id="rg_close" class="btn btn-ghost w-full mt-3">Cerrar</button>`);
+        ov.querySelector("#rg_x").addEventListener("click", () => ov.remove());
+        ov.querySelector("#rg_close").addEventListener("click", () => ov.remove());
       });
 
       $("#e_cancel").addEventListener("click", closeModal);
