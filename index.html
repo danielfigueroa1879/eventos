@@ -792,6 +792,7 @@
         },
         async yaRegistrado(evId, rut) { return get(K.as).find(x => x.evento_id === evId && x.rut === rut) || null; },
         async createAsistencia(evId, rut, esSupervisor) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
+        async setAsistenciaSupervisor(id, esSup) { const a = get(K.as); const r = a.find(x => x.id === id); if (r) { r.es_supervisor = !!esSup; set(K.as, a); ping(); } return r; },
         async deleteAsistencia(id) { set(K.as, get(K.as).filter(x => x.id !== id)); ping(); },
         async cerrarPartido(ev, asist) {
           const hid = uid();
@@ -843,6 +844,7 @@
         },
         async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).limit(1)); return d[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }).select().single()); },
+        async setAsistenciaSupervisor(id, esSup) { ok(await sb.from("asistencias").update({ es_supervisor: !!esSup }).eq("id", id)); },
         async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
         async cerrarPartido(ev, asist) {
           const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
@@ -4074,7 +4076,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div><label class="text-sm font-semibold text-slate-700">Nombres</label><input id="e_nom" class="fld" value="${esc(g.nombres || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Apellidos</label><input id="e_ape" class="fld" value="${esc(g.apellidos || "")}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Teléfono</label><input id="e_tel" class="fld" value="${esc(g.telefono || "")}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">${rotuloFecha}</label><input id="e_fec" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
+      <div><label id="e_fec_lbl" class="text-sm font-semibold text-slate-700">${rotuloFecha}</label><input id="e_fec" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
+      <label class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 cursor-pointer">
+        <input type="checkbox" id="e_super" class="w-4 h-4 flex-shrink-0" ${esSup ? "checked" : ""}>
+        <span>🤵 Es <b>supervisor</b> <span class="text-slate-400 font-normal">(desmárcalo para dejarlo como guardia)</span></span>
+      </label>
       <label class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 cursor-pointer">
         <input type="checkbox" id="e_spd" class="w-4 h-4 flex-shrink-0" ${g.spd ? "checked" : ""}>
         <span>Autorizado por <b>SPD</b> <span class="text-slate-400 font-normal">(Subsecretaría de Prevención del Delito — presenta resolución)</span></span>
@@ -4086,12 +4092,19 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
     </div>`);
       $("#e_nom").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
       $("#e_ape").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
+      // Al cambiar el rol, actualiza el rótulo de la fecha (supervisor = autorización; guardia = examen).
+      $("#e_super").addEventListener("change", e => {
+        const lbl = $("#e_fec_lbl");
+        if (lbl) lbl.textContent = e.target.checked ? "Fecha de autorización de la resolución" : "Fecha último examen";
+      });
       $("#e_cancel").addEventListener("click", closeModal);
       $("#e_save").addEventListener("click", async () => {
         const fx = $("#e_fec").value;
         if (fx) { const d = parseFecha(fx); if (d && startOfDay(d).getTime() > startOfDay(new Date()).getTime()) { toast("La fecha del examen no puede ser futura", false); return; } }
+        const nuevoSup = !!$("#e_super").checked;
         try {
           await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, aprobado: true, revision_tipo: null });
+          if (nuevoSup !== esSup && a.id) await Data.setAsistenciaSupervisor(a.id, nuevoSup);
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
