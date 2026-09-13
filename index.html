@@ -2147,7 +2147,7 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="badge" style="background:#e0f2fe;color:#075985;margin-left:4px" title="Supervisor">🤵 SUPERVISOR</span>` : '';
-      const spd = g.spd ? ` <span class="badge" style="background:#1b3a8f;color:#f7941d;font-weight:bold;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>` : '';
+      const spd = g.spd ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2200,7 +2200,7 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${esNuevoG ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} ml-1 whitespace-nowrap">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 ml-1 whitespace-nowrap">🤵 SUPERVISOR</span>` : '';
-      const spd = g.spd ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#1b3a8f;color:#f7941d" title="Autorizado por SPD">SPD</span>` : '';
+      const spd = g.spd ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#1b3a8f;color:#ffffff" title="Autorizado por SPD">SPD</span>` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2231,7 +2231,7 @@
       const tf = normalizarTelefono(g.telefono);
       const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—";
       const sup = a.es_supervisor ? ' <span class="badge" style="background:#e0f2fe;color:#075985" title="Supervisor">🤵 SUP</span>' : '';
-      const spd = g.spd ? ' <span class="badge" style="background:#1b3a8f;color:#f7941d;font-weight:bold" title="Autorizado por SPD">SPD</span>' : '';
+      const spd = g.spd ? ' <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD">SPD</span>' : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2305,7 +2305,7 @@
     </div>
     <div class="text-center mb-3">
       <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1' : ''}"${nameBox ? ` style="${nameBox}"` : ''}>${esc(nomFull)}</span></div>
-      <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#f7941d" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
+      <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
       <div class="text-center text-red-800 font-extrabold text-xs mb-1">⚠ ${getInfracciones(g).length === 1 ? "OBSERVACIÓN" : getInfracciones(g).length + " OBSERVACIONES"}</div>
