@@ -1589,7 +1589,7 @@
         const g = a.guardia;
         if (g && g.infractor) {
           const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
-          infractoresAct.set(a.rut, { nombre, etiqueta: fichaLabel(g), motivo: g.infractor_motivo || "", fecha: g.infractor_fecha ? fechaFmt(g.infractor_fecha) : "" });
+          infractoresAct.set(a.rut, { nombre, etiqueta: fichaFrase(g), detenido: fichaEsDetenido(g), fecha: g.infractor_fecha ? fechaFmt(g.infractor_fecha) : "" });
         }
       });
 
@@ -1629,21 +1629,20 @@
       try { if (typeof sonarIngreso === "function") sonarIngreso(); } catch (_) {}
       const lista = items.map(it => `<div class="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-left">
           <div class="font-bold text-red-800">${esc(it.nombre)}</div>
-          <div class="text-red-700 text-xs font-bold mt-0.5">${esc(it.etiqueta)}</div>
-          ${it.motivo ? `<div class="text-red-600 text-xs mt-0.5">${esc(it.motivo)}</div>` : ""}
+          <div class="text-red-700 text-xs font-bold mt-0.5">${it.detenido ? "🚔" : "🚩"} ${esc(it.etiqueta)}</div>
           ${it.fecha ? `<div class="text-red-500 text-[11px] mt-0.5">📅 ${esc(it.fecha)}</div>` : ""}
         </div>`).join("");
-      const titulo = items.length === 1 ? "Se presentó una persona FICHADA" : `Se presentaron ${items.length} personas FICHADAS`;
+      const titulo = items.length === 1 ? "⚠ Alerta de ingreso" : `⚠ Alerta de ingreso (${items.length})`;
       // Si ya hay una ventana abierta, no la interrumpimos: mostramos un aviso rojo persistente.
       const modalAbierto = (() => { const m = $("#modal"); return m && getComputedStyle(m).display !== "none"; })();
       if (modalAbierto) {
-        toast(`🚩 ${titulo}: ${items.map(i => i.nombre + " (" + i.etiqueta.replace(/^[^A-Za-z]+/, "") + ")").join(", ")}`, false, 9000);
+        toast(`⚠ ${items.map(i => i.nombre + " — " + i.etiqueta).join("   ·   ")}`, false, 9000);
         return;
       }
       openModal(`<div class="text-center">
         <div class="text-4xl mb-1">🚩</div>
         <h2 class="font-extrabold text-lg text-red-700 mb-1">${titulo}</h2>
-        <p class="text-sm text-slate-500 mb-3">Este guardia está fichado. Verifica en el punto de control.</p>
+        <p class="text-sm text-slate-500 mb-3">Verifica en el punto de control.</p>
         <div class="space-y-2 mb-4">${lista}</div>
         <button id="inf_ok" class="btn btn-danger w-full">Entendido</button>
       </div>`);
@@ -2062,12 +2061,19 @@
     // Leyes disponibles para fichar a un guardia como infractor (además de "Detenido").
     const LEYES_INFRACCION = ["Ley 20.000", "Ley 19.327", "Ley 18.314", "Ley 19.913", "Ley 12.927"];
     function fichaEsDetenido(g) { return !!(g && g.infractor && /detenid/i.test(g.infractor_tipo || "")); }
-    // Texto corto del badge: "🚔 DETENIDO" o "🚩 INFRACTOR (LEY 20.000)".
+    // Texto corto del badge: "🚔 DETENIDO" o "🚩 INFRACTOR LEY 20.000".
     function fichaLabel(g) {
       if (!g || !g.infractor) return "";
       const t = (g.infractor_tipo || "").trim();
       if (fichaEsDetenido(g)) return "🚔 DETENIDO";
-      return "🚩 INFRACTOR" + (t ? ` (${t.toUpperCase()})` : "");
+      return "🚩 INFRACTOR" + (t ? ` ${t.toUpperCase()}` : "");
+    }
+    // Frase descriptiva: "Infractor Ley 20.000" o "Detenido por <motivo>".
+    function fichaFrase(g) {
+      if (!g || !g.infractor) return "";
+      const t = (g.infractor_tipo || "").trim();
+      if (fichaEsDetenido(g)) return "Detenido" + (g.infractor_motivo ? ` por ${g.infractor_motivo}` : "");
+      return "Infractor" + (t ? ` ${t}` : "");
     }
     // Colores del badge según sea Detenido (rojo sólido) o Infractor (rojo claro).
     function fichaColor(g) { return fichaEsDetenido(g) ? { bg: "#dc2626", fg: "#ffffff" } : { bg: "#fee2e2", fg: "#b91c1c" }; }
@@ -2216,8 +2222,8 @@
       <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${g.infractor ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3 text-center">
-      <div class="text-red-700 font-extrabold text-sm">${esc(fichaLabel(g))}</div>
-      ${g.infractor_motivo ? `<div class="text-red-600 text-xs mt-0.5">${esc(g.infractor_motivo)}</div>` : ""}
+      <div class="text-red-700 font-extrabold text-sm">${fichaEsDetenido(g) ? "🚔" : "🚩"} ${esc(fichaFrase(g))}</div>
+      ${(!fichaEsDetenido(g) && g.infractor_motivo) ? `<div class="text-red-600 text-xs mt-0.5">${esc(g.infractor_motivo)}</div>` : ""}
       ${g.infractor_fecha ? `<div class="text-red-500 text-[11px] mt-0.5">📅 ${esc(fechaFmt(g.infractor_fecha))}</div>` : ""}
     </div>` : ""}
     <div class="text-sm">
@@ -4163,7 +4169,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <span>Autorizado por <b>SPD</b> <span class="text-slate-400 font-normal">(Subsecretaría de Prevención del Delito — presenta resolución)</span></span>
       </label>
       <div class="rounded-xl border border-red-300 bg-red-50 px-3 py-2">
-        <label for="e_infractor_tipo" class="text-sm font-semibold text-red-700">🚩 Ficha / Situación</label>
+        <label for="e_infractor_tipo" class="text-sm font-semibold text-red-700">🚩 Situación (infractor / detenido)</label>
         <select id="e_infractor_tipo" class="fld mt-1">
           <option value="">Sin observación (normal)</option>
           ${LEYES_INFRACCION.map(l => `<option value="${esc(l)}" ${g.infractor && (g.infractor_tipo || "") === l ? "selected" : ""}>Infractor — ${esc(l)}</option>`).join("")}
