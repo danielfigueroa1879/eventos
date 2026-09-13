@@ -1780,6 +1780,7 @@
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
         <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel (.xlsx) o PDF (hoja oficio horizontal)">⬇ Descargar eventos</button>
+        <button id="expInfractores" class="btn text-sm px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold shadow-md rounded-xl" title="Descargar en Excel el registro de todos los guardias infractores / detenidos">🚩 Infractores</button>
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
@@ -1924,6 +1925,7 @@
       const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
       const bEvXls = $("#expEventosXls"); if (bEvXls) bEvXls.addEventListener("click", modalExportEventos);
+      const bInf = $("#expInfractores"); if (bInf) bInf.addEventListener("click", descargarExcelInfractores);
       const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asist));
       // Candado ABIERTO/CERRADO: alterna si los guardias pueden corregir sus datos al registrarse.
       const toggleLock = async (btn) => {
@@ -2657,6 +2659,63 @@
       const conteos = await cargarConteosEventos(eventos);
       // Excel real (.xlsx); si la librería no cargó, respaldo al .xls con formato.
       if (!xlsxEventos(eventos, conteos)) descargarArchivo(xlsFileEventos(eventos, conteos));
+    }
+
+    // --- Excel (.xlsx) con TODOS los guardias infractores / detenidos, enumerado y con formato ---
+    async function descargarExcelInfractores() {
+      if (!window.XLSX) { toast("No se pudo cargar el generador de Excel", false); return; }
+      toast("Preparando el registro de infractores…");
+      let guardias = [];
+      try { guardias = await Data.listGuardias(); } catch (_) { guardias = []; }
+      // Una fila por cada infracción/detención (para que quede el registro completo).
+      const filas = [];
+      (guardias || []).forEach(g => {
+        if (!tieneFicha(g)) return;
+        const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+        getInfracciones(g).forEach(r => {
+          filas.push([
+            g.rut || "—",
+            nombre,
+            g.telefono || "—",
+            recEsDetenido(r) ? "Detenido" : "Infractor",
+            recEsDetenido(r) ? "—" : (r.tipo || "—"),
+            r.motivo || "—",
+            r.lugar || "—",
+            r.fecha ? fechaFmt(r.fecha) : "—",
+          ]);
+        });
+      });
+      if (!filas.length) { toast("No hay guardias infractores registrados", false); return; }
+      // Orden: por nombre (col índice 1)
+      filas.sort((a, b) => String(a[1]).localeCompare(String(b[1]), "es"));
+      const cols = ["N°", "RUT", "Nombre", "Teléfono", "Situación", "Ley / Tipo", "Motivo / detalle", "Lugar", "Fecha"];
+      const gen = new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" });
+      const nInfractores = new Set(filas.map(f => f[0])).size;
+      const aoa = [
+        ["Registro de guardias infractores / detenidos"],
+        [`${nInfractores} persona${nInfractores === 1 ? "" : "s"} · ${filas.length} registro${filas.length === 1 ? "" : "s"} · Generado ${gen}`],
+        [],
+        cols,
+      ];
+      filas.forEach((f, i) => aoa.push([i + 1, ...f]));
+      const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [{ wch: 5 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 34 }, { wch: 28 }, { wch: 12 }];
+      const nc = cols.length - 1, rHead = 3, rBody0 = 4;
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: nc } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: nc } },
+      ];
+      // Estilos: título, encabezado verde con letras blancas, bordes.
+      xlSet(ws, 0, 0, XL_ST.titulo); xlSet(ws, 1, 0, XL_ST.sub);
+      cols.forEach((c, j) => xlSet(ws, rHead, j, XL_ST.head));
+      filas.forEach((f, i) => {
+        const rr = rBody0 + i;
+        for (let j = 0; j <= nc; j++) xlSet(ws, rr, j, (j === 2 || j === 6 || j === 7) ? XL_ST.celdaIzq : XL_ST.celda);
+      });
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "Infractores");
+      const fecha = new Date().toISOString().slice(0, 10);
+      window.XLSX.writeFile(wb, `Infractores-${fecha}.xlsx`);
     }
 
     // --- PDF de TODOS los eventos, en hoja OFICIO HORIZONTAL (se abre en cualquier celular y PC) ---
