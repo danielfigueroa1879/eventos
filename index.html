@@ -1631,11 +1631,16 @@
 
       // Guardias con observaciones (infractor/detenido) presentes en el evento — por RUT.
       const infractoresAct = new Map(); // rut -> { nombre, registros }
+      const spdAct = new Map(); // rut -> { nombre } — guardias autorizados por SPD
       (asist || []).forEach(a => {
         const g = a.guardia;
         if (g && tieneFicha(g)) {
           const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
           infractoresAct.set(a.rut, { nombre, registros: getInfracciones(g) });
+        }
+        if (g && g.spd) {
+          const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
+          spdAct.set(a.rut, { nombre });
         }
       });
 
@@ -1644,6 +1649,7 @@
         ADMIN_STATE._avisEvento = ev.id;
         ADMIN_STATE._avisSigs = new Set(sigActual.keys());
         ADMIN_STATE._infractSigs = new Set(infractoresAct.keys());
+        ADMIN_STATE._spdSigs = new Set(spdAct.keys());
         return;
       }
 
@@ -1662,6 +1668,14 @@
       });
       ADMIN_STATE._infractSigs = new Set(infractoresAct.keys());
       if (infractoresNuevos.length) alertaInfractores(infractoresNuevos);
+
+      // Guardias autorizados por SPD que aparecieron desde el último refresco → pedir resolución.
+      const spdNuevos = [];
+      spdAct.forEach((info, rut) => {
+        if (!(ADMIN_STATE._spdSigs && ADMIN_STATE._spdSigs.has(rut))) spdNuevos.push(info);
+      });
+      ADMIN_STATE._spdSigs = new Set(spdAct.keys());
+      if (spdNuevos.length) alertaSPD(spdNuevos);
 
       const partes = [];
       if (nuevos.length) partes.push(`🔴 ${nuevos.length === 1 ? "Nuevo guardia" : nuevos.length + " guardias nuevos"}: ${nuevos.join(", ")}`);
@@ -1695,6 +1709,32 @@
         <button id="inf_ok" class="btn btn-danger w-full">Entendido</button>
       </div>`);
       const b = $("#inf_ok"); if (b) b.addEventListener("click", closeModal);
+    }
+
+    // Alerta al administrador cuando aparece un guardia autorizado por SPD: pedir la resolución.
+    function alertaSPD(items) {
+      try { if (typeof sonarIngreso === "function") sonarIngreso(); } catch (_) {}
+      const badge = `<span class="text-xs font-bold px-2 py-0.5 rounded-md" style="background:#1b3a8f;color:#ffffff">SPD</span>`;
+      const lista = items.map(it => `<div class="rounded-lg px-3 py-2 text-left flex items-center gap-2" style="border:1px solid #c7d2fe;background:#eef2ff">
+          ${badge}
+          <div class="font-bold" style="color:#1b3a8f">${esc(it.nombre)}</div>
+        </div>`).join("");
+      const titulo = items.length === 1 ? "Autorizado por SPD" : `Autorizados por SPD (${items.length})`;
+      // Si ya hay una ventana abierta, no la interrumpimos: mostramos un aviso persistente.
+      const modalAbierto = (() => { const m = $("#modal"); return m && getComputedStyle(m).display !== "none"; })();
+      if (modalAbierto) {
+        toast(`🪪 SPD — Pedir resolución: ${items.map(i => i.nombre).join("   ·   ")}`, false, 9000);
+        return;
+      }
+      openModal(`<div class="text-center">
+        <div class="w-14 h-14 mx-auto mb-2 rounded-full flex items-center justify-center" style="background:#1b3a8f"><span class="text-2xl font-black text-white">SPD</span></div>
+        <h2 class="font-extrabold text-lg mb-1" style="color:#1b3a8f">${titulo}</h2>
+        <p class="text-sm font-semibold text-slate-700 mb-1">⚠ Solicitar la resolución de autorización</p>
+        <p class="text-xs text-slate-500 mb-3">Este guardia está autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución que lo acredita.</p>
+        <div class="space-y-2 mb-4">${lista}</div>
+        <button id="spd_ok" class="btn w-full text-white" style="background:#1b3a8f">Entendido</button>
+      </div>`);
+      const b2 = $("#spd_ok"); if (b2) b2.addEventListener("click", closeModal);
     }
 
     async function renderMain() {
