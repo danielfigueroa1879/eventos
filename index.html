@@ -4304,12 +4304,12 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <div id="e_inf_list" class="mt-2 space-y-2"></div>
         <p class="text-[11px] text-slate-400 mt-1">Puedes registrar varias. Deja la lista vacía si no tiene observaciones.</p>
       </div>
-      <button type="button" id="e_reg_toggle" class="btn btn-ghost w-full text-sm">📋 Registros del guardia</button>
     </div>
     <div class="flex gap-2 mt-4">
       <button id="e_cancel" class="btn btn-ghost flex-1">Cancelar</button>
       <button id="e_save" class="btn btn-p flex-1">Guardar</button>
-    </div>`);
+    </div>
+    <button type="button" id="e_reg_toggle" class="btn btn-ghost w-full text-sm mt-2">📋 Registros del guardia</button>`);
       $("#e_nom").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
       $("#e_ape").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
       // Al cambiar el rol, actualiza el rótulo de la fecha (supervisor = autorización; guardia = examen).
@@ -4375,24 +4375,25 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         document.body.appendChild(ov);
         const colocar = () => {
           const mb = $("#modalBox");
-          if (window.innerWidth >= 640 && mb) {
-            const r = mb.getBoundingClientRect();
+          if (window.innerWidth >= 640) {
+            // PC: barra inferior ANCHA (a casi todo el ancho), sin tocar la ficha de arriba.
             ov.className = "fixed inset-0 z-[70]";
             ov.style.pointerEvents = "none";
             box.className = "card p-4 sm:p-5 overflow-auto shadow-2xl";
             box.style.pointerEvents = "auto";
             box.style.position = "fixed";
-            box.style.left = r.left + "px";
-            box.style.width = r.width + "px";
-            const top = Math.min(r.bottom + 8, window.innerHeight - 120);
-            box.style.top = top + "px";
-            box.style.maxHeight = (window.innerHeight - top - 12) + "px";
+            box.style.left = "12px";
+            box.style.right = "12px";
+            box.style.width = "auto";
+            box.style.bottom = "12px";
+            box.style.top = "auto";
+            box.style.maxHeight = "62vh";
           } else {
             ov.className = "fixed inset-0 bg-black/40 z-[70] flex items-start justify-center p-4 overflow-auto";
             ov.style.pointerEvents = "";
             box.className = "card w-full max-w-3xl p-4 sm:p-5 max-h-[92vh] overflow-auto my-auto";
             box.style.pointerEvents = "";
-            box.style.position = box.style.left = box.style.width = box.style.top = box.style.maxHeight = "";
+            box.style.position = box.style.left = box.style.right = box.style.width = box.style.top = box.style.bottom = box.style.maxHeight = "";
           }
         };
         colocar();
