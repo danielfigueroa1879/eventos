@@ -1138,14 +1138,6 @@
               <input id="g_tel" class="fld" inputmode="tel" placeholder="9 1234 5678" autocomplete="off"/>
             </div>
             <div>
-              <label class="text-sm font-semibold text-slate-700">Sexo</label>
-              <select id="g_sexo" class="fld">
-                <option value="">— Selecciona —</option>
-                <option value="H">Hombre</option>
-                <option value="M">Mujer</option>
-              </select>
-            </div>
-            <div>
               <label id="g_fechaLabel" class="text-sm font-semibold text-slate-700">Fecha último examen OS10</label>
               <input id="g_fecha" type="date" class="fld"/>
               <div id="g_fecMsg" class="text-[11px] mt-0.5"></div>
@@ -1338,7 +1330,7 @@
         try {
           // 1) Guardar/actualizar los datos del guardia (con límite de tiempo).
           if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
-            await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), sexo: (sexoSel && sexoSel.value) || null, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' }), TIMEOUT_MS);
+            await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' }), TIMEOUT_MS);
           } else if (modo === "existe" && registroAbierto) {
             const g0 = guardiaCargado || {};
             const nom = formatNombre(nombres.value).trim(), ape = formatNombre(apellidos.value).trim(), telf = tel.value.trim();
@@ -1350,10 +1342,10 @@
               telf !== (g0.telefono || "").trim() ||
               fecha.value !== (g0.fecha_ultimo_examen || "");
             if (modificado) {
-              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, sexo: (sexoSel && sexoSel.value) || null, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' }), TIMEOUT_MS);
+              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' }), TIMEOUT_MS);
             } else {
               // Si no modificó nada, solo actualizamos los datos básicos sin tocar su estado de aprobación
-              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, sexo: (sexoSel && sexoSel.value) || null, fecha_ultimo_examen: fecha.value }), TIMEOUT_MS);
+              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value }), TIMEOUT_MS);
             }
           }
           // Si la edición está CERRADA (registroAbierto=false), no se modifica el guardia: solo se registra la asistencia.
@@ -1857,10 +1849,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -1881,10 +1873,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
+            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -2140,11 +2132,16 @@
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
-      return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50"${tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
-    <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
-    <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium ${tieneInf ? 'text-red-700' : 'text-slate-800'}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
-    <td data-label="Género" class="pr-2 font-semibold ${sexoGuardia(g) === 'M' ? 'text-pink-600' : sexoGuardia(g) === 'H' ? 'text-sky-700' : 'text-slate-400'}">${sexoGuardia(g) || "—"}</td>
+      const esMujer = sexoGuardia(g) === "M";
+      // Prioridad de fondo: infractor (rojo) por sobre mujer (rosado claro).
+      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fdf2f8"' : '');
+      const nCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-400');   // N°
+      const rCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : '');                  // RUT
+      const nomCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-800');  // Nombre
+      return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''} border-b border-slate-50"${rowStyle}>
+    <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
+    <td data-label="RUT" class="pr-2 font-mono ${rCls}">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
+    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2186,13 +2183,18 @@
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
+      const esMujer = sexoGuardia(g) === "M";
+      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fdf2f8"' : '');
+      const nCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-600');
+      const nomCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-900');
+      const segCls = esMujer && !tieneInf ? 'text-rose-700' : 'text-slate-600';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
-      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50"${tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
-      <span class="text-xs font-bold text-slate-600 w-6 flex-shrink-0">${i + 1}</span>
+      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left active:bg-slate-50"${rowStyle}>
+      <span class="text-xs font-bold ${nCls} w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-sm truncate flex items-center ${tieneInf ? 'text-red-700' : 'text-slate-900'}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
-        <span class="block text-[11px] text-slate-600 truncate">${segunda}</span>
+        <span class="block font-semibold text-sm truncate flex items-center ${nomCls}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
+        <span class="block text-[11px] ${segCls} truncate">${segunda}</span>
       </span>
       ${vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
@@ -2211,11 +2213,15 @@
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
-      return `<tr class="border-b border-slate-50"${tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : ''}>
-        <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
-        <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td>
-        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${tieneInf ? 'text-red-700' : 'text-slate-800'}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}</td>
-        <td data-label="Género" class="pr-2 font-semibold ${sexoGuardia(g) === 'M' ? 'text-pink-600' : sexoGuardia(g) === 'H' ? 'text-sky-700' : 'text-slate-400'}">${sexoGuardia(g) || "—"}</td>
+      const esMujer = sexoGuardia(g) === "M";
+      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fdf2f8"' : '');
+      const nCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-400');
+      const rCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : '');
+      const nomClsE = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-800');
+      return `<tr class="border-b border-slate-50"${rowStyle}>
+        <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
+        <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}">${esc(a.rut)}</td>
+        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${nomClsE}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
         <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2279,7 +2285,6 @@
     </div>` : ""}
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
-      ${detalleFila("⚧", "Género", sexoGuardia(g) === "M" ? "Mujer (M)" : sexoGuardia(g) === "H" ? "Hombre (H)" : "—")}
       ${detalleFila("📅", a.es_supervisor ? "Fecha Resolución" : "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
@@ -4770,8 +4775,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla completa -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${asistGuardiasE.length ? asistGuardiasE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <tbody>${asistGuardiasE.length ? asistGuardiasE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -4788,8 +4793,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${nSupE ? asistSupervisoresE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">Aún no hay supervisores registrados.</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <tbody>${nSupE ? asistSupervisoresE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay supervisores registrados.</td></tr>`}</tbody>
           </table>
         </div>
       </div>
