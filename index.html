@@ -2690,15 +2690,15 @@
       const nPers = new Set(filas.map(f => f.rut)).size;
       const th = (t) => `<th class="px-2 py-2 text-left font-bold whitespace-nowrap">${t}</th>`;
       const filaHTML = (f, i) => `<tr class="border-b border-slate-100" data-s="${esc((f.rut + " " + f.nombre).toLowerCase())}" ${f.detenido ? 'style="background:#fef2f2"' : ""}>
-        <td class="px-2 py-1.5 text-slate-400">${i + 1}</td>
-        <td class="px-2 py-1.5 font-mono whitespace-nowrap">${esc(f.rut)}</td>
-        <td class="px-2 py-1.5 font-medium ${f.detenido ? "text-red-700" : "text-slate-800"} whitespace-nowrap">${esc(f.nombre)}</td>
-        <td class="px-2 py-1.5 whitespace-nowrap">${esc(f.telefono)}</td>
-        <td class="px-2 py-1.5 font-bold ${f.detenido ? "text-red-700" : "text-red-600"} whitespace-nowrap">${f.detenido ? "🚔 Detenido" : "🚩 Infractor"}</td>
-        <td class="px-2 py-1.5 whitespace-nowrap">${esc(f.tipo)}</td>
-        <td class="px-2 py-1.5">${esc(f.motivo)}</td>
-        <td class="px-2 py-1.5">${esc(f.lugar)}</td>
-        <td class="px-2 py-1.5 whitespace-nowrap">${esc(f.fecha)}</td>
+        <td class="px-2 py-1 text-slate-400">${i + 1}</td>
+        <td class="px-2 py-1 font-mono whitespace-nowrap">${esc(f.rut)}</td>
+        <td class="px-2 py-1 font-medium ${f.detenido ? "text-red-700" : "text-slate-800"} whitespace-nowrap">${esc(f.nombre)}</td>
+        <td class="px-2 py-1 whitespace-nowrap">${esc(f.telefono)}</td>
+        <td class="px-2 py-1 font-bold ${f.detenido ? "text-red-700" : "text-red-600"} whitespace-nowrap">${f.detenido ? "🚔 Detenido" : "🚩 Infractor"}</td>
+        <td class="px-2 py-1 whitespace-nowrap">${esc(f.tipo)}</td>
+        <td class="px-2 py-1">${esc(f.motivo)}</td>
+        <td class="px-2 py-1">${esc(f.lugar)}</td>
+        <td class="px-2 py-1 whitespace-nowrap">${esc(f.fecha)}</td>
       </tr>`;
       const cuerpo = filas.length ? filas.map(filaHTML).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">No hay guardias infractores registrados.</td></tr>`;
       return `
@@ -4363,14 +4363,14 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       $("#e_reg_toggle").addEventListener("click", () => {
         const regs = getInfracciones(g);
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
-        const th = t => `<th class="px-2 py-1.5 text-left font-bold whitespace-nowrap">${t}</th>`;
+        const th = t => `<th class="px-2 py-1 text-left font-bold whitespace-nowrap">${t}</th>`;
         const cuerpo = regs.length ? regs.map((r, i) => `<tr class="border-b border-red-100" ${recEsDetenido(r) ? 'style="background:#fef2f2"' : ""}>
-            <td class="px-2 py-1.5 text-slate-400">${i + 1}</td>
-            <td class="px-2 py-1.5 font-bold ${recEsDetenido(r) ? "text-red-700" : "text-red-600"} whitespace-nowrap">${recEsDetenido(r) ? "🚔 Detenido" : "🚩 Infractor"}</td>
-            <td class="px-2 py-1.5 whitespace-nowrap">${esc(recEsDetenido(r) ? "—" : (r.tipo || "—"))}</td>
-            <td class="px-2 py-1.5">${esc(r.motivo || "—")}</td>
-            <td class="px-2 py-1.5">${esc(r.lugar || "—")}</td>
-            <td class="px-2 py-1.5 whitespace-nowrap">${esc(r.fecha ? fechaFmt(r.fecha) : "—")}</td>
+            <td class="px-2 py-1 text-slate-400">${i + 1}</td>
+            <td class="px-2 py-1 font-bold ${recEsDetenido(r) ? "text-red-700" : "text-red-600"} whitespace-nowrap">${recEsDetenido(r) ? "🚔 Detenido" : "🚩 Infractor"}</td>
+            <td class="px-2 py-1 whitespace-nowrap">${esc(recEsDetenido(r) ? "—" : (r.tipo || "—"))}</td>
+            <td class="px-2 py-1">${esc(r.motivo || "—")}</td>
+            <td class="px-2 py-1">${esc(r.lugar || "—")}</td>
+            <td class="px-2 py-1 whitespace-nowrap">${esc(r.fecha ? fechaFmt(r.fecha) : "—")}</td>
           </tr>`).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-4">Este guardia no tiene infracciones ni detenciones registradas.</td></tr>`;
         const contenido = `
           <div class="flex items-center justify-between gap-2 mb-2">
@@ -4395,12 +4395,12 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           if (window.innerWidth >= 640 && mb) {
             // PC: panel ancho pero no a pantalla completa, anclado justo donde termina Editar guardia.
             const r = mb.getBoundingClientRect();
-            const w = Math.min(window.innerWidth - 24, 1100);
+            const w = Math.min(window.innerWidth - 24, 1040);
             const left = Math.round((window.innerWidth - w) / 2);
-            const top = Math.min(r.bottom + 14, window.innerHeight - 96);
+            const top = Math.min(r.bottom + 4, window.innerHeight - 120);
             ov.className = "fixed inset-0 z-[70]";
             ov.style.pointerEvents = "none";
-            box.className = "card p-4 sm:p-5 overflow-auto shadow-2xl";
+            box.className = "card p-3 overflow-auto shadow-2xl";
             box.style.pointerEvents = "auto";
             box.style.position = "fixed";
             box.style.left = left + "px";
