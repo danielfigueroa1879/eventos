@@ -2134,7 +2134,7 @@
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       // Prioridad de fondo: infractor (rojo) por sobre mujer (rosado claro).
-      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fdf2f8"' : '');
+      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fce7f3"' : '');
       const nCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-400');   // N°
       const rCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : '');                  // RUT
       const nomCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-800');  // Nombre
@@ -2184,7 +2184,7 @@
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
-      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fdf2f8"' : '');
+      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fdf4f8"' : '');
       const nCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-600');
       const nomCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-900');
       const segCls = esMujer && !tieneInf ? 'text-rose-700' : 'text-slate-600';
@@ -2214,7 +2214,7 @@
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
       const esMujer = sexoGuardia(g) === "M";
-      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fdf2f8"' : '');
+      const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : (esMujer ? ' style="background:#fce7f3"' : '');
       const nCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-400');
       const rCls = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : '');
       const nomClsE = tieneInf ? 'text-red-700' : (esMujer ? 'text-rose-800' : 'text-slate-800');
