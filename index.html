@@ -730,11 +730,21 @@
         "HERNÁN", "HERNAN", "JHON", "JOHN", "MICHAEL"
       ]);
       const F_EXC = new Set([
-        "CARMEN", "ISABEL", "RAQUEL", "MABEL", "MERCEDES", "INÉS", "INES", "MILAGROS",
+        "CARMEN", "ISABEL", "RAQUEL", "MABEL", "MARIBEL", "MERCEDES", "INÉS", "INES", "MILAGROS",
         "SOLEDAD", "LOURDES", "ESPERANZA", "LIBERTAD", "CARIDAD", "BEATRIZ", "BEATRÍZ",
-        "JAZMÍN", "JAZMIN", "YASMÍN", "YASMIN", "MIRIAM", "MIRIAN", "RUTH", "JUDITH",
-        "LUZ", "PAZ", "CRUZ", "ANDREA", "LILIAN", "LILIÁN", "ROCÍO", "ROCIO",
-        "PILAR", "SOL", "ABIGAIL"
+        "JAZMÍN", "JAZMIN", "YAZMÍN", "YAZMIN", "YASMÍN", "YASMIN", "MIRIAM", "MIRIAN", "RUTH", "JUDITH", "EDITH", "ESTER", "ESTHER",
+        "LUZ", "PAZ", "CRUZ", "ANDREA", "LILIAN", "LILIÁN", "VIVIAN", "VIVIANNE", "ROCÍO", "ROCIO",
+        "PILAR", "SOL", "ABIGAIL",
+        // Nombres femeninos frecuentes que NO terminan en "A" (antes se contaban como hombres):
+        "NICOLE", "NICOL", "NICOLL", "DENISSE", "DENISE", "THIARE", "TIARE", "SCARLETTE", "SCARLETT", "SCARLET",
+        "YOSELIN", "YOSELINE", "YOSELYN", "JOSELIN", "JOSELINE", "JOSELYN", "EVELYN", "EVELIN", "EVELING",
+        "KAREN", "KARIN", "KARÍN", "CAREN", "KAREM", "JACQUELINE", "JAQUELINE", "JEANNETTE", "JEANETTE", "JANNETTE",
+        "JANET", "JANETH", "YANET", "YANETH", "JEANNETH", "LISETTE", "LISET", "LIZETH", "LISETH", "IVETTE", "YVETTE",
+        "MARLENE", "MARLEN", "MADELEINE", "NOEMÍ", "NOEMI", "RAQUEL", "ANAÍS", "ANAIS", "BELÉN", "BELEN",
+        "NANCY", "MERI", "MERY", "YAMILET", "YAMILE", "YAMILETH", "INGRID", "ASTRID", "DORIS", "GLADYS", "GLADIS",
+        "KIMBERLY", "KIMBERLYN", "CAROL", "CAROLL", "DAFNE", "DAPHNE", "IRIS", "ELIZABETH", "ELISABETH",
+        "KATHERINE", "CATHERINE", "KATHERIN", "KATERINE", "KATTERINE", "JENNIFER", "YENNIFER", "MELANIE", "MELANY",
+        "ROSEMARY", "ROSMERY", "ROSEMARIE", "ANNGIE", "ANGIE", "LESLIE", "LESLY", "YASNA", "YOSELYNE"
       ]);
       if (M_EXC.has(n)) return "H";
       if (F_EXC.has(n)) return "M";
