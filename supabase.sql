@@ -38,6 +38,7 @@ create table if not exists guardias_central (
   nombres             text,                       -- MAYÚSCULAS (2 nombres)
   apellidos           text,                       -- MAYÚSCULAS (2 apellidos)
   telefono            text,
+  sexo                text,                       -- 'H' (hombre) o 'M' (mujer)
   fecha_ultimo_examen date,
   aprobado            boolean default true,      -- false = pendiente de revisión
   revision_tipo       text,                      -- 'NUEVO' o 'MODIFICADO'
@@ -51,6 +52,7 @@ create table if not exists guardias_central (
 );
 
 -- Migración para la tabla guardias_central (agrega la columna si falta):
+alter table guardias_central add column if not exists sexo text;
 alter table guardias_central add column if not exists aprobado boolean default true;
 alter table guardias_central add column if not exists revision_tipo text;
 alter table guardias_central add column if not exists infractor boolean default false;

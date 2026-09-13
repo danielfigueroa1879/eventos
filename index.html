@@ -756,6 +756,12 @@
       if (F_EXC.has(n)) return "M";
       return n[n.length - 1] === "A" ? "M" : "H";
     }
+    // Sexo del guardia: usa el dato guardado (H/M) si existe; si no, infiere por el nombre.
+    function sexoGuardia(g) {
+      const s = (g && g.sexo ? String(g.sexo).trim().toUpperCase()[0] : "");
+      if (s === "H" || s === "M") return s;
+      return generoDeNombre(g && g.nombres);
+    }
 
     /* =========================================================================
        CAPA DE DATOS  (Supabase  ó  LocalStorage/Demo)
@@ -1130,6 +1136,14 @@
               <input id="g_tel" class="fld" inputmode="tel" placeholder="9 1234 5678" autocomplete="off"/>
             </div>
             <div>
+              <label class="text-sm font-semibold text-slate-700">Sexo</label>
+              <select id="g_sexo" class="fld">
+                <option value="">— Selecciona —</option>
+                <option value="H">Hombre</option>
+                <option value="M">Mujer</option>
+              </select>
+            </div>
+            <div>
               <label id="g_fechaLabel" class="text-sm font-semibold text-slate-700">Fecha último examen OS10</label>
               <input id="g_fecha" type="date" class="fld"/>
               <div id="g_fecMsg" class="text-[11px] mt-0.5"></div>
@@ -1167,7 +1181,7 @@
       const rut = $("#g_rut"), extra = $("#camposExtra"), vigBox = $("#vigBox"), vigBadge = $("#vigBadge"),
         turnoBox = $("#turnoBox"), turnoInfo = $("#turnoInfo"),
         submit = $("#g_submit"), rutMsg = $("#rutMsg"),
-        nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha"),
+        nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha"), sexoSel = $("#g_sexo"),
         nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg"),
         superWrap = $("#g_superWrap"), superSel = $("#g_rol");
       let modo = null, guardiaExiste = false, guardiaCargado = null;
@@ -1240,6 +1254,7 @@
           guardiaExiste = true; modo = "existe"; guardiaCargado = g;
           extra.hidden = false;
           nombres.value = g.nombres || ""; apellidos.value = g.apellidos || ""; tel.value = g.telefono || ""; fecha.value = g.fecha_ultimo_examen || "";
+          if (sexoSel) sexoSel.value = (g.sexo && /^[HM]/i.test(g.sexo)) ? g.sexo[0].toUpperCase() : (generoDeNombre(g.nombres) || "");
           if (registroAbierto) {
             // Edición ABIERTA: el guardia puede corregir sus datos (nombres, apellidos, teléfono o curso) al registrar su ingreso.
             [nombres, apellidos, tel, fecha].forEach(i => i.removeAttribute("readonly"));
@@ -1321,7 +1336,7 @@
         try {
           // 1) Guardar/actualizar los datos del guardia (con límite de tiempo).
           if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
-            await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' }), TIMEOUT_MS);
+            await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: formatNombre(nombres.value).trim(), apellidos: formatNombre(apellidos.value).trim(), telefono: tel.value.trim(), sexo: (sexoSel && sexoSel.value) || null, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'NUEVO' }), TIMEOUT_MS);
           } else if (modo === "existe" && registroAbierto) {
             const g0 = guardiaCargado || {};
             const nom = formatNombre(nombres.value).trim(), ape = formatNombre(apellidos.value).trim(), telf = tel.value.trim();
@@ -1333,10 +1348,10 @@
               telf !== (g0.telefono || "").trim() ||
               fecha.value !== (g0.fecha_ultimo_examen || "");
             if (modificado) {
-              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' }), TIMEOUT_MS);
+              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, sexo: (sexoSel && sexoSel.value) || null, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' }), TIMEOUT_MS);
             } else {
               // Si no modificó nada, solo actualizamos los datos básicos sin tocar su estado de aprobación
-              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value }), TIMEOUT_MS);
+              await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, sexo: (sexoSel && sexoSel.value) || null, fecha_ultimo_examen: fecha.value }), TIMEOUT_MS);
             }
           }
           // Si la edición está CERRADA (registroAbierto=false), no se modifica el guardia: solo se registra la asistencia.
@@ -1733,8 +1748,8 @@
       const totalProrrogas = nP + asistSupervisores.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
       const totalVencidos = nX + asistSupervisores.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
       // Conteo aproximado de hombres/mujeres por primer nombre (ver generoDeNombre).
-      const nH = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "H").length;
-      const nM = filas.filter(a => generoDeNombre(a.guardia?.nombres) === "M").length;
+      const nH = filas.filter(a => sexoGuardia(a.guardia) === "H").length;
+      const nM = filas.filter(a => sexoGuardia(a.guardia) === "M").length;
 
       // Candado de edición del evento: ABIERTO (verde) = los guardias pueden corregir sus datos;
       // CERRADO (gris) = nadie puede modificar los datos al registrar su ingreso.
@@ -3759,8 +3774,8 @@
       const asistSupervisores = (asist || []).filter(a => a.es_supervisor);
 
       // Conteo automático en tiempo real desde la asistencia registrada
-      const calcHombres = asistGuardias.filter(a => generoDeNombre(a.guardia?.nombres) === "H").length;
-      const calcMujeres = asistGuardias.filter(a => generoDeNombre(a.guardia?.nombres) === "M").length;
+      const calcHombres = asistGuardias.filter(a => sexoGuardia(a.guardia) === "H").length;
+      const calcMujeres = asistGuardias.filter(a => sexoGuardia(a.guardia) === "M").length;
       const calcSupervisores = asistSupervisores.length;
       const calcTotalGGSS = asistGuardias.length;
 
@@ -4302,7 +4317,16 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
     <div class="space-y-2">
       <div><label class="text-xs font-semibold text-slate-600">Nombres</label><input id="e_nom" class="fld fld-sm" value="${esc(g.nombres || "")}"/></div>
       <div><label class="text-xs font-semibold text-slate-600">Apellidos</label><input id="e_ape" class="fld fld-sm" value="${esc(g.apellidos || "")}"/></div>
-      <div><label class="text-xs font-semibold text-slate-600">Teléfono</label><input id="e_tel" class="fld fld-sm" value="${esc(g.telefono || "")}"/></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs font-semibold text-slate-600">Teléfono</label><input id="e_tel" class="fld fld-sm" value="${esc(g.telefono || "")}"/></div>
+        <div><label class="text-xs font-semibold text-slate-600">Sexo</label>
+          <select id="e_sexo" class="fld fld-sm">
+            <option value="">—</option>
+            <option value="H" ${sexoGuardia(g) === "H" ? "selected" : ""}>Hombre</option>
+            <option value="M" ${sexoGuardia(g) === "M" ? "selected" : ""}>Mujer</option>
+          </select>
+        </div>
+      </div>
       <div><label id="e_fec_lbl" class="text-xs font-semibold text-slate-600">${rotuloFecha}</label><input id="e_fec" type="date" max="${new Date().toISOString().slice(0, 10)}" class="fld fld-sm" value="${esc(g.fecha_ultimo_examen || "")}"/></div>
       <label class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 cursor-pointer">
         <input type="checkbox" id="e_super" class="w-4 h-4 flex-shrink-0" ${esSup ? "checked" : ""}>
@@ -4459,7 +4483,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const esInfractor = infracciones.length > 0;
         const prim = infracciones[infracciones.length - 1] || {};
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), sexo: $("#e_sexo").value || null, fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
           if (nuevoSup !== esSup && a.id) await Data.setAsistenciaSupervisor(a.id, nuevoSup);
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
