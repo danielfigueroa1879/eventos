@@ -41,12 +41,16 @@ create table if not exists guardias_central (
   fecha_ultimo_examen date,
   aprobado            boolean default true,      -- false = pendiente de revisión
   revision_tipo       text,                      -- 'NUEVO' o 'MODIFICADO'
+  infractor           boolean default false,     -- true = fichado como infractor (marca roja + alerta)
+  infractor_motivo    text,                       -- motivo (ej: 'Ley 20.000 (Droga)')
   updated_at          timestamptz default now()
 );
 
 -- Migración para la tabla guardias_central (agrega la columna si falta):
 alter table guardias_central add column if not exists aprobado boolean default true;
 alter table guardias_central add column if not exists revision_tipo text;
+alter table guardias_central add column if not exists infractor boolean default false;
+alter table guardias_central add column if not exists infractor_motivo text;
 
 create table if not exists asistencias (
   id           uuid primary key default gen_random_uuid(),
