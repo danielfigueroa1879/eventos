@@ -4304,7 +4304,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <div id="e_inf_list" class="mt-2 space-y-2"></div>
         <p class="text-[11px] text-slate-400 mt-1">Puedes registrar varias. Deja la lista vacía si no tiene observaciones.</p>
       </div>
-      <button type="button" id="e_reg_toggle" class="btn btn-ghost w-full text-sm">📋 Registros de infractores / detenidos</button>
+      <button type="button" id="e_reg_toggle" class="btn btn-ghost w-full text-sm">📋 Registros del guardia</button>
       <div id="e_reg_panel" hidden></div>
     </div>
     <div class="flex gap-2 mt-4">
@@ -4342,28 +4342,38 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       $("#e_inf_add").addEventListener("click", () => infList.insertAdjacentHTML("beforeend", infRowHTML()));
       infList.addEventListener("click", e => { const b = e.target.closest(".inf-del"); if (b) b.closest(".inf-row").remove(); });
 
-      // Botón "Registros": despliega la tabla de infractores/detenidos debajo y ensancha el modal.
-      const regBtn = $("#e_reg_toggle"), regPanel = $("#e_reg_panel"), mBox = $("#modalBox");
+      // Botón "Registros": despliega SOLO las infracciones/detenciones de ESTE guardia.
+      const regBtn = $("#e_reg_toggle"), regPanel = $("#e_reg_panel");
       let regCargado = false;
-      regBtn.addEventListener("click", async () => {
+      regBtn.addEventListener("click", () => {
         const abrir = regPanel.hidden;
         if (abrir) {
-          if (mBox) mBox.classList.replace("max-w-md", "max-w-5xl");
           if (!regCargado) {
-            regPanel.innerHTML = `<div class="text-center text-slate-400 text-sm py-3">Cargando…</div>`;
-            regPanel.hidden = false;
-            const filas = await listaInfractores();
+            const regs = getInfracciones(g);
+            const th = t => `<th class="px-2 py-1.5 text-left font-bold whitespace-nowrap">${t}</th>`;
+            const cuerpo = regs.length ? regs.map((r, i) => `<tr class="border-b border-red-100" ${recEsDetenido(r) ? 'style="background:#fef2f2"' : ""}>
+                <td class="px-2 py-1.5 text-slate-400">${i + 1}</td>
+                <td class="px-2 py-1.5 font-bold ${recEsDetenido(r) ? "text-red-700" : "text-red-600"} whitespace-nowrap">${recEsDetenido(r) ? "🚔 Detenido" : "🚩 Infractor"}</td>
+                <td class="px-2 py-1.5 whitespace-nowrap">${esc(recEsDetenido(r) ? "—" : (r.tipo || "—"))}</td>
+                <td class="px-2 py-1.5">${esc(r.motivo || "—")}</td>
+                <td class="px-2 py-1.5">${esc(r.lugar || "—")}</td>
+                <td class="px-2 py-1.5 whitespace-nowrap">${esc(r.fecha ? fechaFmt(r.fecha) : "—")}</td>
+              </tr>`).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-4">Este guardia no tiene infracciones ni detenciones registradas.</td></tr>`;
             regPanel.innerHTML = `<div class="rounded-xl border border-red-200 bg-red-50/40 p-2 mt-1">
-              <div class="font-bold text-red-700 text-sm mb-2">🚩 Registro de infractores / detenidos</div>
-              ${infractoresContenidoHTML(filas)}</div>`;
-            infractoresWire();
+              <div class="font-bold text-red-700 text-sm mb-2">📋 Registros de ${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut)} <span class="text-slate-400 font-normal">(${regs.length})</span></div>
+              <div class="overflow-x-auto rounded-lg border border-red-100">
+                <table class="w-full text-sm" style="min-width:560px">
+                  <thead><tr class="text-white" style="background:#0f5323">${th("N°")}${th("Situación")}${th("Ley / Tipo")}${th("Motivo / detalle")}${th("Lugar")}${th("Fecha")}</tr></thead>
+                  <tbody>${cuerpo}</tbody>
+                </table>
+              </div></div>`;
             regCargado = true;
-          } else { regPanel.hidden = false; }
+          }
+          regPanel.hidden = false;
           regBtn.textContent = "📋 Ocultar registros";
         } else {
           regPanel.hidden = true;
-          if (mBox) mBox.classList.replace("max-w-5xl", "max-w-md");
-          regBtn.textContent = "📋 Registros de infractores / detenidos";
+          regBtn.textContent = "📋 Registros del guardia";
         }
       });
 
