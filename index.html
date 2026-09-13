@@ -1857,10 +1857,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -1881,10 +1881,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
+            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -2144,6 +2144,7 @@
     <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
     <td data-label="Nombre" class="pr-2 font-medium ${tieneInf ? 'text-red-700' : 'text-slate-800'}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
+    <td data-label="Género" class="pr-2 font-semibold ${sexoGuardia(g) === 'M' ? 'text-pink-600' : sexoGuardia(g) === 'H' ? 'text-sky-700' : 'text-slate-400'}">${sexoGuardia(g) || "—"}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2214,6 +2215,7 @@
         <td data-label="#" class="py-1.5 pr-2 text-slate-400">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap">${esc(a.rut)}</td>
         <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${tieneInf ? 'text-red-700' : 'text-slate-800'}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}</td>
+        <td data-label="Género" class="pr-2 font-semibold ${sexoGuardia(g) === 'M' ? 'text-pink-600' : sexoGuardia(g) === 'H' ? 'text-sky-700' : 'text-slate-400'}">${sexoGuardia(g) || "—"}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
         <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2277,6 +2279,7 @@
     </div>` : ""}
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<span class="font-mono">${esc(a.rut)}</span>`)}
+      ${detalleFila("⚧", "Género", sexoGuardia(g) === "M" ? "Mujer (M)" : sexoGuardia(g) === "H" ? "Hombre (H)" : "—")}
       ${detalleFila("📅", a.es_supervisor ? "Fecha Resolución" : "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${detalleFila("⏱️", "Vigencia", badge(v))}
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
@@ -4767,8 +4770,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla completa -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${asistGuardiasE.length ? asistGuardiasE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <tbody>${asistGuardiasE.length ? asistGuardiasE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -4785,8 +4788,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${nSupE ? asistSupervisoresE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay supervisores registrados.</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Género</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <tbody>${nSupE ? asistSupervisoresE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">Aún no hay supervisores registrados.</td></tr>`}</tbody>
           </table>
         </div>
       </div>
