@@ -1129,10 +1129,13 @@
           <div id="turnoInfo" class="mt-1 font-semibold text-indigo-800"></div>
         </div>
 
-        <label id="g_superWrap" hidden class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 cursor-pointer">
-          <input type="checkbox" id="g_super" class="w-4 h-4 flex-shrink-0">
-          <span>Ingreso como <b>Supervisor</b> <span class="text-slate-400 font-normal">(marca solo si eres supervisor)</span></span>
-        </label>
+        <div id="g_superWrap" hidden>
+          <label for="g_rol" class="text-sm font-semibold text-slate-700">Ingreso como</label>
+          <select id="g_rol" class="fld mt-1">
+            <option value="guardia" selected>Guardia</option>
+            <option value="supervisor">Supervisor</option>
+          </select>
+        </div>
 
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
       </div>
@@ -1148,7 +1151,7 @@
         submit = $("#g_submit"), rutMsg = $("#rutMsg"),
         nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha"),
         nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg"),
-        superWrap = $("#g_superWrap"), superChk = $("#g_super");
+        superWrap = $("#g_superWrap"), superSel = $("#g_rol");
       let modo = null, guardiaExiste = false, guardiaCargado = null;
 
       // Fecha del examen: no puede ser futura
@@ -1183,14 +1186,14 @@
       fecha.addEventListener("change", () => { if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); vigBox.hidden = true; } else { avisoFecha(); mostrarVigencia(fecha.value); } actualizarBtn(); });
 
       // El supervisor no da examen OS10: su vigencia (3 años) nace de la fecha de autorización de la resolución.
-      // Al marcar la casilla de Supervisor, cambian los rótulos del formulario para reflejarlo.
+      // Al elegir Supervisor en el desplegable, cambian los rótulos del formulario para reflejarlo.
       const fechaLabel = $("#g_fechaLabel"), vigBoxLabel = $("#vigBoxLabel");
       function aplicarRotuloSupervisor() {
-        const esSup = !!(superChk && superChk.checked);
+        const esSup = !!(superSel && superSel.value === "supervisor");
         if (fechaLabel) fechaLabel.textContent = esSup ? "Fecha de autorización de la resolución" : "Fecha último examen OS10";
         if (vigBoxLabel) vigBoxLabel.textContent = esSup ? "Estado de la autorización" : "Estado del curso";
       }
-      if (superChk) superChk.addEventListener("change", aplicarRotuloSupervisor);
+      if (superSel) superSel.addEventListener("change", aplicarRotuloSupervisor);
 
       rut.addEventListener("input", () => {
         rut.value = formatRut(rut.value); rutMsg.innerHTML = ""; submit.disabled = true; submit.textContent = "Ingrese su RUT";
@@ -1320,7 +1323,7 @@
           }
           // Si la edición está CERRADA (registroAbierto=false), no se modifica el guardia: solo se registra la asistencia.
           // 2) Registrar la asistencia y CONFIRMAR que el servidor la escribió (devuelve la fila insertada).
-          const asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superChk && superChk.checked)), TIMEOUT_MS);
+          const asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superSel && superSel.value === "supervisor")), TIMEOUT_MS);
           if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
           mostrarIngresoExitoso(asis);
