@@ -201,14 +201,14 @@
       outline-offset: -2px
     }
 
-    /* Mujeres: fondo rosado claro (PC un poco más visible, celular más tenue) */
+    /* Mujeres: mismo tono rojo del infractor, con fondo un poco más claro */
     .row-mujer {
-      background: #fef9fc
+      background: #fef6f6
     }
 
     @media (max-width: 767px) {
       .row-mujer {
-        background: #fefdfe
+        background: #fef8f8
       }
     }
 
@@ -2147,9 +2147,9 @@
       // Prioridad de fondo: infractor (rojo) por sobre mujer (rosado claro con hover rojo).
       const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : '';
       const claseMujer = (esMujer && !tieneInf) ? ' row-mujer' : '';
-      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : 'text-slate-400');   // N°
-      const rCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : '');                  // RUT
-      const nomCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : 'text-slate-800');  // Nombre
+      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-400');   // N°
+      const rCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : '');                  // RUT
+      const nomCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-800');  // Nombre
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseMujer} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
@@ -2198,9 +2198,9 @@
       const esMujer = sexoGuardia(g) === "M";
       const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : '';
       const claseMujer = (esMujer && !tieneInf) ? ' row-mujer' : ' active:bg-slate-50';
-      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : 'text-slate-600');
-      const nomCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : 'text-slate-900');
-      const segCls = esMujer && !tieneInf ? 'text-rose-700' : 'text-slate-600';
+      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-600');
+      const nomCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-900');
+      const segCls = esMujer && !tieneInf ? 'text-red-700' : 'text-slate-600';
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseMujer}"${rowStyle}>
@@ -2229,9 +2229,9 @@
       const esMujer = sexoGuardia(g) === "M";
       const rowStyle = tieneInf ? ' style="background:#fef2f2;box-shadow:inset 3px 0 0 #dc2626"' : '';
       const claseMujer = (esMujer && !tieneInf) ? ' row-mujer' : '';
-      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : 'text-slate-400');
-      const rCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : '');
-      const nomClsE = tieneInf ? 'text-red-800' : (esMujer ? 'text-rose-800' : 'text-slate-800');
+      const nCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-400');
+      const rCls = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : '');
+      const nomClsE = tieneInf ? 'text-red-800' : (esMujer ? 'text-red-800' : 'text-slate-800');
       return `<tr class="border-b border-slate-50${claseMujer}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}">${esc(a.rut)}</td>
@@ -2287,7 +2287,7 @@
       <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
     </div>
     <div class="text-center mb-3">
-      <div class="font-bold text-lg ${tieneFicha(g) ? 'text-red-800' : 'text-slate-800'} leading-tight">${esc(nomFull)}</div>
+      <div class="font-bold text-lg ${(tieneFicha(g) || sexoGuardia(g) === 'M') ? 'text-red-800' : 'text-slate-800'} leading-tight">${esc(nomFull)}</div>
       <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 align-middle" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
@@ -3537,7 +3537,7 @@
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
-        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-rose-800 font-semibold" : "text-slate-700"}"><span class="${mujer ? "text-rose-400" : "text-slate-400"} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : "text-slate-700"}"><span class="${mujer ? "text-red-400" : "text-slate-400"} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = readonly ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
             <button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
