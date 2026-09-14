@@ -61,6 +61,9 @@ alter table guardias_central add column if not exists infractor_motivo text;
 alter table guardias_central add column if not exists infractor_fecha date;
 alter table guardias_central add column if not exists infractor_lugar text;
 alter table guardias_central add column if not exists infracciones jsonb default '[]'::jsonb;
+alter table guardias_central add column if not exists spd boolean default false;
+-- Marca si el administrador ya revisó/verificó la resolución del guardia autorizado por SPD.
+alter table guardias_central add column if not exists spd_verificado boolean default false;
 
 create table if not exists asistencias (
   id           uuid primary key default gen_random_uuid(),
