@@ -1643,8 +1643,8 @@
       cont.querySelectorAll(".evItem").forEach(b => b.addEventListener("click", () => {
         if (ADMIN_STATE._reordenando) return;
         ADMIN_STATE.selected = b.dataset.id;
-        ADMIN_STATE.expandido = b.dataset.id;   // al seleccionar: verde + resumen abierto
-        programarCierreResumen();
+        ADMIN_STATE.expandido = null;   // seleccionar NO abre el resumen (eso es solo con el chevron)
+        if (ADMIN_STATE._resumenTimer) clearTimeout(ADMIN_STATE._resumenTimer);
         ADMIN_STATE.turnoFiltro = "all";
         if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer();
         refreshAdmin();
