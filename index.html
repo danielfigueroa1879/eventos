@@ -1711,28 +1711,11 @@
       const b = $("#inf_ok"); if (b) b.addEventListener("click", closeModal);
     }
 
-    // Estado (por evento) de resoluciones SPD ya verificadas por el administrador.
-    // Se guarda en memoria y en localStorage (respaldo si el navegador lo permite).
-    const SPD_VER = {}; // evId -> Set(rut)
-    function spdVerSet(evId) {
-      if (!SPD_VER[evId]) {
-        let arr = [];
-        try { const raw = localStorage.getItem("spd_ver_" + evId); if (raw) arr = JSON.parse(raw) || []; } catch (_) {}
-        SPD_VER[evId] = new Set(arr);
-      }
-      return SPD_VER[evId];
-    }
-    function spdVerificado(evId, rut) {
-      try { return spdVerSet(evId).has(rut); } catch (_) { return false; }
-    }
-    function marcarSpdVerificado(evId, rut) {
-      const set = spdVerSet(evId); set.add(rut);
-      try { localStorage.setItem("spd_ver_" + evId, JSON.stringify([...set])); } catch (_) {}
-    }
-    // Aviso "pedir resolución" junto al nombre, mientras el SPD no esté verificado.
+    // Aviso "pedir resolución" junto al nombre, mientras el SPD no esté verificado por el administrador.
+    // La verificación se guarda en la base de datos (campo spd_verificado), igual que la aprobación de perfil,
+    // para que funcione en todos los dispositivos.
     function spdAvisoHTML(ev, a, g) {
-      if (!g || !g.spd) return "";
-      if (ev && spdVerificado(ev.id, a.rut)) return "";
+      if (!g || !g.spd || g.spd_verificado) return "";
       return ` <span data-spdaviso="${esc(a.rut)}" class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Solicitar la resolución de autorización SPD">⚠ Pedir resolución</span>`;
     }
 
@@ -2366,7 +2349,10 @@
     ${!empresa && g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn w-full text-white shadow-sm flex items-center justify-center gap-2" style="background:${g.revision_tipo === 'NUEVO' ? '#ef4444' : '#eab308'}">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
     ${!empresa && g.spd ? `<div class="mt-4 rounded-xl px-3 py-2" style="border:1px solid #c7d2fe;background:#eef2ff">
       <div class="text-sm font-semibold mb-1" style="color:#1b3a8f">🪪 SPD — Solicitar resolución</div>
-      <p class="text-xs text-slate-500">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución de autorización. Al revisar aquí, el aviso "Pedir resolución" se quita de la lista.</p>
+      <p class="text-xs text-slate-500 mb-2">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución de autorización.</p>
+      ${g.spd_verificado
+        ? `<div class="text-xs font-bold" style="color:#166534">✔ Resolución verificada</div>`
+        : `<button id="dg_spd_ver" class="btn w-full text-white shadow-sm" style="background:#1b3a8f">✔ Resolución verificada</button>`}
     </div>` : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
@@ -2400,11 +2386,17 @@
           } catch (err) { toast("Error: " + (err.message || err), false); }
         });
       }
-      // Revisar (abrir el detalle) un guardia SPD marca su resolución como vista y quita el aviso de la lista.
-      if (!empresa && g.spd && !spdVerificado(ev.id, a.rut)) {
-        marcarSpdVerificado(ev.id, a.rut);
-        document.querySelectorAll(`[data-spdaviso="${(window.CSS && CSS.escape) ? CSS.escape(a.rut) : a.rut}"]`).forEach(el => el.remove());
-        setTimeout(() => { try { refreshAdmin(); } catch (_) {} }, 400);
+      // Verificar la resolución SPD: se guarda en la base de datos (igual que la aprobación de perfil).
+      if (!empresa && g.spd && !g.spd_verificado) {
+        const btnSpdVer = $("#dg_spd_ver");
+        if (btnSpdVer) btnSpdVer.addEventListener("click", async () => {
+          try {
+            await Data.upsertGuardia({ ...g, spd_verificado: true });
+            document.querySelectorAll(`[data-spdaviso="${(window.CSS && CSS.escape) ? CSS.escape(a.rut) : a.rut}"]`).forEach(el => el.remove());
+            toast("✔ Resolución SPD verificada", true);
+            closeModal(); refreshAdmin();
+          } catch (err) { toast("Error: " + (err.message || err), false); }
+        });
       }
       if (!empresa) {
         $("#dg_edit").addEventListener("click", () => modalEditarGuardia(a, ev));
@@ -4674,7 +4666,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const esInfractor = infracciones.length > 0;
         const prim = infracciones[infracciones.length - 1] || {};
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), sexo: $("#e_sexo").value || null, fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), sexo: $("#e_sexo").value || null, fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, spd_verificado: $("#e_spd").checked ? !!(g.spd && g.spd_verificado) : false, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
           if (nuevoSup !== esSup && a.id) await Data.setAsistenciaSupervisor(a.id, nuevoSup);
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
