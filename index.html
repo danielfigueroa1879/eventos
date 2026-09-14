@@ -238,11 +238,11 @@
 
     /* --- Modo oscuro del listado: fondos de fila y textos legibles --- */
     html[data-theme="dark"] .row-mujer {
-      background: rgba(225, 90, 100, .16) !important
+      background: #351f24 !important
     }
 
     html[data-theme="dark"] .row-hombre {
-      background: rgba(90, 150, 245, .16) !important
+      background: #1c2839 !important
     }
 
     html[data-theme="dark"] .row-inf {
@@ -266,6 +266,38 @@
     html[data-theme="dark"] .text-amber-700,
     html[data-theme="dark"] .text-yellow-800 {
       color: #fcd34d !important
+    }
+
+    /* --- Modo oscuro del formulario Editar guardia: cajas y bordes de colores --- */
+    html[data-theme="dark"] .bg-sky-50,
+    html[data-theme="dark"] .bg-sky-100 {
+      background: #14303f !important
+    }
+
+    html[data-theme="dark"] .bg-blue-50 {
+      background: #1a2740 !important
+    }
+
+    html[data-theme="dark"] .bg-red-50 {
+      background: #3a2327 !important
+    }
+
+    html[data-theme="dark"] .border-sky-200 {
+      border-color: #2a5a72 !important
+    }
+
+    html[data-theme="dark"] .border-blue-200 {
+      border-color: #2f4a80 !important
+    }
+
+    html[data-theme="dark"] .border-red-300,
+    html[data-theme="dark"] .border-red-200 {
+      border-color: #7a3b3b !important
+    }
+
+    html[data-theme="dark"] .text-sky-800,
+    html[data-theme="dark"] .text-sky-700 {
+      color: #7dd3fc !important
     }
 
     input,
@@ -2446,11 +2478,11 @@
     </div>
     </div>
     ${!empresa && g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn w-full text-white shadow-sm flex items-center justify-center gap-2" style="background:${g.revision_tipo === 'NUEVO' ? '#ef4444' : '#eab308'}">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
-    ${!empresa && g.spd ? `<div class="mt-4 rounded-xl px-3 py-2" style="border:1px solid #c7d2fe;background:#eef2ff">
-      <div class="text-sm font-semibold mb-1" style="color:#1b3a8f">🪪 SPD — Solicitar resolución</div>
+    ${!empresa && g.spd ? `<div class="mt-4 rounded-xl px-3 py-2 border border-blue-200 bg-blue-50">
+      <div class="text-sm font-semibold mb-1 text-blue-800">🪪 SPD — Solicitar resolución</div>
       <p class="text-xs text-slate-500 mb-2">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución de autorización.</p>
       ${spdVerificado(ev, a, g)
-        ? `<div class="text-xs font-bold" style="color:#166534">✔ Resolución verificada</div>`
+        ? `<div class="text-xs font-bold text-green-700">✔ Resolución verificada</div>`
         : `<button id="dg_spd_ver" class="btn w-full text-white shadow-sm" style="background:#1b3a8f">✔ Resolución verificada</button>`}
     </div>` : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
@@ -4615,9 +4647,9 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <input type="checkbox" id="e_super" class="w-4 h-4 flex-shrink-0" ${esSup ? "checked" : ""}>
         <span>🤵 Es <b>supervisor</b> <span class="text-slate-400 font-normal">(desmárcalo para dejarlo como guardia)</span></span>
       </label>
-      <label class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl px-3 py-1.5 cursor-pointer" style="border:1px solid #c7d2fe;background:#eef2ff">
+      <label class="flex items-center gap-2 text-sm text-slate-700 select-none rounded-xl px-3 py-1.5 cursor-pointer border border-blue-200 bg-blue-50">
         <input type="checkbox" id="e_spd" class="w-4 h-4 flex-shrink-0" ${g.spd ? "checked" : ""}>
-        <span>Autorizado por <b style="color:#1b3a8f">SPD</b> <span class="text-slate-400 font-normal">(Subsecretaría de Prevención del Delito — presenta resolución)</span></span>
+        <span>Autorizado por <b class="text-blue-800">SPD</b> <span class="text-slate-400 font-normal">(Subsecretaría de Prevención del Delito — presenta resolución)</span></span>
       </label>
       <div class="rounded-xl border border-red-300 bg-red-50 px-3 py-2">
         <button type="button" id="e_inf_head" class="w-full flex items-center justify-between">
