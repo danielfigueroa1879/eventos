@@ -37,6 +37,8 @@ alter table eventos add column if not exists orden integer;
 -- N° y fecha de la Resolución DD.FF. que autoriza el evento:
 alter table eventos add column if not exists resol_numero text;
 alter table eventos add column if not exists resol_fecha  date;
+-- Rango de fechas del evento: fecha_evento = "desde"; fecha_hasta = "hasta" (opcional).
+alter table eventos add column if not exists fecha_hasta date;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9

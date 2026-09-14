@@ -1927,7 +1927,7 @@
     <div class="flex items-start justify-between gap-2 mb-3">
       <div class="min-w-0">
         <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</h1>
-        <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(fechaFmt(ev.fecha_evento))}` : ""}</div>
+        <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(fechaFmt(ev.fecha_evento))}${ev.fecha_hasta && ev.fecha_hasta !== ev.fecha_evento ? " al " + esc(fechaFmt(ev.fecha_hasta)) : ""}` : ""}</div>
         ${ev.resol_numero || ev.resol_fecha ? `<div class="text-xs text-slate-500 truncate">📄 Resol. DD.FF. ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</div>` : ""}
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
@@ -4526,7 +4526,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div id="m_partido_wrap" hidden><label class="text-sm font-semibold text-slate-700">Partido (equipos)</label><input id="m_partido" class="fld" placeholder="La Serena vs Huachipato" value="${edit ? esc(ev.partido || "") : ""}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Empresa de seguridad</label><input id="m_emp" class="fld" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Fecha ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-sm font-semibold text-slate-700">Desde ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
+        <div><label class="text-sm font-semibold text-slate-700">Hasta ${edit ? "" : "(opcional)"}</label><input id="m_fecha_hasta" type="date" class="fld" value="${edit ? esc(ev.fecha_hasta || "") : ""}"/></div>
+      </div>
       <div class="grid grid-cols-2 gap-3">
         <div><label class="text-sm font-semibold text-slate-700">N° de Resol. DD.FF.</label><input id="m_resol_num" class="fld" placeholder="Ej: 1234" value="${edit ? esc(ev.resol_numero || "") : ""}"/></div>
         <div><label class="text-sm font-semibold text-slate-700">Fecha de la resolución</label><input id="m_resol_fecha" type="date" class="fld" value="${edit ? esc(ev.resol_fecha || "") : ""}"/></div>
@@ -4621,8 +4624,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         if (!(turnoHoras > 0)) turnoHoras = TURNO_HORAS_DEFAULT;
         turnoHoras = Math.min(24, Math.max(1, turnoHoras));
         const turnoInicio = ($("#m_tini").value || TURNO_INICIO_DEFAULT);
+        const fechaHasta = $("#m_fecha_hasta").value || null;
+        if (fecha && fechaHasta && fechaHasta < fecha) { toast("La fecha 'Hasta' no puede ser anterior a 'Desde'", false); return; }
         const campos = {
-          nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha,
+          nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha, fecha_hasta: fechaHasta,
           resol_numero: ($("#m_resol_num").value || "").trim() || null,
           resol_fecha: $("#m_resol_fecha").value || null,
           tipo: esPart ? "partido" : "evento", partido: esPart ? partidoTxt : null,
