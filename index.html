@@ -448,9 +448,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 26px;
-      align-self: stretch;
-      border-radius: .5rem;
+      align-self: center;
+      width: 18px;
+      padding: 6px 0;
+      border-radius: .4rem;
       color: #94a3b8;
       cursor: grab;
       user-select: none;
@@ -465,6 +466,7 @@
     #listaEventos .evRow.evDragging { opacity: .65; }
     #listaEventos .evRow.evDragging .evItem { box-shadow: 0 8px 20px -6px rgba(2, 6, 23, .35); }
     #listaEventos.evReordering .evItem { pointer-events: none; }  /* al arrastrar no se dispara el click de selección */
+    #listaEventos.evReordering .evHandle { pointer-events: auto; }  /* pero el asa sigue activa para arrastrar */
     html[data-theme="dark"] #listaEventos .evHandle { color: #6b7280; }
     html[data-theme="dark"] #listaEventos .evHandle:hover { color: #9ca3af; background: rgba(148, 163, 184, .14); }
     /* En celular: asa angosta y pegada a la izquierda; las tarjetas ganan ancho a ambos lados */
@@ -472,9 +474,8 @@
       #listaEventos { margin-left: -.4rem; margin-right: -.45rem; }
       #listaEventos .evRow { gap: .1rem; }
       #listaEventos .evHandle {
-        width: 20px;
-        font-size: 20px;
-        background: rgba(148, 163, 184, .10);
+        width: 18px;
+        font-size: 19px;
       }
       html[data-theme="dark"] #listaEventos .evHandle { background: rgba(148, 163, 184, .12); }
     }
@@ -1626,9 +1627,9 @@
         <div class="flex justify-between gap-2"><span class="evResLbl">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
       </div>` : "";
         return `<div class="evRow" data-id="${e.id}">
-      <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
       <div class="flex-1 min-w-0">
-      <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} px-3 py-2 border-l-4 flex items-center gap-2 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
+      <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} pl-1.5 pr-3 py-2 border-l-4 flex items-center gap-1.5 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
+        <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
         <span class="flex-1 min-w-0">
           <span class="block font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight">${esc(e.nombre_evento)}</span>
           <span class="block text-xs ${act ? 'text-green-800/70' : 'text-slate-500'}">Empresa: ${esc(e.empresa)}</span>
@@ -1666,6 +1667,8 @@
           refreshAdmin();
         }
       }));
+      // Tocar el asa (puntitos) no selecciona el evento: solo sirve para arrastrar/ordenar.
+      cont.querySelectorAll(".evHandle").forEach(ha => ha.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }));
       habilitarReordenEventos(cont);
       // contadores + resumen del evento expandido
       ADMIN_STATE.eventos.forEach(async e => {
