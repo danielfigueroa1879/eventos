@@ -1711,11 +1711,31 @@
       const b = $("#inf_ok"); if (b) b.addEventListener("click", closeModal);
     }
 
+    // Estado de resoluciones SPD ya verificadas. Funciona SIN cambios en la base de datos:
+    // se guarda en memoria + navegador (localStorage). Si la BD tiene el campo spd_verificado,
+    // también se respeta y se intenta persistir para sincronizar entre dispositivos (opcional).
+    const SPD_VER = {}; // evId -> Set(rut)
+    function spdVerSet(evId) {
+      if (!SPD_VER[evId]) {
+        let arr = [];
+        try { const r = localStorage.getItem("spd_ver_" + evId); if (r) arr = JSON.parse(r) || []; } catch (_) {}
+        SPD_VER[evId] = new Set(arr);
+      }
+      return SPD_VER[evId];
+    }
+    function spdVerificado(ev, a, g) {
+      if (g && g.spd_verificado) return true;
+      try { return !!(ev && spdVerSet(ev.id).has(a.rut)); } catch (_) { return false; }
+    }
+    function marcarSpdVerificado(ev, a, g) {
+      const set = spdVerSet(ev.id); set.add(a.rut);
+      try { localStorage.setItem("spd_ver_" + ev.id, JSON.stringify([...set])); } catch (_) {}
+      // Intento opcional de persistir en la BD (si existe la columna); si falla, no pasa nada.
+      try { Data.upsertGuardia({ ...g, spd_verificado: true }).catch(() => {}); } catch (_) {}
+    }
     // Aviso "pedir resolución" junto al nombre, mientras el SPD no esté verificado por el administrador.
-    // La verificación se guarda en la base de datos (campo spd_verificado), igual que la aprobación de perfil,
-    // para que funcione en todos los dispositivos.
     function spdAvisoHTML(ev, a, g) {
-      if (!g || !g.spd || g.spd_verificado) return "";
+      if (!g || !g.spd || spdVerificado(ev, a, g)) return "";
       return ` <span data-spdaviso="${esc(a.rut)}" class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Solicitar la resolución de autorización SPD">⚠ Pedir resolución</span>`;
     }
 
@@ -2350,7 +2370,7 @@
     ${!empresa && g.spd ? `<div class="mt-4 rounded-xl px-3 py-2" style="border:1px solid #c7d2fe;background:#eef2ff">
       <div class="text-sm font-semibold mb-1" style="color:#1b3a8f">🪪 SPD — Solicitar resolución</div>
       <p class="text-xs text-slate-500 mb-2">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución de autorización.</p>
-      ${g.spd_verificado
+      ${spdVerificado(ev, a, g)
         ? `<div class="text-xs font-bold" style="color:#166534">✔ Resolución verificada</div>`
         : `<button id="dg_spd_ver" class="btn w-full text-white shadow-sm" style="background:#1b3a8f">✔ Resolución verificada</button>`}
     </div>` : ""}
@@ -2386,16 +2406,14 @@
           } catch (err) { toast("Error: " + (err.message || err), false); }
         });
       }
-      // Verificar la resolución SPD: se guarda en la base de datos (igual que la aprobación de perfil).
-      if (!empresa && g.spd && !g.spd_verificado) {
+      // Verificar la resolución SPD: se marca al instante (memoria + navegador) y quita el aviso.
+      if (!empresa && g.spd && !spdVerificado(ev, a, g)) {
         const btnSpdVer = $("#dg_spd_ver");
-        if (btnSpdVer) btnSpdVer.addEventListener("click", async () => {
-          try {
-            await Data.upsertGuardia({ ...g, spd_verificado: true });
-            document.querySelectorAll(`[data-spdaviso="${(window.CSS && CSS.escape) ? CSS.escape(a.rut) : a.rut}"]`).forEach(el => el.remove());
-            toast("✔ Resolución SPD verificada", true);
-            closeModal(); refreshAdmin();
-          } catch (err) { toast("Error: " + (err.message || err), false); }
+        if (btnSpdVer) btnSpdVer.addEventListener("click", () => {
+          marcarSpdVerificado(ev, a, g);
+          document.querySelectorAll(`[data-spdaviso="${(window.CSS && CSS.escape) ? CSS.escape(a.rut) : a.rut}"]`).forEach(el => el.remove());
+          toast("✔ Resolución SPD verificada", true);
+          closeModal(); refreshAdmin();
         });
       }
       if (!empresa) {
@@ -4666,7 +4684,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const esInfractor = infracciones.length > 0;
         const prim = infracciones[infracciones.length - 1] || {};
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), sexo: $("#e_sexo").value || null, fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, spd_verificado: $("#e_spd").checked ? !!(g.spd && g.spd_verificado) : false, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
+          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), sexo: $("#e_sexo").value || null, fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
           if (nuevoSup !== esSup && a.id) await Data.setAsistenciaSupervisor(a.id, nuevoSup);
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
