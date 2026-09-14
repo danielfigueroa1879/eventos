@@ -1751,17 +1751,20 @@
       const sel = (window.CSS && CSS.escape) ? CSS.escape(rut) : rut;
       document.querySelectorAll(`[data-spdaviso="${sel}"]`).forEach(el => el.remove());
     }
-    // Aviso "pedir resolución" junto al nombre, mientras el SPD no esté verificado por el administrador.
-    // Es tocable: al tocarlo se marca como verificado y desaparece (sin cambios en la base de datos).
-    function spdAvisoHTML(ev, a, g) {
+    // Aviso "pedir resolución" junto al nombre, como estado (igual que "Datos editados").
+    // En celular es tocable (marca verificado); en PC solo es indicador y se aprueba con el botón de la fila.
+    function spdAvisoHTML(ev, a, g, tocable = true) {
       if (!g || !g.spd || spdVerificado(ev, a, g)) return "";
-      return ` <span data-spdaviso="${esc(a.rut)}" data-spdev="${esc(ev ? ev.id : "")}" role="button" tabindex="0" class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse cursor-pointer" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Tocar para marcar la resolución como verificada">⚠ Pedir resolución</span>`;
+      const tap = tocable ? ` data-spdtap="1" role="button" tabindex="0"` : "";
+      const cur = tocable ? " cursor-pointer" : "";
+      const title = tocable ? "Tocar para marcar la resolución como verificada" : "Solicitar la resolución de autorización SPD";
+      return ` <span data-spdaviso="${esc(a.rut)}" data-spdev="${esc(ev ? ev.id : "")}"${tap} class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse${cur}" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="${title}">⚠ Pedir resolución</span>`;
     }
     // Un solo manejador (en fase de captura) para que tocar el aviso lo quite y NO abra el detalle.
     if (!window._spdAvisoWired) {
       window._spdAvisoWired = true;
       document.addEventListener("click", (e) => {
-        const el = e.target && e.target.closest ? e.target.closest("[data-spdaviso]") : null;
+        const el = e.target && e.target.closest ? e.target.closest("[data-spdtap]") : null;
         if (!el) return;
         e.stopPropagation(); e.preventDefault();
         const rut = el.getAttribute("data-spdaviso");
@@ -2087,6 +2090,11 @@
           } catch (err) { toast("Error: " + (err.message || err), false); }
         }
       }));
+      main.querySelectorAll("[data-spdok]").forEach(x => x.addEventListener("click", () => {
+        quitarAvisoSpd(x.dataset.spdev, x.dataset.spdok);
+        toast("✔ Resolución SPD verificada", true);
+        refreshAdmin();
+      }));
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
     }
     function chip(label, n, color) { return `<div class="rounded-lg py-1.5 b-${color}"><div class="text-lg font-bold leading-tight">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
@@ -2222,7 +2230,7 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="badge" style="background:#e0f2fe;color:#075985;margin-left:4px" title="Supervisor">🤵 SUPERVISOR</span>` : '';
-      const spd = g.spd ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>${spdAvisoHTML(ev, a, g)}` : '';
+      const spd = g.spd ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2246,6 +2254,7 @@
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
+      ${g.spd && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
       <button data-edit="${a.id}" class="text-slate-500 hover:text-green-700 px-1" title="Editar">✎</button>
       <button data-del="${a.id}" class="text-slate-500 hover:text-red-600 px-1" title="Quitar">🗑</button>
     </td>
