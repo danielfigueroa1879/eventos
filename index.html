@@ -1570,9 +1570,9 @@
 
     async function refreshAdmin(first) {
       ADMIN_STATE.eventos = await Data.listEventos();
-      // No se auto-selecciona ningún evento al entrar: todos parten cerrados (chevron a la derecha).
-      // Si el evento seleccionado ya no existe, se deja sin selección.
-      if (ADMIN_STATE.selected && !ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected)) ADMIN_STATE.selected = null;
+      // Al entrar se muestra el primer evento en el panel (verde), pero con el RESUMEN cerrado (chevron a la derecha).
+      if (first && !ADMIN_STATE.selected && ADMIN_STATE.eventos[0]) { ADMIN_STATE.selected = ADMIN_STATE.eventos[0].id; ADMIN_STATE.expandido = null; }
+      if (ADMIN_STATE.selected && !ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected)) ADMIN_STATE.selected = ADMIN_STATE.eventos[0]?.id || null;
       renderSidebarList();
       await renderMain();
     }
@@ -1593,18 +1593,18 @@
         const rango = e.fecha_evento ? (fechaFmt(e.fecha_evento) + (e.fecha_hasta && e.fecha_hasta !== e.fecha_evento ? " al " + fechaFmt(e.fecha_hasta) : "")) : "—";
         const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
         const turnoTxt = tnNow ? `${esc(tnNow.etiqueta)} (${esc(tnNow.rango)})` : (eventoUsaTurnos(e) ? "—" : "Sin turnos");
-        const resumen = abierto ? `<div class="evResumen rounded-lg border border-green-200 bg-white/80 p-2 mt-1 mb-1 text-[11px] text-slate-700 space-y-1">
-        <div class="flex justify-between gap-2"><span class="text-slate-500">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-slate-500">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-slate-500">👮 Guardias</span><span class="font-semibold text-right"><span data-reg="${e.id}">…</span> / ${esc(e.cantidad_esperada || "—")}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-slate-500">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-slate-500">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
-        <div class="flex justify-between gap-2"><span class="text-slate-500">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
+        const resumen = abierto ? `<div class="evResumen bg-green-50 md:bg-green-100 border-x border-b border-y-green-200 border-r-green-200 border-l-4 border-l-green-600 rounded-b-lg px-3 py-2 -mt-px mb-1 text-[11px] text-green-900 space-y-1">
+        <div class="flex justify-between gap-2"><span class="text-green-800/70">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
+        <div class="flex justify-between gap-2"><span class="text-green-800/70">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
+        <div class="flex justify-between gap-2"><span class="text-green-800/70">👮 Guardias</span><span class="font-semibold text-right"><span data-reg="${e.id}">…</span> / ${esc(e.cantidad_esperada || "—")}</span></div>
+        <div class="flex justify-between gap-2"><span class="text-green-800/70">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
+        <div class="flex justify-between gap-2"><span class="text-green-800/70">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
+        <div class="flex justify-between gap-2"><span class="text-green-800/70">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
       </div>` : "";
         return `<div class="evRow" data-id="${e.id}">
       <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
       <div class="flex-1 min-w-0">
-      <button data-id="${e.id}" class="evItem w-full text-left rounded-lg px-3 py-2 border-l-4 flex items-center gap-2 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
+      <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} px-3 py-2 border-l-4 flex items-center gap-2 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
         <span class="flex-1 min-w-0">
           <span class="block font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight">${esc(e.nombre_evento)}</span>
           <span class="block text-xs ${act ? 'text-green-800/70' : 'text-slate-500'}">Empresa: ${esc(e.empresa)}</span>
