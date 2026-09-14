@@ -39,6 +39,9 @@ alter table eventos add column if not exists resol_numero text;
 alter table eventos add column if not exists resol_fecha  date;
 -- Rango de fechas del evento: fecha_evento = "desde"; fecha_hasta = "hasta" (opcional).
 alter table eventos add column if not exists fecha_hasta date;
+-- Ubicación del evento:
+alter table eventos add column if not exists direccion text;
+alter table eventos add column if not exists comuna    text;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9

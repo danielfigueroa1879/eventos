@@ -1928,6 +1928,7 @@
       <div class="min-w-0">
         <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</h1>
         <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(fechaFmt(ev.fecha_evento))}${ev.fecha_hasta && ev.fecha_hasta !== ev.fecha_evento ? " al " + esc(fechaFmt(ev.fecha_hasta)) : ""}` : ""}</div>
+        ${ev.direccion || ev.comuna ? `<div class="text-xs text-slate-500 truncate">📍 ${esc([ev.direccion, ev.comuna].filter(Boolean).join(", "))}</div>` : ""}
         ${ev.resol_numero || ev.resol_fecha ? `<div class="text-xs text-slate-500 truncate">📄 Resol. DD.FF. ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</div>` : ""}
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
@@ -2811,7 +2812,7 @@
 
     // --- Excel de TODOS los eventos (en el orden del panel) con los datos de la empresa ---
     function xlsFileEventos(eventos, conteos) {
-      const cols = ["N°", "Evento", "Empresa", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
+      const cols = ["N°", "Evento", "Empresa", "Dirección", "Comuna", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
       const thS = `background:${VERDE_PAGINA};color:#ffffff;font-weight:bold;text-align:center;border:1px solid #0a3d18;padding:6px 10px;white-space:nowrap;`;
       const tdS = `border:1px solid #cbd5e1;padding:5px 10px;mso-number-format:'\\@';`;
       const tdC = tdS + "text-align:center;";
@@ -2822,6 +2823,8 @@
           i + 1,
           ev.nombre_evento || "",
           ev.empresa || "",
+          ev.direccion || "—",
+          ev.comuna || "—",
           eventoTipoTexto(ev),
           ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
           ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
@@ -2832,7 +2835,7 @@
           c.guardias,
           c.supervisores,
         ];
-        return `<tr>${cells.map((v, j) => `<td style="${j === 1 || j === 2 || j === 6 ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
+        return `<tr>${cells.map((v, j) => `<td style="${j === 1 || j === 2 || j === 3 || j === 4 || j === 8 ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
       }).join("");
       const nCols = cols.length;
       const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
@@ -2843,7 +2846,7 @@
         <tr><td colspan="${nCols}" style="text-align:center;padding:2px;">${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</td></tr>
         <tr><td colspan="${nCols}" style="padding:2px;"></td></tr>`;
       const totalRow = `<tr>
-        <td style="${tdC}font-weight:bold;" colspan="9">TOTALES</td>
+        <td style="${tdC}font-weight:bold;" colspan="11">TOTALES</td>
         <td style="${tdC}font-weight:bold;">${totalEsp}</td>
         <td style="${tdC}font-weight:bold;">${totalReg}</td>
         <td style="${tdC}font-weight:bold;">${totalSup}</td>
@@ -2859,7 +2862,7 @@
     // --- Excel REAL (.xlsx con SheetJS): se abre sin errores en Excel, Google Sheets y celulares ---
     function xlsxEventos(eventos, conteos) {
       if (!window.XLSX) return false;
-      const cols = ["N°", "Evento", "Empresa", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
+      const cols = ["N°", "Evento", "Empresa", "Dirección", "Comuna", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
       const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
       const totalReg = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).guardias || 0), 0);
       const totalSup = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).supervisores || 0), 0);
@@ -2876,6 +2879,8 @@
           i + 1,
           ev.nombre_evento || "",
           ev.empresa || "",
+          ev.direccion || "—",
+          ev.comuna || "—",
           eventoTipoTexto(ev),
           ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
           ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
@@ -2888,22 +2893,22 @@
         ]);
       });
       const rHead = 3, rBody0 = 4;
-      aoa.push(["", "TOTALES", "", "", "", "", "", "", "", totalEsp, totalReg, totalSup]);
+      aoa.push(["", "TOTALES", "", "", "", "", "", "", "", "", "", totalEsp, totalReg, totalSup]);
       const rTot = aoa.length - 1;
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 14 }];
       const nc = cols.length - 1;
       ws["!merges"] = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: nc } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: nc } },
-        { s: { r: rTot, c: 0 }, e: { r: rTot, c: 8 } },
+        { s: { r: rTot, c: 0 }, e: { r: rTot, c: 10 } },
       ];
       // Estilos: título, encabezado verde con letras blancas, bordes y totales.
       xlSet(ws, 0, 0, XL_ST.titulo); xlSet(ws, 1, 0, XL_ST.sub);
       cols.forEach((c, j) => xlSet(ws, rHead, j, XL_ST.head));
       eventos.forEach((ev, i) => {
         const rr = rBody0 + i;
-        for (let j = 0; j <= nc; j++) xlSet(ws, rr, j, (j === 1 || j === 2) ? XL_ST.celdaIzq : XL_ST.celda);
+        for (let j = 0; j <= nc; j++) xlSet(ws, rr, j, (j === 1 || j === 2 || j === 3 || j === 4) ? XL_ST.celdaIzq : XL_ST.celda);
       });
       for (let j = 0; j <= nc; j++) xlSet(ws, rTot, j, XL_ST.total);
       const wb = window.XLSX.utils.book_new();
@@ -3147,13 +3152,15 @@
       doc.text("Listado de eventos", W / 2, 34, { align: "center" });
       doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
       doc.text(`${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`, W / 2, 50, { align: "center" });
-      const cols = ["N°", "Evento", "Empresa", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
+      const cols = ["N°", "Evento", "Empresa", "Dirección", "Comuna", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
       const body = eventos.map((ev, i) => {
         const c = conteos[ev.id] || { guardias: 0, supervisores: 0 };
         return [
           String(i + 1),
           ev.nombre_evento || "—",
           ev.empresa || "—",
+          ev.direccion || "—",
+          ev.comuna || "—",
           eventoTipoTexto(ev),
           ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
           ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
@@ -3165,29 +3172,31 @@
           String(c.supervisores),
         ];
       });
-      body.push(["", "TOTALES", "", "", "", "", "", "", "", String(totalEsp), String(totalReg), String(totalSup)]);
+      body.push(["", "TOTALES", "", "", "", "", "", "", "", "", "", String(totalEsp), String(totalReg), String(totalSup)]);
       const lastIdx = body.length - 1;
       doc.autoTable({
         startY: 62,
         head: [cols],
         body,
         theme: "grid",
-        styles: { fontSize: 8, cellPadding: 3, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+        styles: { fontSize: 7.5, cellPadding: 2.5, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
         headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
         alternateRowStyles: { fillColor: [244, 247, 245] },
         columnStyles: {
-          0: { cellWidth: 24 },
-          1: { halign: "left", cellWidth: 138 },
-          2: { halign: "left", cellWidth: 118 },
-          3: { cellWidth: 58 },
-          4: { cellWidth: 52 },
-          5: { cellWidth: 52 },
-          6: { cellWidth: 74 },
-          7: { cellWidth: 58 },
-          8: { cellWidth: 52 },
-          9: { cellWidth: 50 },
-          10: { cellWidth: 56 },
-          11: { cellWidth: 62 },
+          0: { cellWidth: 22 },
+          1: { halign: "left", cellWidth: 116 },
+          2: { halign: "left", cellWidth: 92 },
+          3: { halign: "left", cellWidth: 104 },
+          4: { halign: "left", cellWidth: 64 },
+          5: { cellWidth: 50 },
+          6: { cellWidth: 46 },
+          7: { cellWidth: 46 },
+          8: { cellWidth: 62 },
+          9: { cellWidth: 52 },
+          10: { cellWidth: 46 },
+          11: { cellWidth: 44 },
+          12: { cellWidth: 50 },
+          13: { cellWidth: 56 },
         },
         margin: { left: 28, right: 28, bottom: 40 },
         didParseCell: (d) => {
@@ -4537,6 +4546,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div id="m_nom_wrap"><label class="text-sm font-semibold text-slate-700">Nombre del evento</label><input id="m_nom" class="fld" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
       <div id="m_partido_wrap" hidden><label class="text-sm font-semibold text-slate-700">Partido (equipos)</label><input id="m_partido" class="fld" placeholder="La Serena vs Huachipato" value="${edit ? esc(ev.partido || "") : ""}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Empresa de seguridad</label><input id="m_emp" class="fld" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-sm font-semibold text-slate-700">Dirección</label><input id="m_dir" class="fld" placeholder="Av. Amunátegui 1234" value="${edit ? esc(ev.direccion || "") : ""}"/></div>
+        <div><label class="text-sm font-semibold text-slate-700">Comuna</label><input id="m_comuna" class="fld" placeholder="La Serena" value="${edit ? esc(ev.comuna || "") : ""}"/></div>
+      </div>
       <div><label class="text-sm font-semibold text-slate-700">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
       <div class="grid grid-cols-2 gap-3">
         <div><label class="text-sm font-semibold text-slate-700">Desde ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
@@ -4640,6 +4653,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         if (fecha && fechaHasta && fechaHasta < fecha) { toast("La fecha 'Hasta' no puede ser anterior a 'Desde'", false); return; }
         const campos = {
           nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha, fecha_hasta: fechaHasta,
+          direccion: ($("#m_dir").value || "").trim() || null,
+          comuna: ($("#m_comuna").value || "").trim() || null,
           resol_numero: ($("#m_resol_num").value || "").trim() || null,
           resol_fecha: $("#m_resol_fecha").value || null,
           tipo: esPart ? "partido" : "evento", partido: esPart ? partidoTxt : null,
