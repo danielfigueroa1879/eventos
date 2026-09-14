@@ -2431,8 +2431,8 @@
       // Color y caja del nombre según sexo (hombre azul / mujer rojo); infractor sin caja.
       const _sexG = sexoGuardia(g);
       const nameColor = tieneFicha(g) ? 'text-slate-800' : (_sexG === 'M' ? 'text-red-800' : (_sexG === 'H' ? 'text-blue-900' : 'text-slate-800'));
-      const nameBox = (!tieneFicha(g) && _sexG === 'H') ? 'background:#eff6ff;border:1px solid #bfdbfe'
-        : (!tieneFicha(g) && _sexG === 'M') ? 'background:#fef2f2;border:1px solid #fecaca'
+      const nameBox = (!tieneFicha(g) && _sexG === 'H') ? 'border border-blue-200 bg-blue-50'
+        : (!tieneFicha(g) && _sexG === 'M') ? 'border border-red-200 bg-red-50'
         : '';
       const telHTML = (() => {
         const tf = normalizarTelefono(g.telefono);
@@ -2454,7 +2454,7 @@
       <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
     </div>
     <div class="text-center mb-3">
-      <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1' : ''}"${nameBox ? ` style="${nameBox}"` : ''}>${esc(nomFull)}</span></div>
+      <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1 ' + nameBox : ''}">${esc(nomFull)}</span></div>
       <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
