@@ -1577,18 +1577,23 @@
       await renderMain();
     }
 
+    // Cierra el resumen del evento automáticamente a los 10 s (deja el chevron a la derecha).
+    function programarCierreResumen() {
+      if (ADMIN_STATE._resumenTimer) clearTimeout(ADMIN_STATE._resumenTimer);
+      ADMIN_STATE._resumenTimer = setTimeout(() => { ADMIN_STATE.expandido = null; renderSidebarList(); }, 10000);
+    }
     function renderSidebarList() {
       const cont = $("#listaEventos"); if (!cont) return;
       if (!ADMIN_STATE.eventos.length) { cont.innerHTML = `<p class="text-sm text-slate-400 p-2">Aún no hay eventos. Crea el primero.</p>`; return; }
       const ec = $("#evCount"); if (ec) ec.textContent = ADMIN_STATE.eventos.length;
-      const haySel = !!ADMIN_STATE.selected;
-      const chevron = act => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 self-center ${act ? 'text-green-700' : 'text-slate-300'}" style="transition:transform .2s${act ? ';transform:rotate(90deg)' : ''}"><path d="m9 18 6-6-6-6"/></svg>`;
+      const chevron = (id, abierto) => `<span data-chev="${id}" class="evChev flex-shrink-0 self-center p-0.5 -mr-1 cursor-pointer ${abierto ? 'text-green-700' : 'text-slate-300'}" title="${abierto ? 'Cerrar resumen' : 'Ver resumen'}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s${abierto ? ';transform:rotate(90deg)' : ''}"><path d="m9 18 6-6-6-6"/></svg></span>`;
       cont.innerHTML = ADMIN_STATE.eventos.map(e => {
         const act = e.id === ADMIN_STATE.selected;
+        const abierto = e.id === ADMIN_STATE.expandido;
         const rango = e.fecha_evento ? (fechaFmt(e.fecha_evento) + (e.fecha_hasta && e.fecha_hasta !== e.fecha_evento ? " al " + fechaFmt(e.fecha_hasta) : "")) : "—";
         const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
         const turnoTxt = tnNow ? `${esc(tnNow.etiqueta)} (${esc(tnNow.rango)})` : (eventoUsaTurnos(e) ? "—" : "Sin turnos");
-        const resumen = act ? `<div class="evResumen rounded-lg border border-green-200 bg-white/80 p-2 mt-1 mb-1 text-[11px] text-slate-700 space-y-1">
+        const resumen = abierto ? `<div class="evResumen rounded-lg border border-green-200 bg-white/80 p-2 mt-1 mb-1 text-[11px] text-slate-700 space-y-1">
         <div class="flex justify-between gap-2"><span class="text-slate-500">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
         <div class="flex justify-between gap-2"><span class="text-slate-500">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
         <div class="flex justify-between gap-2"><span class="text-slate-500">👮 Guardias</span><span class="font-semibold text-right"><span data-reg="${e.id}">…</span> / ${esc(e.cantidad_esperada || "—")}</span></div>
@@ -1605,21 +1610,37 @@
           <span class="block text-xs ${act ? 'text-green-800/70' : 'text-slate-500'}">Empresa: ${esc(e.empresa)}</span>
           <span class="block text-[11px] ${act ? 'text-green-700/70' : 'text-slate-400'} mt-0.5" data-count="${e.id}">…</span>
         </span>
-        ${chevron(act)}
+        ${chevron(e.id, abierto)}
       </button>
       ${resumen}
       </div>
     </div>`;
       }).join("");
-      cont.querySelectorAll(".evItem").forEach(b => b.addEventListener("click", () => { if (ADMIN_STATE._reordenando) return; ADMIN_STATE.selected = b.dataset.id; ADMIN_STATE.turnoFiltro = "all"; if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); refreshAdmin(); }));
+      cont.querySelectorAll(".evItem").forEach(b => b.addEventListener("click", () => {
+        if (ADMIN_STATE._reordenando) return;
+        ADMIN_STATE.selected = b.dataset.id;
+        ADMIN_STATE.expandido = b.dataset.id;   // al seleccionar: verde + resumen abierto
+        programarCierreResumen();
+        ADMIN_STATE.turnoFiltro = "all";
+        if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer();
+        refreshAdmin();
+      }));
+      // Chevron: abre/cierra SOLO el resumen (no cambia el evento cargado).
+      cont.querySelectorAll(".evChev").forEach(ch => ch.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const id = ch.dataset.chev;
+        if (ADMIN_STATE.expandido === id) { ADMIN_STATE.expandido = null; if (ADMIN_STATE._resumenTimer) clearTimeout(ADMIN_STATE._resumenTimer); }
+        else { ADMIN_STATE.expandido = id; programarCierreResumen(); }
+        renderSidebarList();
+      }));
       habilitarReordenEventos(cont);
-      // contadores + resumen del evento seleccionado
+      // contadores + resumen del evento expandido
       ADMIN_STATE.eventos.forEach(async e => {
         let as = [];
         try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
         const g = as.filter(a => !a.es_supervisor), sup = as.filter(a => a.es_supervisor);
         const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length} / ${e.cantidad_esperada || "—"} guardias`;
-        if (e.id === ADMIN_STATE.selected) {
+        if (e.id === ADMIN_STATE.expandido) {
           const elR = $(`[data-reg="${e.id}"]`); if (elR) elR.textContent = g.length;
           // Llegados en el turno vigente ahora
           const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
