@@ -2364,10 +2364,9 @@
     </div>
     </div>
     ${!empresa && g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn w-full text-white shadow-sm flex items-center justify-center gap-2" style="background:${g.revision_tipo === 'NUEVO' ? '#ef4444' : '#eab308'}">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
-    ${!empresa && g.spd && !spdVerificado(ev.id, a.rut) ? `<div class="mt-4 rounded-xl px-3 py-2" style="border:1px solid #c7d2fe;background:#eef2ff">
+    ${!empresa && g.spd ? `<div class="mt-4 rounded-xl px-3 py-2" style="border:1px solid #c7d2fe;background:#eef2ff">
       <div class="text-sm font-semibold mb-1" style="color:#1b3a8f">🪪 SPD — Solicitar resolución</div>
-      <p class="text-xs text-slate-500 mb-2">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución y confírmalo aquí.</p>
-      <button id="dg_spd_ver" class="btn w-full text-white shadow-sm" style="background:#1b3a8f">✔ Resolución verificada</button>
+      <p class="text-xs text-slate-500">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución de autorización. Al revisar aquí, el aviso "Pedir resolución" se quita de la lista.</p>
     </div>` : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
@@ -2401,14 +2400,12 @@
           } catch (err) { toast("Error: " + (err.message || err), false); }
         });
       }
-      const btnSpdVer = $("#dg_spd_ver");
-      if (btnSpdVer) btnSpdVer.addEventListener("click", () => {
+      // Revisar (abrir el detalle) un guardia SPD marca su resolución como vista y quita el aviso de la lista.
+      if (!empresa && g.spd && !spdVerificado(ev.id, a.rut)) {
         marcarSpdVerificado(ev.id, a.rut);
-        // Quitar el aviso "pedir resolución" de inmediato (además del refresco).
         document.querySelectorAll(`[data-spdaviso="${(window.CSS && CSS.escape) ? CSS.escape(a.rut) : a.rut}"]`).forEach(el => el.remove());
-        toast("✔ Resolución SPD verificada", true);
-        closeModal(); refreshAdmin();
-      });
+        setTimeout(() => { try { refreshAdmin(); } catch (_) {} }, 400);
+      }
       if (!empresa) {
         $("#dg_edit").addEventListener("click", () => modalEditarGuardia(a, ev));
         $("#dg_del").addEventListener("click", () => confirmar(`¿Quitar a ${g.nombres || a.rut} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }));
