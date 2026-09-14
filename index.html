@@ -1562,6 +1562,9 @@
 
       if (ADMIN_STATE.unsub) ADMIN_STATE.unsub();
       ADMIN_STATE.unsub = Data.onChange(() => refreshAdmin());
+      // Re-render periódico para que los turnos finalizados hace +2 h dejen de mostrarse solos.
+      if (ADMIN_STATE._tick) clearInterval(ADMIN_STATE._tick);
+      ADMIN_STATE._tick = setInterval(() => { if (ADMIN_STATE.selected) renderMain(); }, 5 * 60 * 1000);
       await refreshAdmin(true);
     }
 
@@ -1880,22 +1883,29 @@
       const turnosArr = Object.values(turnosMap).sort((x, y) => x.clave - y.clave);
       if (ADMIN_STATE.turnoFiltro !== "all" && !turnosMap[ADMIN_STATE.turnoFiltro]) ADMIN_STATE.turnoFiltro = "all";
 
-      // Se renderizan todas las filas del turno; la búsqueda filtra en vivo el DOM (ver filtrarLista)
+      // Un turno se considera FINALIZADO (historial) 2 h después de su hora de término.
+      const GRACIA_TURNO_MS = 2 * 3600 * 1000;
+      const turnoFinalizado = a => { const tn = calcularTurno(a.hora_ingreso, ev); return !!(tn && Date.now() > tn.fin.getTime() + GRACIA_TURNO_MS); };
+      const chipFinalizado = t => Date.now() > (t.fin.getTime ? t.fin.getTime() : new Date(t.fin).getTime()) + GRACIA_TURNO_MS;
+
+      // Se renderizan todas las filas del turno; la búsqueda filtra en vivo el DOM (ver filtrarLista).
+      // En la vista "Todos" se ocultan los turnos ya finalizados hace +2 h (quedan como historial, se ven al elegir su turno).
       const filas = asistGuardias.filter(a => {
-        if (ADMIN_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); if (!tn || String(tn.clave) !== ADMIN_STATE.turnoFiltro) return false; }
-        return true;
+        if (ADMIN_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); return !!tn && String(tn.clave) === ADMIN_STATE.turnoFiltro; }
+        return !(usaT && turnoFinalizado(a));
       });
-      // Los supervisores del turno filtrado se muestran en su propio listado (no comparten filtro visual con guardias, pero si con el turno).
       const filasSup = asistSupervisores.filter(a => {
-        if (ADMIN_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); if (!tn || String(tn.clave) !== ADMIN_STATE.turnoFiltro) return false; }
-        return true;
+        if (ADMIN_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); return !!tn && String(tn.clave) === ADMIN_STATE.turnoFiltro; }
+        return !(usaT && turnoFinalizado(a));
       });
+      const nActivos = usaT ? asistGuardias.filter(a => !turnoFinalizado(a)).length : asistGuardias.length;
 
       const turnosBar = `
       <div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        <button data-turno="all" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === "all" ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">Todos (${asistGuardias.length})</button>
-        ${turnosArr.map(t => `<button data-turno="${t.clave}" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === String(t.clave) ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)} (${t.count})</button>`).join("")}
-      </div>`;
+        <button data-turno="all" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === "all" ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">Todos (${nActivos})</button>
+        ${turnosArr.map(t => { const fin = chipFinalizado(t); return `<button data-turno="${t.clave}" title="${fin ? "Turno finalizado — historial" : "Turno vigente"}" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === String(t.clave) ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap${fin ? " opacity-70" : ""}">${fin ? "📁 " : ""}${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)} (${t.count})</button>`; }).join("")}
+      </div>
+      ${turnosArr.some(chipFinalizado) ? '<p class="text-[11px] text-slate-400 mt-1 px-1">📁 Turnos finalizados (historial): ya no se muestran en “Todos”; toca el turno para ver quiénes estuvieron.</p>' : ""}`;
 
       const nV = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VIGENTE").length;
       const nP = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
@@ -1918,6 +1928,7 @@
       <div class="min-w-0">
         <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</h1>
         <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(fechaFmt(ev.fecha_evento))}` : ""}</div>
+        ${ev.resol_numero || ev.resol_fecha ? `<div class="text-xs text-slate-500 truncate">📄 Resol. DD.FF. ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</div>` : ""}
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0 items-center">
@@ -4516,6 +4527,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div><label class="text-sm font-semibold text-slate-700">Empresa de seguridad</label><input id="m_emp" class="fld" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
       <div><label class="text-sm font-semibold text-slate-700">Fecha ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-sm font-semibold text-slate-700">N° de Resol. DD.FF.</label><input id="m_resol_num" class="fld" placeholder="Ej: 1234" value="${edit ? esc(ev.resol_numero || "") : ""}"/></div>
+        <div><label class="text-sm font-semibold text-slate-700">Fecha de la resolución</label><input id="m_resol_fecha" type="date" class="fld" value="${edit ? esc(ev.resol_fecha || "") : ""}"/></div>
+      </div>
       <div id="m_turnos_mode_wrap">
         <label class="text-sm font-semibold text-slate-700">¿Usar turnos?</label>
         <select id="m_turnos_mode" class="fld">
@@ -4608,6 +4623,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const turnoInicio = ($("#m_tini").value || TURNO_INICIO_DEFAULT);
         const campos = {
           nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha,
+          resol_numero: ($("#m_resol_num").value || "").trim() || null,
+          resol_fecha: $("#m_resol_fecha").value || null,
           tipo: esPart ? "partido" : "evento", partido: esPart ? partidoTxt : null,
           usa_turnos: usaTurnos, turno_horas: turnoHoras, turno_inicio: turnoInicio,
           qr_rotativo: $("#m_qr_rot").checked
