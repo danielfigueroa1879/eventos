@@ -4534,44 +4534,44 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       if (ev instanceof Event) ev = undefined;           // proteger: nunca tratar un click como edición
       const edit = !!ev && !!ev.id;                       // solo es edición si trae un evento con id real
       openModal(`
-    <h2 class="font-bold text-lg text-slate-800 mb-3">${edit ? "Editar evento" : "Nuevo evento"}</h2>
-    <div class="space-y-3">
+    <h2 class="font-bold text-base text-slate-800 mb-2">${edit ? "Editar evento" : "Nuevo evento"}</h2>
+    <div class="space-y-2">
       <div>
-        <label class="text-sm font-semibold text-slate-700">Tipo</label>
-        <select id="m_tipo" class="fld">
+        <label class="text-xs font-semibold text-slate-600">Tipo</label>
+        <select id="m_tipo" class="fld fld-sm">
           <option value="evento">Evento</option>
           <option value="partido">Partido</option>
         </select>
       </div>
-      <div id="m_nom_wrap"><label class="text-sm font-semibold text-slate-700">Nombre del evento</label><input id="m_nom" class="fld" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
-      <div id="m_partido_wrap" hidden><label class="text-sm font-semibold text-slate-700">Partido (equipos)</label><input id="m_partido" class="fld" placeholder="La Serena vs Huachipato" value="${edit ? esc(ev.partido || "") : ""}"/></div>
-      <div><label class="text-sm font-semibold text-slate-700">Empresa de seguridad</label><input id="m_emp" class="fld" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
-      <div class="grid grid-cols-2 gap-3">
-        <div><label class="text-sm font-semibold text-slate-700">Dirección</label><input id="m_dir" class="fld" placeholder="Av. Amunátegui 1234" value="${edit ? esc(ev.direccion || "") : ""}"/></div>
-        <div><label class="text-sm font-semibold text-slate-700">Comuna</label><input id="m_comuna" class="fld" placeholder="La Serena" value="${edit ? esc(ev.comuna || "") : ""}"/></div>
+      <div id="m_nom_wrap"><label class="text-xs font-semibold text-slate-600">Nombre del evento</label><input id="m_nom" class="fld fld-sm" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
+      <div id="m_partido_wrap" hidden><label class="text-xs font-semibold text-slate-600">Partido (equipos)</label><input id="m_partido" class="fld fld-sm" placeholder="La Serena vs Huachipato" value="${edit ? esc(ev.partido || "") : ""}"/></div>
+      <div><label class="text-xs font-semibold text-slate-600">Empresa de seguridad</label><input id="m_emp" class="fld fld-sm" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs font-semibold text-slate-600">Dirección</label><input id="m_dir" class="fld fld-sm" placeholder="Av. Amunátegui 1234" value="${edit ? esc(ev.direccion || "") : ""}"/></div>
+        <div><label class="text-xs font-semibold text-slate-600">Comuna</label><input id="m_comuna" class="fld fld-sm" placeholder="La Serena" value="${edit ? esc(ev.comuna || "") : ""}"/></div>
       </div>
-      <div><label class="text-sm font-semibold text-slate-700">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
-      <div class="grid grid-cols-2 gap-3">
-        <div><label class="text-sm font-semibold text-slate-700">Desde ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
-        <div><label class="text-sm font-semibold text-slate-700">Hasta ${edit ? "" : "(opcional)"}</label><input id="m_fecha_hasta" type="date" class="fld" value="${edit ? esc(ev.fecha_hasta || "") : ""}"/></div>
+      <div><label class="text-xs font-semibold text-slate-600">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld fld-sm" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs font-semibold text-slate-600">Desde ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld fld-sm" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
+        <div><label class="text-xs font-semibold text-slate-600">Hasta ${edit ? "" : "(opcional)"}</label><input id="m_fecha_hasta" type="date" class="fld fld-sm" value="${edit ? esc(ev.fecha_hasta || "") : ""}"/></div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div><label class="text-sm font-semibold text-slate-700">N° de Resol. DD.FF.</label><input id="m_resol_num" class="fld" placeholder="Ej: 1234" value="${edit ? esc(ev.resol_numero || "") : ""}"/></div>
-        <div><label class="text-sm font-semibold text-slate-700">Fecha de la resolución</label><input id="m_resol_fecha" type="date" class="fld" value="${edit ? esc(ev.resol_fecha || "") : ""}"/></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs font-semibold text-slate-600">N° de Resol. DD.FF.</label><input id="m_resol_num" class="fld fld-sm" placeholder="Ej: 1234" value="${edit ? esc(ev.resol_numero || "") : ""}"/></div>
+        <div><label class="text-xs font-semibold text-slate-600">Fecha de la resolución</label><input id="m_resol_fecha" type="date" class="fld fld-sm" value="${edit ? esc(ev.resol_fecha || "") : ""}"/></div>
       </div>
       <div id="m_turnos_mode_wrap">
-        <label class="text-sm font-semibold text-slate-700">¿Usar turnos?</label>
-        <select id="m_turnos_mode" class="fld">
+        <label class="text-xs font-semibold text-slate-600">¿Usar turnos?</label>
+        <select id="m_turnos_mode" class="fld fld-sm">
           <option value="con">Con turnos</option>
           <option value="sin">Sin turnos (evento corto)</option>
         </select>
       </div>
-      <div id="m_turnos_block" class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
-        <div class="text-sm font-semibold text-slate-700">🕑 Configuración de turnos</div>
-        <div class="grid grid-cols-2 gap-3">
+      <div id="m_turnos_block" class="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2">
+        <div class="text-xs font-semibold text-slate-700">🕑 Configuración de turnos</div>
+        <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="text-xs font-semibold text-slate-600">Duración del turno</label>
-            <select id="m_turno" class="fld">
+            <label class="text-[11px] font-semibold text-slate-600">Duración del turno</label>
+            <select id="m_turno" class="fld fld-sm">
               <option value="12">Turno de 12 horas (día/noche)</option>
               <option value="8">Turno de 8 horas</option>
               <option value="6">Turno de 6 horas</option>
@@ -4580,25 +4580,26 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
             </select>
           </div>
           <div>
-            <label class="text-xs font-semibold text-slate-600">Inicio del 1er turno</label>
-            <input id="m_tini" type="time" class="fld" value="${edit ? esc(ev.turno_inicio || TURNO_INICIO_DEFAULT) : TURNO_INICIO_DEFAULT}"/>
+            <label class="text-[11px] font-semibold text-slate-600">Inicio del 1er turno</label>
+            <input id="m_tini" type="time" class="fld fld-sm" value="${edit ? esc(ev.turno_inicio || TURNO_INICIO_DEFAULT) : TURNO_INICIO_DEFAULT}"/>
           </div>
         </div>
         <div id="m_turno_custom_wrap" hidden>
-          <label class="text-xs font-semibold text-slate-600">Horas por turno (personalizado)</label>
-          <input id="m_turno_custom" type="number" min="1" max="24" step="1" class="fld" placeholder="Ej: 10"/>
+          <label class="text-[11px] font-semibold text-slate-600">Horas por turno (personalizado)</label>
+          <input id="m_turno_custom" type="number" min="1" max="24" step="1" class="fld fld-sm" placeholder="Ej: 10"/>
         </div>
         <p class="text-[11px] text-slate-400">La asistencia se separa automáticamente por turno según la hora de ingreso.</p>
       </div>
-      <label class="flex items-start gap-2 text-sm text-slate-700 select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 cursor-pointer">
+      <label class="flex items-start gap-2 text-sm text-slate-700 select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 cursor-pointer">
         <input type="checkbox" id="m_qr_rot" class="w-4 h-4 flex-shrink-0 mt-0.5">
         <span>🔒 <b>QR rotativo por turno</b> (código presencial)<br><span class="text-[11px] text-slate-400 font-normal">El código QR cambia en cada turno (1 hora antes de su inicio) y solo sirve escaneándolo en el lugar. Recomendado en eventos con turnos.</span></span>
       </label>
     </div>
-    <div class="flex gap-2 mt-4">
+    <div class="flex gap-2 mt-3">
       <button id="m_cancel" class="btn btn-ghost flex-1">Cancelar</button>
       <button id="m_save" class="btn btn-p flex-1">${edit ? "Guardar" : "Crear evento"}</button>
     </div>`);
+      { const _mb = $("#modalBox"); if (_mb) _mb.classList.replace("p-5", "p-4"); const _mo = $("#modal"); if (_mo) _mo.style.alignItems = "flex-start"; }
       // QR rotativo: por defecto activo si el evento usa turnos (o según lo ya guardado al editar).
       $("#m_qr_rot").checked = edit ? qrRotativo(ev) : true;
       // Selector de duración de turno: mostrar campo personalizado cuando corresponde
