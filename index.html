@@ -2811,7 +2811,7 @@
 
     // --- Excel de TODOS los eventos (en el orden del panel) con los datos de la empresa ---
     function xlsFileEventos(eventos, conteos) {
-      const cols = ["N°", "Evento", "Empresa", "Tipo", "Fecha", "Estado", "Esperados", "Registrados", "Supervisores"];
+      const cols = ["N°", "Evento", "Empresa", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
       const thS = `background:${VERDE_PAGINA};color:#ffffff;font-weight:bold;text-align:center;border:1px solid #0a3d18;padding:6px 10px;white-space:nowrap;`;
       const tdS = `border:1px solid #cbd5e1;padding:5px 10px;mso-number-format:'\\@';`;
       const tdC = tdS + "text-align:center;";
@@ -2824,12 +2824,15 @@
           ev.empresa || "",
           eventoTipoTexto(ev),
           ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
+          ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
+          ev.resol_numero || "—",
+          ev.resol_fecha ? fechaFmt(ev.resol_fecha) : "—",
           ev.activo === false ? "Inactivo" : "Activo",
           ev.cantidad_esperada || 0,
           c.guardias,
           c.supervisores,
         ];
-        return `<tr>${cells.map((v, j) => `<td style="${j === 1 || j === 2 ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
+        return `<tr>${cells.map((v, j) => `<td style="${j === 1 || j === 2 || j === 6 ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
       }).join("");
       const nCols = cols.length;
       const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
@@ -2840,7 +2843,7 @@
         <tr><td colspan="${nCols}" style="text-align:center;padding:2px;">${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</td></tr>
         <tr><td colspan="${nCols}" style="padding:2px;"></td></tr>`;
       const totalRow = `<tr>
-        <td style="${tdC}font-weight:bold;" colspan="6">TOTALES</td>
+        <td style="${tdC}font-weight:bold;" colspan="9">TOTALES</td>
         <td style="${tdC}font-weight:bold;">${totalEsp}</td>
         <td style="${tdC}font-weight:bold;">${totalReg}</td>
         <td style="${tdC}font-weight:bold;">${totalSup}</td>
@@ -2856,7 +2859,7 @@
     // --- Excel REAL (.xlsx con SheetJS): se abre sin errores en Excel, Google Sheets y celulares ---
     function xlsxEventos(eventos, conteos) {
       if (!window.XLSX) return false;
-      const cols = ["N°", "Evento", "Empresa", "Tipo", "Fecha", "Estado", "Esperados", "Registrados", "Supervisores"];
+      const cols = ["N°", "Evento", "Empresa", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
       const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
       const totalReg = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).guardias || 0), 0);
       const totalSup = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).supervisores || 0), 0);
@@ -2875,6 +2878,9 @@
           ev.empresa || "",
           eventoTipoTexto(ev),
           ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
+          ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
+          ev.resol_numero || "—",
+          ev.resol_fecha ? fechaFmt(ev.resol_fecha) : "—",
           ev.activo === false ? "Inactivo" : "Activo",
           ev.cantidad_esperada || 0,
           c.guardias,
@@ -2882,15 +2888,15 @@
         ]);
       });
       const rHead = 3, rBody0 = 4;
-      aoa.push(["", "TOTALES", "", "", "", "", totalEsp, totalReg, totalSup]);
+      aoa.push(["", "TOTALES", "", "", "", "", "", "", "", totalEsp, totalReg, totalSup]);
       const rTot = aoa.length - 1;
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 14 }];
       const nc = cols.length - 1;
       ws["!merges"] = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: nc } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: nc } },
-        { s: { r: rTot, c: 0 }, e: { r: rTot, c: 5 } },
+        { s: { r: rTot, c: 0 }, e: { r: rTot, c: 8 } },
       ];
       // Estilos: título, encabezado verde con letras blancas, bordes y totales.
       xlSet(ws, 0, 0, XL_ST.titulo); xlSet(ws, 1, 0, XL_ST.sub);
@@ -3141,7 +3147,7 @@
       doc.text("Listado de eventos", W / 2, 34, { align: "center" });
       doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
       doc.text(`${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`, W / 2, 50, { align: "center" });
-      const cols = ["N°", "Evento", "Empresa", "Tipo", "Fecha", "Estado", "Esperados", "Registrados", "Supervisores"];
+      const cols = ["N°", "Evento", "Empresa", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
       const body = eventos.map((ev, i) => {
         const c = conteos[ev.id] || { guardias: 0, supervisores: 0 };
         return [
@@ -3150,32 +3156,38 @@
           ev.empresa || "—",
           eventoTipoTexto(ev),
           ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
+          ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
+          ev.resol_numero || "—",
+          ev.resol_fecha ? fechaFmt(ev.resol_fecha) : "—",
           ev.activo === false ? "Inactivo" : "Activo",
           String(ev.cantidad_esperada || 0),
           String(c.guardias),
           String(c.supervisores),
         ];
       });
-      body.push(["", "TOTALES", "", "", "", "", String(totalEsp), String(totalReg), String(totalSup)]);
+      body.push(["", "TOTALES", "", "", "", "", "", "", "", String(totalEsp), String(totalReg), String(totalSup)]);
       const lastIdx = body.length - 1;
       doc.autoTable({
         startY: 62,
         head: [cols],
         body,
         theme: "grid",
-        styles: { fontSize: 8, cellPadding: 4, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+        styles: { fontSize: 8, cellPadding: 3, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
         headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
         alternateRowStyles: { fillColor: [244, 247, 245] },
         columnStyles: {
-          0: { cellWidth: 28 },
-          1: { halign: "left", cellWidth: 150 },
-          2: { halign: "left", cellWidth: 140 },
-          3: { cellWidth: 70 },
-          4: { cellWidth: 62 },
-          5: { cellWidth: 56 },
-          6: { cellWidth: 58 },
-          7: { cellWidth: 66 },
-          8: { cellWidth: 74 },
+          0: { cellWidth: 24 },
+          1: { halign: "left", cellWidth: 138 },
+          2: { halign: "left", cellWidth: 118 },
+          3: { cellWidth: 58 },
+          4: { cellWidth: 52 },
+          5: { cellWidth: 52 },
+          6: { cellWidth: 74 },
+          7: { cellWidth: 58 },
+          8: { cellWidth: 52 },
+          9: { cellWidth: 50 },
+          10: { cellWidth: 56 },
+          11: { cellWidth: 62 },
         },
         margin: { left: 28, right: 28, bottom: 40 },
         didParseCell: (d) => {
