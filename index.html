@@ -1723,20 +1723,42 @@
       }
       return SPD_VER[evId];
     }
+    function spdVisto(evId, rut) {
+      try { return spdVerSet(evId).has(rut); } catch (_) { return false; }
+    }
+    function marcarSpdVisto(evId, rut) {
+      const set = spdVerSet(evId); set.add(rut);
+      try { localStorage.setItem("spd_ver_" + evId, JSON.stringify([...set])); } catch (_) {}
+    }
     function spdVerificado(ev, a, g) {
       if (g && g.spd_verificado) return true;
-      try { return !!(ev && spdVerSet(ev.id).has(a.rut)); } catch (_) { return false; }
+      return !!(ev && spdVisto(ev.id, a.rut));
     }
-    function marcarSpdVerificado(ev, a, g) {
-      const set = spdVerSet(ev.id); set.add(a.rut);
-      try { localStorage.setItem("spd_ver_" + ev.id, JSON.stringify([...set])); } catch (_) {}
-      // Intento opcional de persistir en la BD (si existe la columna); si falla, no pasa nada.
-      try { Data.upsertGuardia({ ...g, spd_verificado: true }).catch(() => {}); } catch (_) {}
+    // Quita el aviso "pedir resolución" de un guardia: lo marca visto y lo borra del DOM.
+    function quitarAvisoSpd(evId, rut) {
+      marcarSpdVisto(evId, rut);
+      const sel = (window.CSS && CSS.escape) ? CSS.escape(rut) : rut;
+      document.querySelectorAll(`[data-spdaviso="${sel}"]`).forEach(el => el.remove());
     }
     // Aviso "pedir resolución" junto al nombre, mientras el SPD no esté verificado por el administrador.
+    // Es tocable: al tocarlo se marca como verificado y desaparece (sin cambios en la base de datos).
     function spdAvisoHTML(ev, a, g) {
       if (!g || !g.spd || spdVerificado(ev, a, g)) return "";
-      return ` <span data-spdaviso="${esc(a.rut)}" class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Solicitar la resolución de autorización SPD">⚠ Pedir resolución</span>`;
+      return ` <span data-spdaviso="${esc(a.rut)}" data-spdev="${esc(ev ? ev.id : "")}" role="button" tabindex="0" class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse cursor-pointer" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Tocar para marcar la resolución como verificada">⚠ Pedir resolución</span>`;
+    }
+    // Un solo manejador (en fase de captura) para que tocar el aviso lo quite y NO abra el detalle.
+    if (!window._spdAvisoWired) {
+      window._spdAvisoWired = true;
+      document.addEventListener("click", (e) => {
+        const el = e.target && e.target.closest ? e.target.closest("[data-spdaviso]") : null;
+        if (!el) return;
+        e.stopPropagation(); e.preventDefault();
+        const rut = el.getAttribute("data-spdaviso");
+        const evId = el.getAttribute("data-spdev");
+        quitarAvisoSpd(evId, rut);
+        try { toast("✔ Resolución SPD verificada", true); } catch (_) {}
+        try { refreshAdmin(); } catch (_) {}
+      }, true);
     }
 
     async function renderMain() {
@@ -2410,8 +2432,7 @@
       if (!empresa && g.spd && !spdVerificado(ev, a, g)) {
         const btnSpdVer = $("#dg_spd_ver");
         if (btnSpdVer) btnSpdVer.addEventListener("click", () => {
-          marcarSpdVerificado(ev, a, g);
-          document.querySelectorAll(`[data-spdaviso="${(window.CSS && CSS.escape) ? CSS.escape(a.rut) : a.rut}"]`).forEach(el => el.remove());
+          quitarAvisoSpd(ev.id, a.rut);
           toast("✔ Resolución SPD verificada", true);
           closeModal(); refreshAdmin();
         });
