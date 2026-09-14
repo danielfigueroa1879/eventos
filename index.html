@@ -1570,8 +1570,9 @@
 
     async function refreshAdmin(first) {
       ADMIN_STATE.eventos = await Data.listEventos();
-      if (first && !ADMIN_STATE.selected && ADMIN_STATE.eventos[0]) ADMIN_STATE.selected = ADMIN_STATE.eventos[0].id;
-      if (ADMIN_STATE.selected && !ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected)) ADMIN_STATE.selected = ADMIN_STATE.eventos[0]?.id || null;
+      // No se auto-selecciona ningún evento al entrar: todos parten cerrados (chevron a la derecha).
+      // Si el evento seleccionado ya no existe, se deja sin selección.
+      if (ADMIN_STATE.selected && !ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected)) ADMIN_STATE.selected = null;
       renderSidebarList();
       await renderMain();
     }
@@ -1595,7 +1596,7 @@
         <div class="flex justify-between gap-2"><span class="text-slate-500">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
         <div class="flex justify-between gap-2"><span class="text-slate-500">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
       </div>` : "";
-        return `<div class="evRow${haySel && !act ? ' opacity-50' : ''}" data-id="${e.id}">
+        return `<div class="evRow" data-id="${e.id}">
       <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
       <div class="flex-1 min-w-0">
       <button data-id="${e.id}" class="evItem w-full text-left rounded-lg px-3 py-2 border-l-4 flex items-center gap-2 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
@@ -1880,7 +1881,7 @@
     async function renderMain() {
       const main = $("#main"); if (!main) return;
       const ev = ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected);
-      if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>Crea un evento para comenzar.</div>`; return; }
+      if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>${ADMIN_STATE.eventos.length ? "Selecciona un evento de la lista para ver el detalle." : "Crea un evento para comenzar."}</div>`; return; }
       const asist = await Data.listAsistencias(ev.id);
 
       // Aviso en tiempo real: guardias nuevos o con datos modificados (pendientes de aprobación)
