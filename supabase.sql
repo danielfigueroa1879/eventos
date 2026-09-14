@@ -11,6 +11,8 @@ create table if not exists eventos (
   cantidad_esperada integer default 0,
   fecha_evento      date,
   slug              text unique not null,
+  resol_numero      text,                       -- N° de Resolución DD.FF. que autoriza el evento
+  resol_fecha       date,                       -- fecha de esa resolución
   activo            boolean default true,
   tipo              text default 'evento',     -- 'evento' o 'partido'
   partido           text,                       -- si es partido: equipos (ej: La Serena vs Huachipato)
@@ -32,6 +34,9 @@ alter table eventos add column if not exists registro_abierto boolean default fa
 -- Orden manual de los eventos en el panel del administrador (se arrastra cada tarjeta
 -- para ordenarla de arriba a abajo). Menor número = más arriba. NULL = al final.
 alter table eventos add column if not exists orden integer;
+-- N° y fecha de la Resolución DD.FF. que autoriza el evento:
+alter table eventos add column if not exists resol_numero text;
+alter table eventos add column if not exists resol_fecha  date;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9
