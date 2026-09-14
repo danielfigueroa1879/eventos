@@ -1711,21 +1711,29 @@
       const b = $("#inf_ok"); if (b) b.addEventListener("click", closeModal);
     }
 
-    // Estado local (por evento) de resoluciones SPD ya verificadas por el administrador.
+    // Estado (por evento) de resoluciones SPD ya verificadas por el administrador.
+    // Se guarda en memoria y en localStorage (respaldo si el navegador lo permite).
+    const SPD_VER = {}; // evId -> Set(rut)
+    function spdVerSet(evId) {
+      if (!SPD_VER[evId]) {
+        let arr = [];
+        try { const raw = localStorage.getItem("spd_ver_" + evId); if (raw) arr = JSON.parse(raw) || []; } catch (_) {}
+        SPD_VER[evId] = new Set(arr);
+      }
+      return SPD_VER[evId];
+    }
     function spdVerificado(evId, rut) {
-      try { const raw = localStorage.getItem("spd_ver_" + evId); return raw ? JSON.parse(raw).includes(rut) : false; } catch (_) { return false; }
+      try { return spdVerSet(evId).has(rut); } catch (_) { return false; }
     }
     function marcarSpdVerificado(evId, rut) {
-      try {
-        const key = "spd_ver_" + evId; const raw = localStorage.getItem(key); const arr = raw ? JSON.parse(raw) : [];
-        if (!arr.includes(rut)) { arr.push(rut); localStorage.setItem(key, JSON.stringify(arr)); }
-      } catch (_) {}
+      const set = spdVerSet(evId); set.add(rut);
+      try { localStorage.setItem("spd_ver_" + evId, JSON.stringify([...set])); } catch (_) {}
     }
     // Aviso "pedir resolución" junto al nombre, mientras el SPD no esté verificado.
     function spdAvisoHTML(ev, a, g) {
       if (!g || !g.spd) return "";
       if (ev && spdVerificado(ev.id, a.rut)) return "";
-      return ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Solicitar la resolución de autorización SPD">⚠ Pedir resolución</span>`;
+      return ` <span data-spdaviso="${esc(a.rut)}" class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap animate-pulse" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Solicitar la resolución de autorización SPD">⚠ Pedir resolución</span>`;
     }
 
     async function renderMain() {
@@ -2396,6 +2404,8 @@
       const btnSpdVer = $("#dg_spd_ver");
       if (btnSpdVer) btnSpdVer.addEventListener("click", () => {
         marcarSpdVerificado(ev.id, a.rut);
+        // Quitar el aviso "pedir resolución" de inmediato (además del refresco).
+        document.querySelectorAll(`[data-spdaviso="${(window.CSS && CSS.escape) ? CSS.escape(a.rut) : a.rut}"]`).forEach(el => el.remove());
         toast("✔ Resolución SPD verificada", true);
         closeModal(); refreshAdmin();
       });
