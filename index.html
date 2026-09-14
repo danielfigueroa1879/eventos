@@ -226,6 +226,30 @@
       box-shadow: inset 3px 0 0 #94a3b8
     }
 
+    /* Resumen del evento (barra lateral): extensión del recuadro verde, con modo oscuro */
+    #listaEventos .evResumen {
+      background: #ecfdf3;
+      border: 1px solid #bbf7d0;
+      border-top: 0;
+      border-left: 4px solid #16a34a;
+      color: #14532d;
+    }
+
+    #listaEventos .evResumen .evResLbl {
+      color: rgba(21, 90, 55, .72)
+    }
+
+    html[data-theme="dark"] #listaEventos .evResumen {
+      background: #0f2a1b;
+      border-color: #1f5133;
+      border-left-color: #22c55e;
+      color: #e7f6ec
+    }
+
+    html[data-theme="dark"] #listaEventos .evResumen .evResLbl {
+      color: #86efac
+    }
+
     @media (max-width: 767px) {
       .row-mujer {
         background: #fefdfd
@@ -1593,13 +1617,13 @@
         const rango = e.fecha_evento ? (fechaFmt(e.fecha_evento) + (e.fecha_hasta && e.fecha_hasta !== e.fecha_evento ? " al " + fechaFmt(e.fecha_hasta) : "")) : "—";
         const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
         const turnoTxt = tnNow ? `${esc(tnNow.etiqueta)} (${esc(tnNow.rango)})` : (eventoUsaTurnos(e) ? "—" : "Sin turnos");
-        const resumen = abierto ? `<div class="evResumen bg-green-50 md:bg-green-100 border-x border-b border-y-green-200 border-r-green-200 border-l-4 border-l-green-600 rounded-b-lg px-3 py-2 -mt-px mb-1 text-[11px] text-green-900 space-y-1">
-        <div class="flex justify-between gap-2"><span class="text-green-800/70">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-green-800/70">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-green-800/70">👮 Guardias</span><span class="font-semibold text-right"><span data-reg="${e.id}">…</span> / ${esc(e.cantidad_esperada || "—")}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-green-800/70">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
-        <div class="flex justify-between gap-2"><span class="text-green-800/70">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
-        <div class="flex justify-between gap-2"><span class="text-green-800/70">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
+        const resumen = abierto ? `<div class="evResumen rounded-b-lg px-3 py-2 -mt-px mb-1 text-[11px] space-y-1">
+        <div class="flex justify-between gap-2"><span class="evResLbl">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
+        <div class="flex justify-between gap-2"><span class="evResLbl">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
+        <div class="flex justify-between gap-2"><span class="evResLbl">👮 Guardias</span><span class="font-semibold text-right"><span data-reg="${e.id}">…</span> / ${esc(e.cantidad_esperada || "—")}</span></div>
+        <div class="flex justify-between gap-2"><span class="evResLbl">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
+        <div class="flex justify-between gap-2"><span class="evResLbl">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
+        <div class="flex justify-between gap-2"><span class="evResLbl">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
       </div>` : "";
         return `<div class="evRow" data-id="${e.id}">
       <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
@@ -1625,13 +1649,22 @@
         if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer();
         refreshAdmin();
       }));
-      // Chevron: abre/cierra SOLO el resumen (no cambia el evento cargado).
+      // Chevron: si se cierra, solo cierra el resumen; si se abre, cambia el evento cargado a ese.
       cont.querySelectorAll(".evChev").forEach(ch => ch.addEventListener("click", ev => {
         ev.stopPropagation();
         const id = ch.dataset.chev;
-        if (ADMIN_STATE.expandido === id) { ADMIN_STATE.expandido = null; if (ADMIN_STATE._resumenTimer) clearTimeout(ADMIN_STATE._resumenTimer); }
-        else { ADMIN_STATE.expandido = id; programarCierreResumen(); }
-        renderSidebarList();
+        if (ADMIN_STATE.expandido === id) {
+          ADMIN_STATE.expandido = null;
+          if (ADMIN_STATE._resumenTimer) clearTimeout(ADMIN_STATE._resumenTimer);
+          renderSidebarList();
+        } else {
+          // Abrir el resumen de otro evento = seleccionarlo y cargarlo en el panel principal.
+          ADMIN_STATE.selected = id;
+          ADMIN_STATE.expandido = id;
+          ADMIN_STATE.turnoFiltro = "all";
+          programarCierreResumen();
+          refreshAdmin();
+        }
       }));
       habilitarReordenEventos(cont);
       // contadores + resumen del evento expandido
