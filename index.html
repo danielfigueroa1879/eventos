@@ -772,7 +772,12 @@
 
       const startMin = sh * 60 + sm;
       const curMin = t.getHours() * 60 + t.getMinutes();
-      let delta = curMin - startMin, dayOff = 0;
+      // Tolerancia de llegada temprana: quien se registra hasta `graceMin` minutos ANTES de que
+      // empiece un turno cuenta para ESE turno (el que va a comenzar), no para el turno anterior.
+      // Sin esto, un guardia del turno Día que llega a las 07:30 (para las 08:00) quedaba en Noche.
+      // Se limita a la mitad del turno para no invadir turnos cortos.
+      const graceMin = Math.min(120, Math.floor(H * 30)); // máx 2 h, o H/2 si el turno es corto
+      let delta = curMin - (startMin - graceMin), dayOff = 0;
       if (delta < 0) { delta += 1440; dayOff = -1; } // pertenece al ciclo del día anterior
 
       const idx = Math.floor(delta / (H * 60));       // índice del turno dentro del día (0-based)
