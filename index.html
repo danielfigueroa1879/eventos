@@ -226,12 +226,6 @@
       box-shadow: inset 3px 0 0 #94a3b8
     }
 
-    /* Sin curso O.S.10: fondo rojo claro + acento rojo (letras en rojo oscuro vía clases de texto) */
-    .row-sincurso {
-      background: #fdeaea;
-      box-shadow: inset 3px 0 0 #dc2626
-    }
-
     /* Resumen del evento (barra lateral): extensión del recuadro verde, con modo oscuro */
     #listaEventos .evResumen {
       background: #ecfdf3;
@@ -275,11 +269,6 @@
     html[data-theme="dark"] .row-inf {
       background: rgba(148, 163, 184, .18) !important;
       box-shadow: inset 3px 0 0 #94a3b8 !important
-    }
-
-    html[data-theme="dark"] .row-sincurso {
-      background: rgba(220, 38, 38, .18) !important;
-      box-shadow: inset 3px 0 0 #dc2626 !important
     }
 
     html[data-theme="dark"] .text-blue-900,
@@ -744,9 +733,9 @@
 
     function calcularVigencia(fechaStr, hoy = new Date()) {
       const h = startOfDay(hoy);
-      if (!fechaStr) return { estado: "SIN_CURSO", vigencia: "SIN CURSO", siges: "", color: "gris", puedeTrabajar: false, vence: null };
+      if (!fechaStr) return { estado: "SIN_CURSO", vigencia: "SIN CURSO", siges: "", color: "rojo", puedeTrabajar: false, vence: null };
       const fx = parseFecha(fechaStr);
-      if (!fx) return { estado: "SIN_CURSO", vigencia: "FECHA INVÁLIDA", siges: "", color: "gris", puedeTrabajar: false, vence: null };
+      if (!fx) return { estado: "SIN_CURSO", vigencia: "FECHA INVÁLIDA", siges: "", color: "rojo", puedeTrabajar: false, vence: null };
       const vence = addMonths(fx, MESES_VIGENCIA);
       if (vence.getTime() >= h.getTime())
         return { estado: "VIGENTE", vigencia: "VIGENTE", siges: "OK", color: "verde", puedeTrabajar: true, vence };
@@ -2455,13 +2444,12 @@
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
-      const sinCurso = v.estado === "SIN_CURSO";
-      // Prioridad de fondo: infractor (gris) > sin curso O.S.10 (rojo claro) > sexo (mujer rojo / hombre azul).
+      // Prioridad de fondo: infractor (gris) por sobre sexo (mujer rojo / hombre azul).
       const rowStyle = '';
-      const claseSexo = tieneInf ? ' row-inf' : (sinCurso ? ' row-sincurso' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : '')));
-      const nCls = tieneInf ? 'text-slate-400' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-400')));   // N°
-      const rCls = tieneInf ? 'text-slate-800' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : '')));                  // RUT
-      const nomCls = tieneInf ? 'text-slate-900' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-800')));  // Nombre
+      const claseSexo = tieneInf ? ' row-inf' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : ''));
+      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-400'));   // N°
+      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : ''));                  // RUT
+      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-800'));  // Nombre
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseSexo} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
@@ -2482,7 +2470,7 @@
     }
 
     /* ---- Listado compacto para celular + detalle en ventana ---- */
-    const VIG_COLOR = { VIGENTE: "#16a34a", VENCIDO_CON_PRORROGA: "#d97706", VENCIDO_SIN_PRORROGA: "#dc2626", SIN_CURSO: "#94a3b8" };
+    const VIG_COLOR = { VIGENTE: "#16a34a", VENCIDO_CON_PRORROGA: "#d97706", VENCIDO_SIN_PRORROGA: "#dc2626", SIN_CURSO: "#b91c1c" };
     function inicialGuardia(g) { const s = ((g.nombres || "") + (g.apellidos || "")).trim(); return (s ? s[0] : "?").toUpperCase(); }
     function nombreCorto(g) {
       const nom = (g.nombres || "").trim(), ape = (g.apellidos || "").trim();
@@ -2510,12 +2498,11 @@
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
-      const sinCurso = v.estado === "SIN_CURSO";
       const rowStyle = '';
-      const claseSexo = tieneInf ? ' row-inf active:bg-slate-50' : (sinCurso ? ' row-sincurso' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : ' active:bg-slate-50')));
-      const nCls = tieneInf ? 'text-slate-600' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-600')));
-      const nomCls = tieneInf ? 'text-slate-900' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-900')));
-      const segCls = tieneInf ? 'text-slate-600' : (sinCurso ? 'text-red-700' : (esMujer ? 'text-red-700' : (esHombre ? 'text-blue-700' : 'text-slate-600')));
+      const claseSexo = tieneInf ? ' row-inf active:bg-slate-50' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : ' active:bg-slate-50'));
+      const nCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-600'));
+      const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-900'));
+      const segCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-700' : (esHombre ? 'text-blue-700' : 'text-slate-600'));
       // Mostrar rut, curso y hora de ingreso para todos
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseSexo}"${rowStyle}>
@@ -2543,12 +2530,11 @@
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
-      const sinCurso = v.estado === "SIN_CURSO";
       const rowStyle = '';
-      const claseSexo = tieneInf ? ' row-inf' : (sinCurso ? ' row-sincurso' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : '')));
-      const nCls = tieneInf ? 'text-slate-400' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-400')));
-      const rCls = tieneInf ? 'text-slate-800' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : '')));
-      const nomClsE = tieneInf ? 'text-slate-900' : (sinCurso ? 'text-red-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-800')));
+      const claseSexo = tieneInf ? ' row-inf' : (esMujer ? ' row-mujer' : (esHombre ? ' row-hombre' : ''));
+      const nCls = tieneInf ? 'text-slate-400' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-400'));
+      const rCls = tieneInf ? 'text-slate-800' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : ''));
+      const nomClsE = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-800'));
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}">${esc(a.rut)}</td>
