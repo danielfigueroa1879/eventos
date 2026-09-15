@@ -3789,7 +3789,8 @@
       // arrastra con el mismo dedo/mouse; al soltar, se guarda la nueva posición y vuelve a quedar fijo.
       function habilitarMovConHold(m, p) {
         const el = m.getElement(); if (!el) return;
-        const LONG = 2000, MOVE_TOL = 10;
+        // Tiempo de mantención presionada para desbloquear: en PC (mouse) 1 s; en celular (táctil) 2 s.
+        const LONG_MOUSE = 1000, LONG_TOUCH = 2000, MOVE_TOL = 10;
         let timer = null, downId = null, startX = 0, startY = 0, moviendo = false;
         const limpiarTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
         const desbloquear = () => {
@@ -3834,7 +3835,7 @@
           document.addEventListener("pointerup", onUp);
           document.addEventListener("pointercancel", onUp);
           limpiarTimer();
-          timer = setTimeout(desbloquear, LONG);
+          timer = setTimeout(desbloquear, ev.pointerType === "mouse" ? LONG_MOUSE : LONG_TOUCH);
         };
         el.addEventListener("pointerdown", onDown);
       }
