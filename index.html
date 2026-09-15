@@ -658,6 +658,15 @@
        se vea en la primera vista sin tener que bajar (y sin quedar fijo). */
     .min-h-screen { min-height: calc(100vh - 64px) !important; }
     @media (min-width: 768px) { .md\:min-h-screen { min-height: calc(100vh - 64px) !important; } }
+
+    /* Distribución: un puesto "desbloqueado" (tras mantenerlo presionado 2 s) brilla en verde
+       para avisar que ahora sí se puede arrastrar. Se anima solo el filtro (no el transform,
+       que Leaflet usa para posicionar el marcador). */
+    .puestoMovible { cursor: grabbing !important; animation: puestoGlow .8s ease-in-out infinite; }
+    @keyframes puestoGlow {
+      0%, 100% { filter: drop-shadow(0 0 2px #16a34a) drop-shadow(0 0 4px #16a34a); }
+      50%      { filter: drop-shadow(0 0 6px #22c55e) drop-shadow(0 0 11px #22c55e); }
+    }
   </style>
 </head>
 
@@ -3764,11 +3773,70 @@
       }
       function addMarker(p) {
         if (p.lat == null || p.lng == null) return;
-        const m = L.marker([p.lat, p.lng], { draggable: !readonly, icon: iconFor(p) }).addTo(map);
+        // Los puestos quedan SIEMPRE fijos (draggable:false). Para moverlos hay que
+        // mantener presionado el marcador más de 2 s (ver habilitarMovConHold).
+        const m = L.marker([p.lat, p.lng], { draggable: false, icon: iconFor(p) }).addTo(map);
         m.bindTooltip(tooltipFor(p), { direction: "top", offset: [0, -40], opacity: 0.95, sticky: true });
-        if (!readonly) m.on("dragend", async () => { const ll = m.getLatLng(); p.lat = ll.lat; p.lng = ll.lng; try { await Data.updatePuesto(p.id, { lat: ll.lat, lng: ll.lng }); } catch (e) { } });
-        m.on("click", () => modalPuesto(p));
+        // Si se acaba de mover con la mantención presionada, el "click" siguiente no abre el modal.
+        m.on("click", () => { if (m._movedRecien) { m._movedRecien = false; return; } modalPuesto(p); });
         state.markers[p.id] = m;
+        if (!readonly) habilitarMovConHold(m, p);
+      }
+
+      // Mover un puesto SOLO tras mantenerlo presionado > 2 s (evita moverlo por equivocación,
+      // sobre todo en celular). Antes de los 2 s el marcador está fijo: un toque abre su ficha y
+      // el mapa se puede desplazar normalmente. Cumplidos los 2 s el puesto se "desbloquea" y se
+      // arrastra con el mismo dedo/mouse; al soltar, se guarda la nueva posición y vuelve a quedar fijo.
+      function habilitarMovConHold(m, p) {
+        const el = m.getElement(); if (!el) return;
+        const LONG = 2000, MOVE_TOL = 10;
+        let timer = null, downId = null, startX = 0, startY = 0, moviendo = false;
+        const limpiarTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
+        const desbloquear = () => {
+          moviendo = true;
+          el.classList.add("puestoMovible");
+          try { map.dragging.disable(); } catch (_) { }  // el mapa no se desplaza mientras movemos el puesto
+          if (navigator.vibrate) { try { navigator.vibrate(30); } catch (_) { } }
+          toast("Puesto desbloqueado: arrástralo a su lugar", true);
+        };
+        const onMove = (ev) => {
+          if (ev.pointerId !== downId) return;
+          if (moviendo) {
+            ev.preventDefault();
+            m.setLatLng(map.mouseEventToLatLng(ev));
+          } else {
+            const dx = ev.clientX - startX, dy = ev.clientY - startY;
+            if (dx * dx + dy * dy > MOVE_TOL * MOVE_TOL) limpiarTimer(); // se está desplazando el mapa: no es mantención
+          }
+        };
+        const onUp = async (ev) => {
+          if (ev.pointerId !== downId) return;
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          document.removeEventListener("pointercancel", onUp);
+          limpiarTimer();
+          downId = null;
+          if (moviendo) {
+            moviendo = false;
+            el.classList.remove("puestoMovible");
+            try { map.dragging.enable(); } catch (_) { }
+            m._movedRecien = true;                       // evita que el click posterior abra la ficha
+            setTimeout(() => { m._movedRecien = false; }, 400);
+            const ll = m.getLatLng(); p.lat = ll.lat; p.lng = ll.lng;
+            try { await Data.updatePuesto(p.id, { lat: ll.lat, lng: ll.lng }); } catch (e) { }
+          }
+        };
+        const onDown = (ev) => {
+          if (downId !== null) { limpiarTimer(); return; }        // segundo dedo (zoom): cancelar
+          if (ev.pointerType === "mouse" && ev.button !== 0) return;
+          downId = ev.pointerId; startX = ev.clientX; startY = ev.clientY; moviendo = false;
+          document.addEventListener("pointermove", onMove, { passive: false });
+          document.addEventListener("pointerup", onUp);
+          document.addEventListener("pointercancel", onUp);
+          limpiarTimer();
+          timer = setTimeout(desbloquear, LONG);
+        };
+        el.addEventListener("pointerdown", onDown);
       }
       function refreshMarkers() { Object.values(state.markers).forEach(m => map.removeLayer(m)); state.markers = {}; state.puestos.forEach(addMarker); }
       refreshMarkers();
