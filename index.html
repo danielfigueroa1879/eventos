@@ -2083,12 +2083,11 @@
         <span id="resumenChevron" class="text-slate-400 transition-transform duration-300 flex-shrink-0" style="${ADMIN_STATE.showResumen ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
       </button>
       <div id="resumenPanel" class="p-3 border-t border-slate-100" ${ADMIN_STATE.showResumen ? "" : "hidden"}>
-        <div class="grid grid-cols-3 md:grid-cols-6 gap-2 text-center">
+        <div class="grid grid-cols-3 md:grid-cols-5 gap-2 text-center">
           ${chip("Guardias Total", asistGuardias.length, "azul")}
           ${chip("Guardias vigentes", nV, "verde")}
           ${chip("Guardias prórroga", nP, "amarillo")}
-          ${chip("Guardias vencidos", nX, "rojo")}
-          ${chip("Sin curso", nS, "gris")}
+          ${chip("Sin curso", nS, "rojo")}
           ${chip("Supervisores", nSup, "celeste")}
         </div>
       </div>
