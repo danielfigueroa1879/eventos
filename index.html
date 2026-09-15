@@ -5240,12 +5240,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         </button>
         <div id="empResumenPanel" class="px-4 pb-3 border-t border-slate-100" ${EMPRESA_STATE.showResumen ? "" : "hidden"}>
           <div class="w-full bg-slate-100 rounded-full h-3 mt-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
-          <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mt-4 text-center">
+          <div class="grid grid-cols-3 md:grid-cols-5 gap-2 mt-4 text-center">
             ${chip("Guardias Total", asistGuardiasE.length, "azul")}
             ${chip("Guardias vigentes", cont("VIGENTE"), "verde")}
             ${chip("Guardias prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo")}
-            ${chip("Guardias vencidos", cont("VENCIDO_SIN_PRORROGA"), "rojo")}
-            ${chip("Sin curso", cont("SIN_CURSO"), "gris")}
+            ${chip("Sin curso", cont("SIN_CURSO"), "rojo")}
             ${chip("Supervisores", nSupE, "celeste")}
           </div>
         </div>
