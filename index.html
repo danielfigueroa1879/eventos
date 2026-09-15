@@ -3789,9 +3789,13 @@
       // arrastra con el mismo dedo/mouse; al soltar, se guarda la nueva posición y vuelve a quedar fijo.
       function habilitarMovConHold(m, p) {
         const el = m.getElement(); if (!el) return;
-        // Tiempo de mantención presionada para desbloquear: en PC (mouse) 1 s; en celular (táctil) 2 s.
-        const LONG_MOUSE = 1000, LONG_TOUCH = 2000, MOVE_TOL = 10;
-        let timer = null, downId = null, startX = 0, startY = 0, moviendo = false;
+        // Tiempo de mantención presionada para desbloquear: 1 s en PC y en celular.
+        const LONG = 1000;
+        // touch-action:none evita que el navegador/Leaflet tomen el gesto como desplazamiento y
+        // corten la mantención (por eso antes "no funcionaba en celular"). Se pierde el paneo del
+        // mapa iniciado justo sobre el marcador, pero el mapa igual se mueve desde cualquier otra zona.
+        el.style.touchAction = "none";
+        let timer = null, downId = null, startX = 0, startY = 0, moviendo = false, tol = 10;
         const limpiarTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
         const desbloquear = () => {
           moviendo = true;
@@ -3807,7 +3811,7 @@
             m.setLatLng(map.mouseEventToLatLng(ev));
           } else {
             const dx = ev.clientX - startX, dy = ev.clientY - startY;
-            if (dx * dx + dy * dy > MOVE_TOL * MOVE_TOL) limpiarTimer(); // se está desplazando el mapa: no es mantención
+            if (dx * dx + dy * dy > tol * tol) limpiarTimer(); // se está desplazando el mapa: no es mantención
           }
         };
         const onUp = async (ev) => {
@@ -3831,11 +3835,14 @@
           if (downId !== null) { limpiarTimer(); return; }        // segundo dedo (zoom): cancelar
           if (ev.pointerType === "mouse" && ev.button !== 0) return;
           downId = ev.pointerId; startX = ev.clientX; startY = ev.clientY; moviendo = false;
+          // En táctil el dedo tiembla más: se tolera un poco más de movimiento antes de cancelar.
+          tol = ev.pointerType === "mouse" ? 8 : 18;
+          try { el.setPointerCapture(ev.pointerId); } catch (_) { } // mantiene los eventos en el marcador
           document.addEventListener("pointermove", onMove, { passive: false });
           document.addEventListener("pointerup", onUp);
           document.addEventListener("pointercancel", onUp);
           limpiarTimer();
-          timer = setTimeout(desbloquear, ev.pointerType === "mouse" ? LONG_MOUSE : LONG_TOUCH);
+          timer = setTimeout(desbloquear, LONG);
         };
         el.addEventListener("pointerdown", onDown);
       }
