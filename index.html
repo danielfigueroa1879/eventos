@@ -3835,6 +3835,7 @@
         <div class="relative flex-1 min-h-0">
           <div id="distMap" class="absolute inset-0" style="background:#e5e7eb"></div>
           <div id="distHint" class="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/85 text-white text-xs px-3 py-1.5 rounded-full shadow" hidden>👆 Toca el mapa para ubicar el puesto</div>
+          <div id="distAsigna" class="absolute top-3 left-1/2 -translate-x-1/2 z-[490] bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow" hidden>⚠ Asigna los guardias a las facciones</div>
           <div id="distPanel" class="absolute top-0 right-0 h-full w-80 max-w-[90%] bg-white shadow-2xl border-l border-slate-200 overflow-y-auto z-[500] translate-x-full transition-transform"></div>
         </div>`;
       document.body.appendChild(ov);
@@ -3860,6 +3861,17 @@
       catch (e) { toast("Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
       try { state.asist = await Data.listAsistencias(ev.id); } catch (e) { }
 
+      // --- Distribución por TURNO VIGENTE ---
+      // Solo cuentan los guardias que registraron su ingreso en el turno vigente ahora.
+      // Al pasar al siguiente turno, los del turno anterior ya no aparecen en el mapa y
+      // las facciones quedan vacías hasta que se asignen los guardias del nuevo turno.
+      const usaTurnos = eventoUsaTurnos(ev);
+      function turnoVigClave() { if (!usaTurnos) return null; const t = calcularTurno(new Date().toISOString(), ev); return t ? t.clave : null; }
+      function enTurnoVig(a) { const vc = turnoVigClave(); if (vc == null) return true; const t = calcularTurno(a.hora_ingreso, ev); return !!t && t.clave === vc; }
+      function asistVig() { return state.asist.filter(enTurnoVig); }
+      function hayPorAsignar() { return !readonly && state.puestos.length > 0 && asistVig().some(a => !a.puesto_id); }
+      function refrescarBannerAsigna() { const b = $("#distAsigna", ov); if (b) b.hidden = !hayPorAsignar(); }
+
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
@@ -3871,9 +3883,9 @@
       }
       setTimeout(() => map.invalidateSize(), 250);
 
-      const asignados = pid => state.asist.filter(a => a.puesto_id === pid).length;
+      const asignados = pid => asistVig().filter(a => a.puesto_id === pid).length;
       function guardiasDePuesto(pid) {
-        return state.asist.filter(a => a.puesto_id === pid).map(a => {
+        return asistVig().filter(a => a.puesto_id === pid).map(a => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
           return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M", hombre: sexoGuardia(g) === "H" };
@@ -3989,7 +4001,7 @@
         };
         el.addEventListener("pointerdown", onDown);
       }
-      function refreshMarkers() { Object.values(state.markers).forEach(m => map.removeLayer(m)); state.markers = {}; state.puestos.forEach(addMarker); }
+      function refreshMarkers() { Object.values(state.markers).forEach(m => map.removeLayer(m)); state.markers = {}; state.puestos.forEach(addMarker); refrescarBannerAsigna(); }
       refreshMarkers();
 
       async function recargar() {
@@ -4112,7 +4124,7 @@
 
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
-        const asig = state.asist.filter(a => a.puesto_id === p.id);
+        const asig = asistVig().filter(a => a.puesto_id === p.id);
         const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = readonly ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
@@ -4139,8 +4151,9 @@
       function modalAsignar(p) {
         // Solo se muestran los guardias que quedan: sin asignar + los que ya están en ESTE puesto.
         // (Los asignados a otras facciones no aparecen; ya fueron distribuidos.)
-        const disp = state.asist.filter(a => !a.puesto_id || a.puesto_id === p.id);
-        const totalReg = state.asist.length, asignadosOtros = state.asist.filter(a => a.puesto_id && a.puesto_id !== p.id).length;
+        const base = asistVig();
+        const disp = base.filter(a => !a.puesto_id || a.puesto_id === p.id);
+        const totalReg = base.length, asignadosOtros = base.filter(a => a.puesto_id && a.puesto_id !== p.id).length;
         const filas = disp.length ? disp.map(a => {
           const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
           const aqui = a.puesto_id === p.id;
@@ -4158,7 +4171,7 @@
         document.querySelectorAll("[data-aid]").forEach(chk => chk.addEventListener("change", async () => {
           const a = state.asist.find(x => x.id === chk.dataset.aid); if (!a) return;
           const nuevo = chk.checked ? p.id : null;
-          try { await Data.asignarPuesto(a.id, nuevo); a.puesto_id = nuevo; } catch (e) { toast("Error: " + (e.message || e), false); chk.checked = !chk.checked; }
+          try { await Data.asignarPuesto(a.id, nuevo); a.puesto_id = nuevo; refrescarBannerAsigna(); } catch (e) { toast("Error: " + (e.message || e), false); chk.checked = !chk.checked; }
         }));
       }
 
@@ -4167,8 +4180,9 @@
         const panel = $("#distPanel", ov);
         const totPlan = state.puestos.reduce((s, p) => s + (p.guardias_plan || 0), 0);
         const totPal = state.puestos.reduce((s, p) => s + (p.paletas || 0), 0);
-        const totAsig = state.asist.filter(a => a.puesto_id).length;
-        const sinAsig = state.asist.length - totAsig;
+        const baseVig = asistVig();
+        const totAsig = baseVig.filter(a => a.puesto_id).length;
+        const sinAsig = baseVig.length - totAsig;
         panel.innerHTML = `
           <div class="p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10 shadow-sm">
             <div class="font-bold text-slate-800">Resumen de Puestos (${state.puestos.length})</div>
