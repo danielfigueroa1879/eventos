@@ -1761,12 +1761,14 @@
         const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length} / ${e.cantidad_esperada || "—"} guardias`;
         if (e.id === ADMIN_STATE.expandido) {
           const elR = $(`[data-reg="${e.id}"]`); if (elR) elR.textContent = g.length;
-          // Llegados en el turno vigente ahora
+          // Turno vigente ahora: los conteos H/M/sup y "llegados" son SOLO de ese turno.
           const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
-          const enTurno = tnNow ? g.filter(a => { const t = calcularTurno(a.hora_ingreso, e); return t && t.clave === tnNow.clave; }).length : g.length;
-          const elL = $(`[data-lleg="${e.id}"]`); if (elL) elL.textContent = tnNow ? `${enTurno} en turno · ${g.length} total` : `${g.length}`;
-          const c = contarHM(g);
-          const elHM = $(`[data-hm="${e.id}"]`); if (elHM) elHM.textContent = `${c.h} H · ${c.m} M${sup.length ? " · " + sup.length + " sup." : ""}`;
+          const enTurnoFn = a => { const t = calcularTurno(a.hora_ingreso, e); return t && tnNow && t.clave === tnNow.clave; };
+          const gTurno = tnNow ? g.filter(enTurnoFn) : g;
+          const supTurno = tnNow ? sup.filter(enTurnoFn) : sup;
+          const elL = $(`[data-lleg="${e.id}"]`); if (elL) elL.textContent = tnNow ? `${gTurno.length} en turno · ${g.length} total` : `${g.length}`;
+          const c = contarHM(gTurno);
+          const elHM = $(`[data-hm="${e.id}"]`); if (elHM) elHM.textContent = `${c.h} H · ${c.m} M${supTurno.length ? " · " + supTurno.length + " sup." : ""}`;
         }
       });
     }
