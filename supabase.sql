@@ -79,12 +79,19 @@ create table if not exists asistencias (
   id           uuid primary key default gen_random_uuid(),
   evento_id    uuid references eventos(id) on delete cascade,
   rut          text references guardias_central(rut),
-  hora_ingreso timestamptz default now(),
-  unique (evento_id, rut)                          -- un guardia no se duplica en un evento
+  hora_ingreso timestamptz default now()
+  -- NOTA: NO se usa "unique (evento_id, rut)". Un guardia puede registrarse en TURNOS
+  -- distintos del mismo evento (ej: trabaja de noche, se va y vuelve en otro turno). El
+  -- control de "ya registrado" dentro de un mismo turno (ventana de 2 h) se hace en la app.
 );
 
-create index if not exists idx_asist_evento on asistencias(evento_id);
-create index if not exists idx_asist_rut    on asistencias(rut);
+-- Migración para bases ya existentes: quita la restricción que impedía más de un registro
+-- por guardia en un evento (causaba el error "ya estabas ingresado" al volver en otro turno).
+alter table asistencias drop constraint if exists asistencias_evento_id_rut_key;
+
+create index if not exists idx_asist_evento     on asistencias(evento_id);
+create index if not exists idx_asist_rut        on asistencias(rut);
+create index if not exists idx_asist_evento_rut on asistencias(evento_id, rut);
 
 -- ---------- DISTRIBUCIÓN GRÁFICA (puestos / facciones en el mapa) ----------
 create table if not exists puestos (

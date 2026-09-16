@@ -754,6 +754,10 @@
        ========================================================================= */
     const TURNO_HORAS_DEFAULT = 12;      // turno de 12 horas (día/noche)
     const TURNO_INICIO_DEFAULT = "08:00"; // inicio del primer turno
+    // Margen tras el fin de un turno antes de considerarlo FINALIZADO (historial/archivo).
+    // Pasado este tiempo, el registro deja de bloquear un nuevo ingreso: el guardia que
+    // trabajó un turno, se fue y vuelve en otro turno distinto SÍ puede volver a registrarse.
+    const GRACIA_TURNO_MS = 2 * 3600 * 1000; // 2 h
 
     function pad2(n) { return String(n).padStart(2, "0"); }
     function fmtHM(d) { return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
@@ -809,6 +813,43 @@
         clave: inicio.getTime(),                     // clave estable para agrupar
         etiquetaLarga: fecha + " · " + etiqueta + " (" + rango + ")"
       };
+    }
+
+    // ¿Un registro de asistencia anterior debe BLOQUEAR un nuevo ingreso del mismo guardia?
+    // Solo bloquea mientras el registro siga "vigente":
+    //  - Con turnos: mientras su turno no haya finalizado (hasta 2 h después de que termine).
+    //    Superado ese margen, el registro queda ARCHIVADO en el historial del turno y ya NO
+    //    bloquea: el guardia que vuelve en un turno distinto puede registrarse otra vez.
+    //  - Sin turnos: solo durante las 2 h siguientes al ingreso (evita el doble registro
+    //    inmediato, pero permite volver a ingresar más tarde).
+    // Así se corrige el error del guardia de noche que, al volver en otro turno/día, veía
+    // "ya estabas ingresado".
+    function registroBloquea(rec, ev) {
+      if (!rec || !rec.hora_ingreso) return false;
+      const t = new Date(rec.hora_ingreso).getTime();
+      if (isNaN(t)) return false;
+      const tn = calcularTurno(rec.hora_ingreso, ev);
+      if (tn) return Date.now() <= tn.fin.getTime() + GRACIA_TURNO_MS;
+      return (Date.now() - t) <= GRACIA_TURNO_MS;
+    }
+
+    // Marca a._dup en cada asistencia cuando el MISMO rut (o nombre completo) se repite
+    // DENTRO DEL MISMO TURNO. Un guardia que trabaja en turnos distintos NO es duplicado.
+    function marcarDuplicados(asist, ev) {
+      const usaT = eventoUsaTurnos(ev);
+      const claveTurno = a => { const tn = usaT ? calcularTurno(a.hora_ingreso, ev) : null; return tn ? tn.clave : "sin"; };
+      const rc = {}, nc = {};
+      const nombreDe = a => ((a.guardia?.nombres || "") + " " + (a.guardia?.apellidos || "")).trim();
+      asist.forEach(a => {
+        const k = claveTurno(a);
+        const rk = k + "|r:" + a.rut; rc[rk] = (rc[rk] || 0) + 1;
+        const n = nombreDe(a); if (n) { const nk = k + "|n:" + n; nc[nk] = (nc[nk] || 0) + 1; }
+      });
+      asist.forEach(a => {
+        const k = claveTurno(a); const n = nombreDe(a);
+        a._dup = (rc[k + "|r:" + a.rut] > 1) || (!!n && nc[k + "|n:" + n] > 1);
+      });
+      return asist;
     }
 
     // Devuelve TODOS los turnos del ciclo (día) que contiene la hora `refIso`, para que el
@@ -972,7 +1013,7 @@
           const gu = get(K.gu);
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
         },
-        async yaRegistrado(evId, rut) { return get(K.as).find(x => x.evento_id === evId && x.rut === rut) || null; },
+        async yaRegistrado(evId, rut) { return get(K.as).filter(x => x.evento_id === evId && x.rut === rut).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? 1 : -1))[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
         async setAsistenciaSupervisor(id, esSup) { const a = get(K.as); const r = a.find(x => x.id === id); if (r) { r.es_supervisor = !!esSup; set(K.as, a); ping(); } return r; },
         async setAsistenciaHora(id, iso) { const a = get(K.as); const r = a.find(x => x.id === id); if (r) { r.hora_ingreso = iso; set(K.as, a); ping(); } return r; },
@@ -1025,7 +1066,7 @@
           let gu = []; if (ruts.length) gu = ok(await sb.from("guardias_central").select("*").in("rut", ruts));
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
         },
-        async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).limit(1)); return d[0] || null; },
+        async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).order("hora_ingreso", { ascending: false }).limit(1)); return d[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }).select().single()); },
         async setAsistenciaSupervisor(id, esSup) { ok(await sb.from("asistencias").update({ es_supervisor: !!esSup }).eq("id", id)); },
         async setAsistenciaHora(id, iso) { ok(await sb.from("asistencias").update({ hora_ingreso: iso }).eq("id", id)); },
@@ -1394,7 +1435,9 @@
         rutMsg.innerHTML = `<span class="text-slate-400">Buscando…</span>`;
         let g = null; try { g = await Data.getGuardia(val); } catch (err) { console.error(err); }
         const ya = await Data.yaRegistrado(ev.id, val).catch(() => null);
-        if (ya) {
+        // Solo bloquea si el registro anterior sigue VIGENTE (mismo turno / dentro de 2 h).
+        // Un registro de un turno ya finalizado queda archivado y permite volver a ingresar.
+        if (ya && registroBloquea(ya, ev)) {
           const tnYa = calcularTurno(ya.hora_ingreso, ev);
           const turnoTxt = tnYa ? ` en el <b>${esc(tnYa.etiqueta)}</b> (${esc(tnYa.rango)})` : "";
           rutMsg.innerHTML = `<span class="text-amber-600 font-medium">⚠ Ya registraste tu ingreso a este evento${turnoTxt}, el ${horaFmt(ya.hora_ingreso)}.</span>`;
@@ -1519,12 +1562,13 @@
           // ¿Ya estaba registrado? (doble toque o reintento cuya escritura anterior sí llegó al servidor).
           if (esErrorDuplicado(err)) {
             const ya = await Data.yaRegistrado(ev.id, rutV).catch(() => null);
-            mostrarIngresoExitoso(ya);
-            return;
+            if (ya) { mostrarIngresoExitoso(ya); return; }
           }
           // Recuperación: la escritura pudo haber llegado y solo se perdió la respuesta. Verificamos en el servidor.
+          // Solo se da por exitoso si el registro hallado es VIGENTE (recién creado), no un ingreso
+          // antiguo ya archivado de un turno anterior.
           const ya = await conTimeout(Data.yaRegistrado(ev.id, rutV), 8000).catch(() => null);
-          if (ya) { mostrarIngresoExitoso(ya); return; }
+          if (ya && registroBloquea(ya, ev)) { mostrarIngresoExitoso(ya); return; }
           // No quedó confirmado → error claro, sin falso éxito. El guardia puede reintentar.
           toast("No se pudo registrar tu ingreso. Verifica tu conexión e intenta nuevamente.", "danger", 4000);
           submit.disabled = false; submit.textContent = txtPrev || "✔ Confirmar ingreso";
@@ -2003,9 +2047,10 @@
       const pct = total ? Math.min(100, Math.round(asistGuardias.length / total * 100)) : 0;
       const usaT = eventoUsaTurnos(ev);
 
-      // detectar duplicados (rut o nombre completo repetidos) — sobre toda la asistencia
+      // Detectar duplicados: solo si el mismo rut o nombre se repite DENTRO DEL MISMO TURNO
+      // (un guardia que trabaja en turnos distintos del evento NO es duplicado). Marca a._dup.
       const rutCount = {}, nomCount = {};
-      asist.forEach(a => { rutCount[a.rut] = (rutCount[a.rut] || 0) + 1; const n = ((a.guardia?.nombres || "") + " " + (a.guardia?.apellidos || "")).trim(); if (n) nomCount[n] = (nomCount[n] || 0) + 1; });
+      marcarDuplicados(asist, ev);
 
       // Agrupar por turno segun la hora de ingreso (solo guardias, para el filtro del listado de guardias)
       const turnosMap = {};
@@ -2013,8 +2058,7 @@
       const turnosArr = Object.values(turnosMap).sort((x, y) => x.clave - y.clave);
       if (ADMIN_STATE.turnoFiltro !== "all" && !turnosMap[ADMIN_STATE.turnoFiltro]) ADMIN_STATE.turnoFiltro = "all";
 
-      // Un turno se considera FINALIZADO (historial) 2 h después de su hora de término.
-      const GRACIA_TURNO_MS = 2 * 3600 * 1000;
+      // Un turno se considera FINALIZADO (historial) 2 h después de su hora de término (GRACIA_TURNO_MS).
       const turnoFinalizado = a => { const tn = calcularTurno(a.hora_ingreso, ev); return !!(tn && Date.now() > tn.fin.getTime() + GRACIA_TURNO_MS); };
       const chipFinalizado = t => Date.now() > (t.fin.getTime ? t.fin.getTime() : new Date(t.fin).getTime()) + GRACIA_TURNO_MS;
 
@@ -2433,7 +2477,7 @@
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
-      const dup = (rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1);
+      const dup = (a._dup !== undefined) ? a._dup : ((rutCount[a.rut] > 1) || (nom && nomCount[nom] > 1));
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="badge" style="background:#e0f2fe;color:#075985;margin-left:4px" title="Supervisor">🤵 SUPERVISOR</span>` : '';
@@ -2487,7 +2531,7 @@
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
       const nomLista = (primerNombre + " " + (g.apellidos || "").trim()).trim() || "—";
-      const dup = (rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1);
+      const dup = (a._dup !== undefined) ? a._dup : ((rutCount[a.rut] > 1) || (nomFull && nomCount[nomFull] > 1));
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${esNuevoG ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} ml-1 whitespace-nowrap">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 ml-1 whitespace-nowrap">🤵 SUPERVISOR</span>` : '';
@@ -5193,8 +5237,9 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const pct = total ? Math.min(100, Math.round(asistGuardiasE.length / total * 100)) : 0;
         const cont = (estado) => asistGuardiasE.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === estado).length;
         const nSupE = asistSupervisoresE.length;
+        // Duplicados por turno (ver marcarDuplicados): un guardia en turnos distintos no es duplicado.
         const rutCountE = {}, nomCountE = {};
-        asist.forEach(a => { rutCountE[a.rut] = (rutCountE[a.rut] || 0) + 1; const n = ((a.guardia?.nombres || "") + " " + (a.guardia?.apellidos || "")).trim(); if (n) nomCountE[n] = (nomCountE[n] || 0) + 1; });
+        marcarDuplicados(asist, ev);
         const turnosMapE = {};
         asistGuardiasE.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMapE[tn.clave]) turnosMapE[tn.clave] = { ...tn, count: 0 }; turnosMapE[tn.clave].count++; } });
         const turnosArrE = Object.values(turnosMapE).sort((x, y) => x.clave - y.clave);
