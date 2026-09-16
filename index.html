@@ -2044,7 +2044,6 @@
       const asistSupervisores = asist.filter(a => a.es_supervisor);
 
       const total = ev.cantidad_esperada || 0;
-      const pct = total ? Math.min(100, Math.round(asistGuardias.length / total * 100)) : 0;
       const usaT = eventoUsaTurnos(ev);
 
       // Detectar duplicados: solo si el mismo rut o nombre se repite DENTRO DEL MISMO TURNO
@@ -2056,14 +2055,19 @@
       const turnosMap = {};
       asistGuardias.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMap[tn.clave]) turnosMap[tn.clave] = { ...tn, count: 0 }; turnosMap[tn.clave].count++; } });
       const turnosArr = Object.values(turnosMap).sort((x, y) => x.clave - y.clave);
-      if (ADMIN_STATE.turnoFiltro !== "all" && !turnosMap[ADMIN_STATE.turnoFiltro]) ADMIN_STATE.turnoFiltro = "all";
 
-      // Un turno se considera FINALIZADO (historial) 2 h después de su hora de término (GRACIA_TURNO_MS).
+      // Un turno se considera FINALIZADO (📁 historial) 2 h después de su hora de término (GRACIA_TURNO_MS).
+      // Los turnos finalizados NO se muestran en el listado ni en el resumen: pasan a la carpeta
+      // "📁 Historial de turnos". Así el listado y el resumen quedan actualizados al turno vigente.
       const turnoFinalizado = a => { const tn = calcularTurno(a.hora_ingreso, ev); return !!(tn && Date.now() > tn.fin.getTime() + GRACIA_TURNO_MS); };
       const chipFinalizado = t => Date.now() > (t.fin.getTime ? t.fin.getTime() : new Date(t.fin).getTime()) + GRACIA_TURNO_MS;
+      const turnosActivos = turnosArr.filter(t => !chipFinalizado(t)); // turnos vigentes
+      const nTurnosHist = turnosArr.length - turnosActivos.length;      // turnos ya finalizados (en el Historial)
+      // Si el turno filtrado ya no existe o ya finalizó (pasó al historial), volver a "Todos".
+      if (ADMIN_STATE.turnoFiltro !== "all" && (!turnosMap[ADMIN_STATE.turnoFiltro] || chipFinalizado(turnosMap[ADMIN_STATE.turnoFiltro]))) ADMIN_STATE.turnoFiltro = "all";
 
-      // Se renderizan todas las filas del turno; la búsqueda filtra en vivo el DOM (ver filtrarLista).
-      // En la vista "Todos" se ocultan los turnos ya finalizados hace +2 h (quedan como historial, se ven al elegir su turno).
+      // Listado: el turno filtrado (si hay) o, en "Todos", solo los turnos vigentes (los finalizados
+      // están en el 📁 Historial). El resumen y las estadísticas se calculan sobre lo mostrado.
       const filas = asistGuardias.filter(a => {
         if (ADMIN_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); return !!tn && String(tn.clave) === ADMIN_STATE.turnoFiltro; }
         return !(usaT && turnoFinalizado(a));
@@ -2073,21 +2077,27 @@
         return !(usaT && turnoFinalizado(a));
       });
       const nActivos = usaT ? asistGuardias.filter(a => !turnoFinalizado(a)).length : asistGuardias.length;
+      const pct = total ? Math.min(100, Math.round(filas.length / total * 100)) : 0;
+      // Lo mostrado en pantalla (turno vigente / filtrado). Las descargas del listado usan esto,
+      // para que coincidan con lo que se ve. Los turnos pasados se descargan desde 📁 Historial.
+      const asistMostrada = [...filas, ...filasSup];
 
-      const turnosBar = `
+      // Barra de turnos: solo aparece cuando hay 2+ turnos vigentes a la vez (traslape), para poder
+      // filtrar entre ellos. Con un único turno vigente no se muestra (como en la vista empresa).
+      const turnosBar = (usaT && turnosActivos.length > 1) ? `
       <div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         <button data-turno="all" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === "all" ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">Todos (${nActivos})</button>
-        ${turnosArr.map(t => { const fin = chipFinalizado(t); return `<button data-turno="${t.clave}" title="${fin ? "Turno finalizado — historial" : "Turno vigente"}" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === String(t.clave) ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap${fin ? " opacity-70" : ""}">${fin ? "📁 " : ""}${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)} (${t.count})</button>`; }).join("")}
-      </div>
-      ${turnosArr.some(chipFinalizado) ? '<p class="text-[11px] text-slate-400 mt-1 px-1">📁 Turnos finalizados (historial): ya no se muestran en “Todos”; toca el turno para ver quiénes estuvieron.</p>' : ""}`;
+        ${turnosActivos.map(t => `<button data-turno="${t.clave}" title="Turno vigente" class="turnoChip btn ${ADMIN_STATE.turnoFiltro === String(t.clave) ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)} (${t.count})</button>`).join("")}
+      </div>` : "";
 
-      const nV = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VIGENTE").length;
-      const nP = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
-      const nX = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
-      const nS = asistGuardias.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length;
-      const nSup = asistSupervisores.length;
-      const totalProrrogas = nP + asistSupervisores.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
-      const totalVencidos = nX + asistSupervisores.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
+      // Estadísticas y resumen: sobre lo MOSTRADO (turno vigente / filtrado), no sobre el histórico.
+      const nV = filas.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VIGENTE").length;
+      const nP = filas.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
+      const nX = filas.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
+      const nS = filas.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length;
+      const nSup = filasSup.length;
+      const totalProrrogas = nP + filasSup.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
+      const totalVencidos = nX + filasSup.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
       // Conteo aproximado de hombres/mujeres por primer nombre (ver generoDeNombre).
       const nH = filas.filter(a => sexoGuardia(a.guardia) === "H").length;
       const nM = filas.filter(a => sexoGuardia(a.guardia) === "M").length;
@@ -2119,7 +2129,7 @@
       <button id="toggleResumen" class="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-[13px] sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
         <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 min-w-0">
           <span class="leading-tight"><span class="res-short">Res.</span><span class="res-full">Resumen de acreditaciones</span></span>
-          <span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${asistGuardias.length} reg.</span>
+          <span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${filas.length} reg.</span>
           ${nSup > 0 ? `<span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${nSup} SUP.</span>` : ""}
           ${totalProrrogas > 0 ? `<span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${totalProrrogas} PRÓRR.</span>` : ""}
           <span class="text-[10px] sm:text-[11px] font-normal text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200/80 whitespace-nowrap">${totalVencidos} VENC.</span>
@@ -2127,8 +2137,9 @@
         <span id="resumenChevron" class="text-slate-400 transition-transform duration-300 flex-shrink-0" style="${ADMIN_STATE.showResumen ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
       </button>
       <div id="resumenPanel" class="p-3 border-t border-slate-100" ${ADMIN_STATE.showResumen ? "" : "hidden"}>
+        ${usaT && nTurnosHist ? `<p class="text-[11px] text-slate-400 mb-2">Resumen del turno vigente. Los turnos anteriores están en 📁 Historial de turnos.</p>` : ""}
         <div class="grid grid-cols-3 md:grid-cols-5 gap-2 text-center">
-          ${chip("Guardias Total", asistGuardias.length, "azul")}
+          ${chip("Guardias Total", filas.length, "azul")}
           ${chip("Guardias vigentes", nV, "verde")}
           ${chip("Guardias prórroga", nP, "amarillo")}
           ${chip("Sin curso", nS, "rojo")}
@@ -2145,7 +2156,7 @@
     <div id="qrPanel" class="p-3 border-t border-slate-100" ${ADMIN_STATE.showQR ? "" : "hidden"}>
       <div class="flex items-center justify-between mb-1.5">
         <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia${nSup ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSup} supervisor${nSup === 1 ? '' : 'es'}</span>` : ''}</div>
-        <div class="text-xl font-bold text-green-700">${asistGuardias.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
+        <div class="text-xl font-bold text-green-700">${filas.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
       </div>
       <div class="w-full bg-slate-100 rounded-full h-2.5 mb-3"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
       <div class="flex flex-col items-center">
@@ -2159,6 +2170,7 @@
         <button id="revSexo" class="btn text-sm px-4 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold shadow-md rounded-xl hidden" title="Revisar y corregir el sexo (H/M) de los guardias para que el conteo sea exacto">👥 Sexo</button>
         ${esPartido(ev) ? `<button id="cerrarPartido" class="btn btn-p text-sm">🏁 Cerrar y archivar partido</button>
         <button id="histPartidos" class="btn btn-ghost text-sm">📁 Historial de partidos</button>` : ""}
+        ${usaT ? `<button id="histTurnos" class="btn btn-ghost text-sm" title="Turnos anteriores archivados. Abre cada turno para ver el detalle y descargar su Excel/PDF.">📁 Historial de turnos${nTurnosHist ? ` (${nTurnosHist})` : ""}</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
         <button id="editEv" class="btn btn-ghost text-sm">${esPartido(ev) ? "✎ Cambiar equipos" : "✎ Editar evento"}</button>
@@ -2186,11 +2198,11 @@
           <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
         </div>
       </div>
-      ${usaT ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
+      ${turnosBar ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
 
       <!-- Móvil: listado compacto con detalle en ventana -->
       <div class="md:hidden divide-y divide-slate-100">
-        ${filas.length ? filas.map((a, i) => filaMovil(a, i, ev, rutCount, nomCount)).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${asist.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</div>`}
+        ${filas.length ? filas.map((a, i) => filaMovil(a, i, ev, rutCount, nomCount)).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asist.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</div>`}
       </div>
 
       <!-- Escritorio: tabla completa -->
@@ -2200,7 +2212,7 @@
             <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento."}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -2280,10 +2292,10 @@
       };
       statsBtn.addEventListener("click", () => { ADMIN_STATE.showStats = !ADMIN_STATE.showStats; pintarStats(); });
       pintarStats();
-      $("#expExcel").addEventListener("click", () => descargarExcel(ev, asist));
-      $("#expPDF").addEventListener("click", () => descargarPDF(ev, asist));
-      $("#compartir").addEventListener("click", () => modalCompartir(ev, asist));
-      const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asist));
+      $("#expExcel").addEventListener("click", () => descargarExcel(ev, asistMostrada));
+      $("#expPDF").addEventListener("click", () => descargarPDF(ev, asistMostrada));
+      $("#compartir").addEventListener("click", () => modalCompartir(ev, asistMostrada));
+      const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
       const btnCerrar = $("#cerrarPartido");
       if (btnCerrar) btnCerrar.addEventListener("click", () => {
@@ -2323,6 +2335,8 @@
       const bL2 = $("#lockMovilBtn"); if (bL2) bL2.addEventListener("click", () => toggleLock(bL2));
       const btnHist = $("#histPartidos");
       if (btnHist) btnHist.addEventListener("click", () => modalHistorialPartidos(ev));
+      const btnHistT = $("#histTurnos");
+      if (btnHistT) btnHistT.addEventListener("click", () => modalHistorialTurnos(ev));
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
