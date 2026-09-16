@@ -1761,14 +1761,12 @@
         const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length} / ${e.cantidad_esperada || "—"} guardias`;
         if (e.id === ADMIN_STATE.expandido) {
           const elR = $(`[data-reg="${e.id}"]`); if (elR) elR.textContent = g.length;
-          // Turno vigente ahora: los conteos H/M/sup y "llegados" son SOLO de ese turno.
+          // Llegados en el turno vigente ahora
           const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
-          const enTurnoFn = a => { const t = calcularTurno(a.hora_ingreso, e); return t && tnNow && t.clave === tnNow.clave; };
-          const gTurno = tnNow ? g.filter(enTurnoFn) : g;
-          const supTurno = tnNow ? sup.filter(enTurnoFn) : sup;
-          const elL = $(`[data-lleg="${e.id}"]`); if (elL) elL.textContent = tnNow ? `${gTurno.length} en turno · ${g.length} total` : `${g.length}`;
-          const c = contarHM(gTurno);
-          const elHM = $(`[data-hm="${e.id}"]`); if (elHM) elHM.textContent = `${c.h} H · ${c.m} M${supTurno.length ? " · " + supTurno.length + " sup." : ""}`;
+          const enTurno = tnNow ? g.filter(a => { const t = calcularTurno(a.hora_ingreso, e); return t && t.clave === tnNow.clave; }).length : g.length;
+          const elL = $(`[data-lleg="${e.id}"]`); if (elL) elL.textContent = tnNow ? `${enTurno} en turno · ${g.length} total` : `${g.length}`;
+          const c = contarHM(g);
+          const elHM = $(`[data-hm="${e.id}"]`); if (elHM) elHM.textContent = `${c.h} H · ${c.m} M${sup.length ? " · " + sup.length + " sup." : ""}`;
         }
       });
     }
@@ -3835,12 +3833,19 @@
         <div class="relative flex-1 min-h-0">
           <div id="distMap" class="absolute inset-0" style="background:#e5e7eb"></div>
           <div id="distHint" class="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/85 text-white text-xs px-3 py-1.5 rounded-full shadow" hidden>👆 Toca el mapa para ubicar el puesto</div>
-          <div id="distAsigna" class="absolute top-3 left-1/2 -translate-x-1/2 z-[490] bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow" hidden>⚠ Asigna los guardias a las facciones</div>
           <div id="distPanel" class="absolute top-0 right-0 h-full w-80 max-w-[90%] bg-white shadow-2xl border-l border-slate-200 overflow-y-auto z-[500] translate-x-full transition-transform"></div>
         </div>`;
       document.body.appendChild(ov);
 
       const state = { ev, puestos: [], asist: [], map: null, markers: {}, panelOpen: false };
+      // Para la distribución, cada guardia aparece UNA sola vez (su registro más reciente).
+      // Con el reingreso por turnos un mismo guardia puede tener varios registros; sin esto se
+      // duplicaba en el mapa y en la asignación de facciones.
+      const asistUnica = (arr) => {
+        const by = {};
+        (arr || []).forEach(a => { const cur = by[a.rut]; if (!cur || (a.hora_ingreso || "") > (cur.hora_ingreso || "")) by[a.rut] = a; });
+        return Object.values(by);
+      };
       const cerrar = () => { try { state.map && state.map.remove(); } catch (e) { } ov.remove(); };
       $("#dist_close", ov).addEventListener("click", cerrar);
       // Menú hamburguesa (celular): abrir/cerrar el grupo de acciones
@@ -3859,18 +3864,7 @@
 
       try { state.puestos = await Data.listPuestos(ev.id); }
       catch (e) { toast("Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
-      try { state.asist = await Data.listAsistencias(ev.id); } catch (e) { }
-
-      // --- Distribución por TURNO VIGENTE ---
-      // Solo cuentan los guardias que registraron su ingreso en el turno vigente ahora.
-      // Al pasar al siguiente turno, los del turno anterior ya no aparecen en el mapa y
-      // las facciones quedan vacías hasta que se asignen los guardias del nuevo turno.
-      const usaTurnos = eventoUsaTurnos(ev);
-      function turnoVigClave() { if (!usaTurnos) return null; const t = calcularTurno(new Date().toISOString(), ev); return t ? t.clave : null; }
-      function enTurnoVig(a) { const vc = turnoVigClave(); if (vc == null) return true; const t = calcularTurno(a.hora_ingreso, ev); return !!t && t.clave === vc; }
-      function asistVig() { return state.asist.filter(enTurnoVig); }
-      function hayPorAsignar() { return !readonly && state.puestos.length > 0 && asistVig().some(a => !a.puesto_id); }
-      function refrescarBannerAsigna() { const b = $("#distAsigna", ov); if (b) b.hidden = !hayPorAsignar(); }
+      try { state.asist = asistUnica(await Data.listAsistencias(ev.id)); } catch (e) { }
 
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
@@ -3883,9 +3877,9 @@
       }
       setTimeout(() => map.invalidateSize(), 250);
 
-      const asignados = pid => asistVig().filter(a => a.puesto_id === pid).length;
+      const asignados = pid => state.asist.filter(a => a.puesto_id === pid).length;
       function guardiasDePuesto(pid) {
-        return asistVig().filter(a => a.puesto_id === pid).map(a => {
+        return state.asist.filter(a => a.puesto_id === pid).map(a => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
           return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M", hombre: sexoGuardia(g) === "H" };
@@ -4001,12 +3995,12 @@
         };
         el.addEventListener("pointerdown", onDown);
       }
-      function refreshMarkers() { Object.values(state.markers).forEach(m => map.removeLayer(m)); state.markers = {}; state.puestos.forEach(addMarker); refrescarBannerAsigna(); }
+      function refreshMarkers() { Object.values(state.markers).forEach(m => map.removeLayer(m)); state.markers = {}; state.puestos.forEach(addMarker); }
       refreshMarkers();
 
       async function recargar() {
         try { state.puestos = await Data.listPuestos(ev.id); } catch (e) { }
-        try { state.asist = await Data.listAsistencias(ev.id); } catch (e) { }
+        try { state.asist = asistUnica(await Data.listAsistencias(ev.id)); } catch (e) { }
         refreshMarkers(); if (state.panelOpen) renderPanel();
       }
 
@@ -4124,7 +4118,7 @@
 
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
-        const asig = asistVig().filter(a => a.puesto_id === p.id);
+        const asig = state.asist.filter(a => a.puesto_id === p.id);
         const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = readonly ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
@@ -4149,21 +4143,32 @@
 
       // --- Asignar guardias registrados a un puesto ---
       function modalAsignar(p) {
-        // Solo se muestran los guardias que quedan: sin asignar + los que ya están en ESTE puesto.
-        // (Los asignados a otras facciones no aparecen; ya fueron distribuidos.)
-        const base = asistVig();
-        const disp = base.filter(a => !a.puesto_id || a.puesto_id === p.id);
-        const totalReg = base.length, asignadosOtros = base.filter(a => a.puesto_id && a.puesto_id !== p.id).length;
+        // Se muestran TODOS los guardias: sin asignar, los de ESTE puesto y también los que ya
+        // están en OTRA facción (con la etiqueta de su puesto actual). Marcar un guardia que está
+        // en otro puesto lo MUEVE a este. Así ningún guardia queda oculto ni bloqueado.
+        const nombrePuesto = id => { const q = state.puestos.find(x => x.id === id); return q ? q.nombre : "otro puesto"; };
+        const rank = a => a.puesto_id === p.id ? 0 : (!a.puesto_id ? 1 : 2); // aquí → libres → en otros
+        const disp = state.asist.slice().sort((a, b) => {
+          const d = rank(a) - rank(b); if (d) return d;
+          const na = ((a.guardia?.nombres || "") + (a.guardia?.apellidos || "")).trim();
+          const nb = ((b.guardia?.nombres || "") + (b.guardia?.apellidos || "")).trim();
+          return na.localeCompare(nb);
+        });
+        const totalReg = state.asist.length;
+        const enEste = state.asist.filter(a => a.puesto_id === p.id).length;
+        const libres = state.asist.filter(a => !a.puesto_id).length;
+        const enOtras = state.asist.filter(a => a.puesto_id && a.puesto_id !== p.id).length;
         const filas = disp.length ? disp.map(a => {
           const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
           const aqui = a.puesto_id === p.id;
-          return `<label class="flex items-center gap-2 py-1.5 border-b border-slate-50">
+          const enOtro = a.puesto_id && a.puesto_id !== p.id;
+          return `<label class="flex items-center gap-2 py-1.5 border-b border-slate-50${enOtro ? " opacity-90" : ""}">
             <input type="checkbox" data-aid="${a.id}" ${aqui ? "checked" : ""} class="w-4 h-4 flex-shrink-0">
-            <span class="flex-1 min-w-0"><span class="block truncate text-sm md:text-xs font-medium text-slate-800">${esc(nom)}</span><span class="block text-[11px] md:text-[10px] text-slate-400 font-mono">${esc(a.rut)}</span></span>
+            <span class="flex-1 min-w-0"><span class="block truncate text-sm md:text-xs font-medium text-slate-800">${esc(nom)}</span><span class="block text-[11px] md:text-[10px] text-slate-400 font-mono">${esc(a.rut)}${enOtro ? ` · <span class="font-sans font-semibold text-amber-600">📍 ${esc(nombrePuesto(a.puesto_id))}</span>` : ""}</span></span>
           </label>`;
-        }).join("") : `<div class="text-slate-400 text-sm py-4 text-center col-span-2">Todos los guardias ya están asignados a otras facciones.</div>`;
+        }).join("") : `<div class="text-slate-400 text-sm py-4 text-center col-span-2">Aún no hay guardias registrados en este evento.</div>`;
         openModal(`<h2 class="font-bold text-slate-800 mb-1">Asignar a "${esc(p.nombre)}"</h2>
-          <p class="text-xs text-slate-500 mb-2">Marca los guardias que van en este puesto (plan: ${p.guardias_plan || 0}). Disponibles: <b>${disp.filter(a => !a.puesto_id).length}</b> · en este puesto: <b>${disp.filter(a => a.puesto_id === p.id).length}</b> · ya asignados en otras: ${asignadosOtros}/${totalReg}</p>
+          <p class="text-xs text-slate-500 mb-2">Marca los guardias que van en este puesto (plan: ${p.guardias_plan || 0}). Sin asignar: <b>${libres}</b> · en este puesto: <b>${enEste}</b> · en otras facciones: ${enOtras}/${totalReg}. Marcar uno que está en otra facción lo <b>mueve aquí</b>.</p>
           <div class="max-h-72 md:max-h-[60vh] overflow-auto border border-slate-100 rounded-lg px-2 grid grid-cols-1 md:grid-cols-2 md:gap-x-5">${filas}</div>
           <div class="mt-3"><button id="as_close" class="btn btn-p w-full">Listo</button></div>`);
         $("#modalBox").classList.add("md:max-w-3xl");
@@ -4171,7 +4176,7 @@
         document.querySelectorAll("[data-aid]").forEach(chk => chk.addEventListener("change", async () => {
           const a = state.asist.find(x => x.id === chk.dataset.aid); if (!a) return;
           const nuevo = chk.checked ? p.id : null;
-          try { await Data.asignarPuesto(a.id, nuevo); a.puesto_id = nuevo; refrescarBannerAsigna(); } catch (e) { toast("Error: " + (e.message || e), false); chk.checked = !chk.checked; }
+          try { await Data.asignarPuesto(a.id, nuevo); a.puesto_id = nuevo; } catch (e) { toast("Error: " + (e.message || e), false); chk.checked = !chk.checked; }
         }));
       }
 
@@ -4180,9 +4185,8 @@
         const panel = $("#distPanel", ov);
         const totPlan = state.puestos.reduce((s, p) => s + (p.guardias_plan || 0), 0);
         const totPal = state.puestos.reduce((s, p) => s + (p.paletas || 0), 0);
-        const baseVig = asistVig();
-        const totAsig = baseVig.filter(a => a.puesto_id).length;
-        const sinAsig = baseVig.length - totAsig;
+        const totAsig = state.asist.filter(a => a.puesto_id).length;
+        const sinAsig = state.asist.length - totAsig;
         panel.innerHTML = `
           <div class="p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10 shadow-sm">
             <div class="font-bold text-slate-800">Resumen de Puestos (${state.puestos.length})</div>
