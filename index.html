@@ -3838,12 +3838,19 @@
       document.body.appendChild(ov);
 
       const state = { ev, puestos: [], asist: [], map: null, markers: {}, panelOpen: false };
-      // Para la distribución, cada guardia aparece UNA sola vez (su registro más reciente).
-      // Con el reingreso por turnos un mismo guardia puede tener varios registros; sin esto se
-      // duplicaba en el mapa y en la asignación de facciones.
+      // Para la distribución, cada guardia aparece UNA sola vez. Con el reingreso por turnos un
+      // mismo guardia puede tener varios registros; sin esto se duplicaba en el mapa y en la
+      // asignación. IMPORTANTE: se PREFIERE el registro que ya tiene faccion asignada, para no
+      // "perder" de vista las facciones ya armadas cuando el guardia se reingresa en otro turno.
       const asistUnica = (arr) => {
         const by = {};
-        (arr || []).forEach(a => { const cur = by[a.rut]; if (!cur || (a.hora_ingreso || "") > (cur.hora_ingreso || "")) by[a.rut] = a; });
+        (arr || []).forEach(a => {
+          const cur = by[a.rut];
+          if (!cur) { by[a.rut] = a; return; }
+          const aAsig = !!a.puesto_id, cAsig = !!cur.puesto_id;
+          if (aAsig !== cAsig) { if (aAsig) by[a.rut] = a; return; }   // preferir el que tiene puesto
+          if ((a.hora_ingreso || "") > (cur.hora_ingreso || "")) by[a.rut] = a; // si empatan, el más reciente
+        });
         return Object.values(by);
       };
       const cerrar = () => { try { state.map && state.map.remove(); } catch (e) { } ov.remove(); };
