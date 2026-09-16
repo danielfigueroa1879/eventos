@@ -1613,7 +1613,7 @@
     let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true };
     // Estado propio de la VISTA EMPRESA (solo lectura). Se conserva entre repintados en tiempo real.
     // Ambos paneles arrancan abiertos y se repliegan solos a los 7 s (igual que el Resumen del admin).
-    let EMPRESA_STATE = { showQR: true, showResumen: true, turnoFiltro: "all" };
+    let EMPRESA_STATE = { showQR: true, showResumen: true };
 
     async function renderAdmin() {
       app.innerHTML = `
@@ -3699,6 +3699,90 @@
       $("#hg_pdf").addEventListener("click", () => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)));
     }
 
+    /* ---- Historial de TURNOS (eventos con turnos) ----
+       Agrupa las asistencias por turno y deja SOLO los turnos ya FINALIZADOS (2 h después de
+       su término). Cada turno se puede ver en detalle y descargar en Excel/PDF. Se usa en la
+       vista empresa (carpeta 📁 Historial dentro del QR). */
+    function turnosHistorial(ev, asist) {
+      const grupos = {};
+      (asist || []).forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (!tn) return; const k = tn.clave; if (!grupos[k]) grupos[k] = { tn, recs: [] }; grupos[k].recs.push(a); });
+      return Object.values(grupos)
+        .filter(g => Date.now() > g.tn.fin.getTime() + GRACIA_TURNO_MS)
+        .sort((a, b) => a.tn.clave - b.tn.clave); // ascendente: el más antiguo (Día 1) primero
+    }
+    function turnoEvPseudo(ev, g) {
+      return { ...ev, nombre_evento: `${ev.nombre_evento} — ${g.tn.fecha} ${g.tn.etiqueta} (${g.tn.rango})`, slug: `${ev.slug}-t${g.tn.clave}` };
+    }
+    async function modalHistorialTurnos(ev) {
+      openModal(`<div class="text-center text-slate-400 py-6 text-sm">Cargando historial…</div>`);
+      const cerrarBtn = () => { const b = $("#ht_close"); if (b) b.addEventListener("click", closeModal); };
+      if (!eventoUsaTurnos(ev)) {
+        openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📁 Historial de turnos</h2><p class="text-sm text-slate-500">Este evento no usa turnos, por lo que no tiene historial por turnos.</p><div class="mt-3"><button id="ht_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
+        cerrarBtn(); return;
+      }
+      let asist = [];
+      try { asist = await Data.listAsistencias(ev.id); }
+      catch (e) { openModal(`<p class="text-red-600 text-sm">Error al cargar el historial: ${esc(e.message || String(e))}</p><div class="mt-3"><button id="ht_close" class="btn btn-ghost w-full">Cerrar</button></div>`); cerrarBtn(); return; }
+      const finalizados = turnosHistorial(ev, asist);
+      const cuerpo = finalizados.length ? finalizados.map((g, i) => {
+        const nG = g.recs.filter(a => !a.es_supervisor).length;
+        const nS = g.recs.filter(a => a.es_supervisor).length;
+        return `<div class="border border-slate-200 rounded-xl p-3">
+          <div class="min-w-0">
+            <div class="font-semibold text-slate-800 truncate">📁 Día ${i + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</div>
+            <div class="text-xs text-slate-500">${esc(g.tn.rango)} · ${nG} guardia${nG === 1 ? "" : "s"}${nS ? " · " + nS + " supervisor" + (nS === 1 ? "" : "es") : ""}</div>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-2">
+            <button data-vt="${g.tn.clave}" class="btn btn-ghost text-xs">👁 Ver detalle</button>
+            <button data-xt="${g.tn.clave}" class="btn btn-ghost text-xs">📊 Excel</button>
+            <button data-pt="${g.tn.clave}" class="btn btn-ghost text-xs">📄 PDF</button>
+          </div>
+        </div>`;
+      }).join("") : `<p class="text-sm text-slate-400 text-center py-6">Aún no hay turnos en el historial. Cada turno pasa aquí 2 h después de terminar.</p>`;
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📁 Historial de turnos</h2>
+        <p class="text-sm text-slate-500 mb-3">Turnos anteriores de "<b>${esc(ev.nombre_evento)}</b>". Abre cada turno para ver el detalle y descargar su Excel o PDF.</p>
+        <div class="space-y-2">${cuerpo}</div>
+        <div class="mt-3"><button id="ht_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
+      cerrarBtn();
+      const byClave = clave => finalizados.find(g => String(g.tn.clave) === String(clave));
+      document.querySelectorAll("[data-vt]").forEach(b => b.addEventListener("click", () => { const g = byClave(b.dataset.vt); if (g) modalHistorialTurnoDetalle(ev, g, finalizados); }));
+      document.querySelectorAll("[data-xt]").forEach(b => b.addEventListener("click", () => { const g = byClave(b.dataset.xt); if (g) descargarExcel(turnoEvPseudo(ev, g), g.recs); }));
+      document.querySelectorAll("[data-pt]").forEach(b => b.addEventListener("click", () => { const g = byClave(b.dataset.pt); if (g) descargarPDF(turnoEvPseudo(ev, g), g.recs); }));
+    }
+    function modalHistorialTurnoDetalle(ev, g, finalizados) {
+      const idx = Math.max(0, finalizados.indexOf(g));
+      const recsG = g.recs.filter(a => !a.es_supervisor);
+      const recsS = g.recs.filter(a => a.es_supervisor);
+      const filaDet = (a, i) => {
+        const gu = a.guardia || {};
+        const v = calcularVigencia(gu.fecha_ultimo_examen);
+        const nom = ((gu.nombres || "") + " " + (gu.apellidos || "")).trim() || "—";
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+      };
+      const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
+      const evP = turnoEvPseudo(ev, g);
+      openModalWide(`<div class="flex items-center justify-between mb-1">
+          <h2 class="font-bold text-slate-800">📁 Día ${idx + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</h2>
+          <button id="htd_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
+        <div class="overflow-x-auto"><table class="w-full text-sm">
+          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+          <tbody>${cuerpoG}</tbody>
+        </table></div>
+        ${recsS.length ? `<p class="text-xs font-bold text-sky-800 mt-3 mb-1">🤵 Supervisores (${recsS.length})</p>
+        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <button id="htd_xls" class="btn btn-ghost text-sm">📊 Excel</button>
+          <button id="htd_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
+        </div>
+        <div class="mt-2"><button id="htd_back" class="btn btn-ghost w-full">← Volver al historial</button></div>`);
+      $("#htd_x").addEventListener("click", closeModal);
+      $("#htd_back").addEventListener("click", () => modalHistorialTurnos(ev));
+      $("#htd_xls").addEventListener("click", () => descargarExcel(evP, g.recs));
+      $("#htd_pdf").addEventListener("click", () => descargarPDF(evP, g.recs));
+    }
+
     /* =========================================================================
        DISTRIBUCIÓN GRÁFICA DE GUARDIAS (mapa real — Leaflet / OpenStreetMap)
        ========================================================================= */
@@ -5234,9 +5318,6 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const asistGuardiasE = asist.filter(a => !a.es_supervisor);
         const asistSupervisoresE = asist.filter(a => a.es_supervisor);
         const total = ev.cantidad_esperada || 0;
-        const pct = total ? Math.min(100, Math.round(asistGuardiasE.length / total * 100)) : 0;
-        const cont = (estado) => asistGuardiasE.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === estado).length;
-        const nSupE = asistSupervisoresE.length;
         const usaT = eventoUsaTurnos(ev);
         // Duplicados por turno (ver marcarDuplicados): un guardia en turnos distintos no es duplicado.
         const rutCountE = {}, nomCountE = {};
@@ -5244,25 +5325,20 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const turnosMapE = {};
         asistGuardiasE.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMapE[tn.clave]) turnosMapE[tn.clave] = { ...tn, count: 0 }; turnosMapE[tn.clave].count++; } });
         const turnosArrE = Object.values(turnosMapE).sort((x, y) => x.clave - y.clave);
-        // Filtro de turnos (historial), igual que en el panel admin. Un turno se considera
-        // FINALIZADO (📁 historial) 2 h después de su término (GRACIA_TURNO_MS). En "Todos" se
-        // ocultan los turnos finalizados; se ven al tocar el turno. Así la empresa consulta y
-        // descarga el Excel/PDF de cada turno que va pasando.
-        if (EMPRESA_STATE.turnoFiltro !== "all" && !turnosMapE[EMPRESA_STATE.turnoFiltro]) EMPRESA_STATE.turnoFiltro = "all";
+        // Un turno se considera FINALIZADO (📁 historial) 2 h después de su término (GRACIA_TURNO_MS).
+        // Los turnos finalizados NO se muestran en el listado ni en el resumen: pasan a la carpeta
+        // "Historial" (botón dentro del QR). Así el listado y el resumen quedan SIEMPRE actualizados
+        // al/los turno(s) vigente(s).
         const turnoFinalizadoE = a => { const tn = calcularTurno(a.hora_ingreso, ev); return !!(tn && Date.now() > tn.fin.getTime() + GRACIA_TURNO_MS); };
         const chipFinalizadoE = t => Date.now() > (t.fin.getTime ? t.fin.getTime() : new Date(t.fin).getTime()) + GRACIA_TURNO_MS;
-        const filtrarE = a => {
-          if (EMPRESA_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); return !!tn && String(tn.clave) === EMPRESA_STATE.turnoFiltro; }
-          return !(usaT && turnoFinalizadoE(a));
-        };
-        const filasG = asistGuardiasE.filter(filtrarE);
-        const filasS = asistSupervisoresE.filter(filtrarE);
-        const nActivosE = usaT ? asistGuardiasE.filter(a => !turnoFinalizadoE(a)).length : asistGuardiasE.length;
-        const turnoSelE = (EMPRESA_STATE.turnoFiltro !== "all" && turnosMapE[EMPRESA_STATE.turnoFiltro]) ? turnosMapE[EMPRESA_STATE.turnoFiltro] : null;
-        // Descarga: con un turno seleccionado se exporta SOLO ese turno (con su etiqueta en el
-        // título y nombre de archivo); en "Todos" se exporta el listado completo del evento.
-        const asistDescarga = (EMPRESA_STATE.turnoFiltro !== "all") ? asist.filter(filtrarE) : asist;
-        const evDescarga = turnoSelE ? { ...ev, nombre_evento: `${ev.nombre_evento} — ${turnoSelE.fecha} ${turnoSelE.etiqueta} (${turnoSelE.rango})`, slug: `${ev.slug}-t${turnoSelE.clave}` } : ev;
+        const activoE = a => !(usaT && turnoFinalizadoE(a));
+        const filasG = asistGuardiasE.filter(activoE);   // guardias del turno vigente
+        const filasS = asistSupervisoresE.filter(activoE); // supervisores del turno vigente
+        const asistActiva = asist.filter(activoE);        // todo lo vigente (para descargar el turno actual)
+        const nSupE = filasS.length;
+        const pct = total ? Math.min(100, Math.round(filasG.length / total * 100)) : 0;
+        const cont = (estado) => filasG.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === estado).length;
+        const nTurnosHist = turnosArrE.filter(chipFinalizadoE).length; // turnos ya finalizados (en el historial)
         app.innerHTML = `
     <div class="min-h-screen w-full px-3 pt-0.5 pb-3 md:px-4 md:pt-1 md:pb-6 max-w-[104rem] mx-auto">
       <!-- Los 3 primeros contenedores van mucho más angostos (banner, QR, Guardias ingresados) -->
@@ -5286,27 +5362,32 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <div id="empQrPanel" class="p-3 border-t border-slate-100" ${EMPRESA_STATE.showQR ? "" : "hidden"}>
           <div class="flex items-center justify-between mb-1.5">
             <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</div>
-            <div class="text-xl font-bold text-green-700">${asistGuardiasE.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
+            <div class="text-xl font-bold text-green-700">${filasG.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
           </div>
           <div class="w-full bg-slate-100 rounded-full h-2.5 mb-3"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
           <div class="flex flex-col items-center">
             <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
             ${qrBotonesHTML(ev, { conLink: false })}
           </div>
+          ${usaT ? `<div class="mt-3 pt-3 border-t border-slate-100">
+            <button id="empHist" class="btn btn-ghost w-full text-sm flex items-center justify-center gap-2" title="Turnos anteriores archivados. Abre cada turno para ver el detalle y descargar su Excel/PDF.">📁 Historial de turnos${nTurnosHist ? ` <span class="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800">${nTurnosHist}</span>` : ""}</button>
+            <p class="text-[11px] text-slate-400 mt-1 text-center">Cada turno pasa al historial 2 h después de terminar. Adentro descargas su Excel y PDF.</p>
+          </div>` : ""}
         </div>
       </div>
       <div class="card mt-2 overflow-hidden">
         <button id="empToggleResumen" class="w-full px-4 py-1.5 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
           <span>Guardias ingresados${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</span>
           <span class="flex items-center gap-2 flex-shrink-0">
-            <span class="text-xl font-bold text-green-700">${asistGuardiasE.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></span>
+            <span class="text-xl font-bold text-green-700">${filasG.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></span>
             <span id="empResumenChevron" class="text-slate-400 transition-transform duration-300" style="${EMPRESA_STATE.showResumen ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
           </span>
         </button>
         <div id="empResumenPanel" class="px-4 pb-3 border-t border-slate-100" ${EMPRESA_STATE.showResumen ? "" : "hidden"}>
           <div class="w-full bg-slate-100 rounded-full h-3 mt-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
+          ${usaT && nTurnosHist ? `<p class="text-[11px] text-slate-400 mt-2">Resumen del turno vigente. Los turnos anteriores están en 📁 Historial (dentro del QR).</p>` : ""}
           <div class="grid grid-cols-3 md:grid-cols-5 gap-2 mt-4 text-center">
-            ${chip("Guardias Total", asistGuardiasE.length, "azul")}
+            ${chip("Guardias Total", filasG.length, "azul")}
             ${chip("Guardias vigentes", cont("VIGENTE"), "verde")}
             ${chip("Guardias prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo")}
             ${chip("Sin curso", cont("SIN_CURSO"), "rojo")}
@@ -5317,30 +5398,22 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       </div><!-- fin envoltura angosta: desde aquí los listados van más anchos -->
       <div class="card mt-2">
         <div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center justify-between flex-wrap gap-2">
-          <span>Listado guardias (${filasG.length})${turnoSelE ? ` <span class="text-indigo-600 font-normal text-xs">· ${esc(turnoSelE.fecha)} ${esc(turnoSelE.etiqueta)}</span>` : ""}</span>
+          <span>Listado guardias (${filasG.length})${usaT ? ` <span class="text-indigo-600 font-normal text-xs">· turno vigente</span>` : ""}</span>
           <span class="flex items-center gap-2 flex-wrap">
-            <button id="empXls" class="text-xs font-bold px-2.5 py-1 border border-green-200 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 whitespace-nowrap" title="${turnoSelE ? "Descargar en Excel el listado de este turno" : "Descargar el listado en Excel"}">📊 Excel${turnoSelE ? " del turno" : ""}</button>
-            <button id="empPdf" class="text-xs font-bold px-2.5 py-1 border border-red-200 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 whitespace-nowrap" title="${turnoSelE ? "Descargar en PDF el listado de este turno" : "Descargar el listado en PDF"}">📄 PDF${turnoSelE ? " del turno" : ""}</button>
+            <button id="empXls" class="text-xs font-bold px-2.5 py-1 border border-green-200 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 whitespace-nowrap" title="Descargar el listado del turno vigente en Excel">📊 Excel</button>
+            <button id="empPdf" class="text-xs font-bold px-2.5 py-1 border border-red-200 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 whitespace-nowrap" title="Descargar el listado del turno vigente en PDF">📄 PDF</button>
             <span class="text-xs font-normal">${eventoInfoHTML(ev)}</span>
           </span>
         </div>
-        ${turnosArrE.length ? `
-        <div class="px-3 pt-3">
-          <div class="flex gap-2 overflow-x-auto pb-1">
-            <button data-turno="all" class="turnoChipEmp btn ${EMPRESA_STATE.turnoFiltro === "all" ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">Todos (${nActivosE})</button>
-            ${turnosArrE.map(t => { const fin = chipFinalizadoE(t); return `<button data-turno="${t.clave}" title="${fin ? "Turno finalizado — historial" : "Turno vigente"}" class="turnoChipEmp btn ${EMPRESA_STATE.turnoFiltro === String(t.clave) ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap${fin ? " opacity-70" : ""}">${fin ? "📁 " : ""}${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)} (${t.count})</button>`; }).join("")}
-          </div>
-          ${turnosArrE.some(chipFinalizadoE) ? '<p class="text-[11px] text-slate-400 mt-1">📁 Turnos finalizados (historial): no se muestran en “Todos”. Toca un turno para ver quiénes estuvieron y descargar su Excel/PDF.</p>' : ""}
-        </div>` : ""}
         <!-- Móvil: listado compacto con detalle en ventana (solo lectura) -->
         <div class="md:hidden divide-y divide-slate-100">
-          ${filasG.length ? filasG.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${asistGuardiasE.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados."}</div>`}
+          ${filasG.length ? filasG.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</div>`}
         </div>
         <!-- Escritorio: tabla completa -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
             <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">${asistGuardiasE.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
+            <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -5348,7 +5421,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div class="card mt-2">
         <div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center gap-2">
           <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 flex-shrink-0">🤵 SUPERVISOR</span>
-          <span>Supervisores (${filasS.length})${turnoSelE ? ` <span class="text-indigo-600 font-normal text-xs">· ${esc(turnoSelE.fecha)} ${esc(turnoSelE.etiqueta)}</span>` : ""}</span>
+          <span>Supervisores (${filasS.length})${usaT ? ` <span class="text-indigo-600 font-normal text-xs">· turno vigente</span>` : ""}</span>
         </div>
         <!-- Móvil: listado compacto (solo lectura) -->
         <div class="md:hidden divide-y divide-slate-100">
@@ -5385,13 +5458,12 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
         if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev));
-        // Descargar el listado (guardias + supervisores) en Excel o PDF.
-        // Si hay un turno seleccionado, se descarga SOLO ese turno (evDescarga/asistDescarga
-        // llevan la etiqueta del turno en el título y el nombre del archivo).
-        if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(evDescarga, asistDescarga));
-        if ($("#empPdf")) $("#empPdf").addEventListener("click", () => descargarPDF(evDescarga, asistDescarga));
-        // Filtro de turnos: al tocar un chip se cambia el turno mostrado y se vuelve a pintar.
-        app.querySelectorAll(".turnoChipEmp").forEach(c => c.addEventListener("click", () => { EMPRESA_STATE.turnoFiltro = c.dataset.turno; paint(); }));
+        // Descargar el listado del TURNO VIGENTE (guardias + supervisores activos) en Excel o PDF.
+        // Los turnos anteriores se descargan desde la carpeta 📁 Historial.
+        if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(ev, asistActiva));
+        if ($("#empPdf")) $("#empPdf").addEventListener("click", () => descargarPDF(ev, asistActiva));
+        // Carpeta Historial (dentro del QR): abre los turnos anteriores para ver/descargar.
+        if ($("#empHist")) $("#empHist").addEventListener("click", () => modalHistorialTurnos(ev));
       };
       await paint();
       Data.onChange(paint);
