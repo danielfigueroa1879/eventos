@@ -1613,7 +1613,7 @@
     let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true };
     // Estado propio de la VISTA EMPRESA (solo lectura). Se conserva entre repintados en tiempo real.
     // Ambos paneles arrancan abiertos y se repliegan solos a los 7 s (igual que el Resumen del admin).
-    let EMPRESA_STATE = { showQR: true, showResumen: true };
+    let EMPRESA_STATE = { showQR: true, showResumen: true, turnoFiltro: "all" };
 
     async function renderAdmin() {
       app.innerHTML = `
@@ -5237,12 +5237,32 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const pct = total ? Math.min(100, Math.round(asistGuardiasE.length / total * 100)) : 0;
         const cont = (estado) => asistGuardiasE.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === estado).length;
         const nSupE = asistSupervisoresE.length;
+        const usaT = eventoUsaTurnos(ev);
         // Duplicados por turno (ver marcarDuplicados): un guardia en turnos distintos no es duplicado.
         const rutCountE = {}, nomCountE = {};
         marcarDuplicados(asist, ev);
         const turnosMapE = {};
         asistGuardiasE.forEach(a => { const tn = calcularTurno(a.hora_ingreso, ev); if (tn) { if (!turnosMapE[tn.clave]) turnosMapE[tn.clave] = { ...tn, count: 0 }; turnosMapE[tn.clave].count++; } });
         const turnosArrE = Object.values(turnosMapE).sort((x, y) => x.clave - y.clave);
+        // Filtro de turnos (historial), igual que en el panel admin. Un turno se considera
+        // FINALIZADO (📁 historial) 2 h después de su término (GRACIA_TURNO_MS). En "Todos" se
+        // ocultan los turnos finalizados; se ven al tocar el turno. Así la empresa consulta y
+        // descarga el Excel/PDF de cada turno que va pasando.
+        if (EMPRESA_STATE.turnoFiltro !== "all" && !turnosMapE[EMPRESA_STATE.turnoFiltro]) EMPRESA_STATE.turnoFiltro = "all";
+        const turnoFinalizadoE = a => { const tn = calcularTurno(a.hora_ingreso, ev); return !!(tn && Date.now() > tn.fin.getTime() + GRACIA_TURNO_MS); };
+        const chipFinalizadoE = t => Date.now() > (t.fin.getTime ? t.fin.getTime() : new Date(t.fin).getTime()) + GRACIA_TURNO_MS;
+        const filtrarE = a => {
+          if (EMPRESA_STATE.turnoFiltro !== "all") { const tn = calcularTurno(a.hora_ingreso, ev); return !!tn && String(tn.clave) === EMPRESA_STATE.turnoFiltro; }
+          return !(usaT && turnoFinalizadoE(a));
+        };
+        const filasG = asistGuardiasE.filter(filtrarE);
+        const filasS = asistSupervisoresE.filter(filtrarE);
+        const nActivosE = usaT ? asistGuardiasE.filter(a => !turnoFinalizadoE(a)).length : asistGuardiasE.length;
+        const turnoSelE = (EMPRESA_STATE.turnoFiltro !== "all" && turnosMapE[EMPRESA_STATE.turnoFiltro]) ? turnosMapE[EMPRESA_STATE.turnoFiltro] : null;
+        // Descarga: con un turno seleccionado se exporta SOLO ese turno (con su etiqueta en el
+        // título y nombre de archivo); en "Todos" se exporta el listado completo del evento.
+        const asistDescarga = (EMPRESA_STATE.turnoFiltro !== "all") ? asist.filter(filtrarE) : asist;
+        const evDescarga = turnoSelE ? { ...ev, nombre_evento: `${ev.nombre_evento} — ${turnoSelE.fecha} ${turnoSelE.etiqueta} (${turnoSelE.rango})`, slug: `${ev.slug}-t${turnoSelE.clave}` } : ev;
         app.innerHTML = `
     <div class="min-h-screen w-full px-3 pt-0.5 pb-3 md:px-4 md:pt-1 md:pb-6 max-w-[104rem] mx-auto">
       <!-- Los 3 primeros contenedores van mucho más angostos (banner, QR, Guardias ingresados) -->
@@ -5297,23 +5317,30 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       </div><!-- fin envoltura angosta: desde aquí los listados van más anchos -->
       <div class="card mt-2">
         <div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center justify-between flex-wrap gap-2">
-          <span>Listado guardias (${asistGuardiasE.length})</span>
+          <span>Listado guardias (${filasG.length})${turnoSelE ? ` <span class="text-indigo-600 font-normal text-xs">· ${esc(turnoSelE.fecha)} ${esc(turnoSelE.etiqueta)}</span>` : ""}</span>
           <span class="flex items-center gap-2 flex-wrap">
-            <button id="empXls" class="text-xs font-bold px-2.5 py-1 border border-green-200 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 whitespace-nowrap" title="Descargar el listado en Excel">📊 Excel</button>
-            <button id="empPdf" class="text-xs font-bold px-2.5 py-1 border border-red-200 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 whitespace-nowrap" title="Descargar el listado en PDF">📄 PDF</button>
+            <button id="empXls" class="text-xs font-bold px-2.5 py-1 border border-green-200 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 whitespace-nowrap" title="${turnoSelE ? "Descargar en Excel el listado de este turno" : "Descargar el listado en Excel"}">📊 Excel${turnoSelE ? " del turno" : ""}</button>
+            <button id="empPdf" class="text-xs font-bold px-2.5 py-1 border border-red-200 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 whitespace-nowrap" title="${turnoSelE ? "Descargar en PDF el listado de este turno" : "Descargar el listado en PDF"}">📄 PDF${turnoSelE ? " del turno" : ""}</button>
             <span class="text-xs font-normal">${eventoInfoHTML(ev)}</span>
           </span>
         </div>
-        ${turnosArrE.length ? `<div class="px-3 pt-3 flex gap-2 overflow-x-auto pb-1"><span class="badge b-gris" style="background:#e0e7ff;color:#3730a3">Total: ${asistGuardiasE.length}</span>${turnosArrE.map(t => `<span class="badge b-gris whitespace-nowrap" style="background:#e0e7ff;color:#3730a3" title="${esc(t.rango)}">${esc(t.fecha)} · ${esc(t.etiqueta)}: ${t.count}</span>`).join("")}</div>` : ""}
+        ${turnosArrE.length ? `
+        <div class="px-3 pt-3">
+          <div class="flex gap-2 overflow-x-auto pb-1">
+            <button data-turno="all" class="turnoChipEmp btn ${EMPRESA_STATE.turnoFiltro === "all" ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap">Todos (${nActivosE})</button>
+            ${turnosArrE.map(t => { const fin = chipFinalizadoE(t); return `<button data-turno="${t.clave}" title="${fin ? "Turno finalizado — historial" : "Turno vigente"}" class="turnoChipEmp btn ${EMPRESA_STATE.turnoFiltro === String(t.clave) ? "btn-p" : "btn-ghost"} text-xs whitespace-nowrap${fin ? " opacity-70" : ""}">${fin ? "📁 " : ""}${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)} (${t.count})</button>`; }).join("")}
+          </div>
+          ${turnosArrE.some(chipFinalizadoE) ? '<p class="text-[11px] text-slate-400 mt-1">📁 Turnos finalizados (historial): no se muestran en “Todos”. Toca un turno para ver quiénes estuvieron y descargar su Excel/PDF.</p>' : ""}
+        </div>` : ""}
         <!-- Móvil: listado compacto con detalle en ventana (solo lectura) -->
         <div class="md:hidden divide-y divide-slate-100">
-          ${asistGuardiasE.length ? asistGuardiasE.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">Aún no hay guardias registrados.</div>`}
+          ${filasG.length ? filasG.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${asistGuardiasE.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados."}</div>`}
         </div>
         <!-- Escritorio: tabla completa -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
             <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${asistGuardiasE.length ? asistGuardiasE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay guardias registrados.</td></tr>`}</tbody>
+            <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">${asistGuardiasE.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -5321,17 +5348,17 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div class="card mt-2">
         <div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center gap-2">
           <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 flex-shrink-0">🤵 SUPERVISOR</span>
-          <span>Supervisores (${nSupE})</span>
+          <span>Supervisores (${filasS.length})${turnoSelE ? ` <span class="text-indigo-600 font-normal text-xs">· ${esc(turnoSelE.fecha)} ${esc(turnoSelE.etiqueta)}</span>` : ""}</span>
         </div>
         <!-- Móvil: listado compacto (solo lectura) -->
         <div class="md:hidden divide-y divide-slate-100">
-          ${nSupE ? asistSupervisoresE.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">Aún no hay supervisores registrados.</div>`}
+          ${filasS.length ? filasS.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</div>`}
         </div>
         <!-- Escritorio: tabla -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
             <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${nSupE ? asistSupervisoresE.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Aún no hay supervisores registrados.</td></tr>`}</tbody>
+            <tbody>${filasS.length ? filasS.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -5359,8 +5386,12 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const empDist = document.getElementById("empDist");
         if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev));
         // Descargar el listado (guardias + supervisores) en Excel o PDF.
-        if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(ev, asist));
-        if ($("#empPdf")) $("#empPdf").addEventListener("click", () => descargarPDF(ev, asist));
+        // Si hay un turno seleccionado, se descarga SOLO ese turno (evDescarga/asistDescarga
+        // llevan la etiqueta del turno en el título y el nombre del archivo).
+        if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(evDescarga, asistDescarga));
+        if ($("#empPdf")) $("#empPdf").addEventListener("click", () => descargarPDF(evDescarga, asistDescarga));
+        // Filtro de turnos: al tocar un chip se cambia el turno mostrado y se vuelve a pintar.
+        app.querySelectorAll(".turnoChipEmp").forEach(c => c.addEventListener("click", () => { EMPRESA_STATE.turnoFiltro = c.dataset.turno; paint(); }));
       };
       await paint();
       Data.onChange(paint);
