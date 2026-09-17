@@ -2557,7 +2557,7 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${esNuevoG ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} ml-1 whitespace-nowrap">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 ml-1 whitespace-nowrap">🤵 SUPERVISOR</span>` : '';
-      const spd = g.spd ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#1b3a8f;color:#ffffff" title="Autorizado por SPD">SPD</span>${modo === "empresa" ? "" : spdAvisoHTML(ev, a, g)}` : '';
+      const spd = g.spd ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#1b3a8f;color:#ffffff" title="Autorizado por SPD">SPD</span>${spdAvisoHTML(ev, a, g, modo !== "empresa")}` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2591,7 +2591,7 @@
       const tf = normalizarTelefono(g.telefono);
       const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—";
       const sup = a.es_supervisor ? ' <span class="badge" style="background:#e0f2fe;color:#075985" title="Supervisor">🤵 SUP</span>' : '';
-      const spd = g.spd ? ' <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD">SPD</span>' : '';
+      const spd = g.spd ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2687,12 +2687,14 @@
     </div>
     </div>
     ${!empresa && g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn w-full text-white shadow-sm flex items-center justify-center gap-2" style="background:${g.revision_tipo === 'NUEVO' ? '#ef4444' : '#eab308'}">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
-    ${!empresa && g.spd ? `<div class="mt-4 rounded-xl px-3 py-2 border border-blue-200 bg-blue-50">
+    ${g.spd ? `<div class="mt-4 rounded-xl px-3 py-2 border border-blue-200 bg-blue-50">
       <div class="text-sm font-semibold mb-1 text-blue-800">🪪 SPD — Solicitar resolución</div>
       <p class="text-xs text-slate-500 mb-2">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución de autorización.</p>
       ${spdVerificado(ev, a, g)
         ? `<div class="text-xs font-bold text-green-700">✔ Resolución verificada</div>`
-        : `<button id="dg_spd_ver" class="btn w-full text-white shadow-sm" style="background:#1b3a8f">✔ Resolución verificada</button>`}
+        : (empresa
+          ? `<div class="text-xs font-bold text-amber-700">⚠ Pendiente: pedir la resolución de autorización</div>`
+          : `<button id="dg_spd_ver" class="btn w-full text-white shadow-sm" style="background:#1b3a8f">✔ Resolución verificada</button>`)}
     </div>` : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
