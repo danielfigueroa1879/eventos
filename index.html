@@ -2703,9 +2703,10 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
-      // Tocar la facción en el detalle abre el mapa en ese puesto. En la empresa, solo lectura.
+      // Tocar la facción en el detalle abre el mapa en ese puesto. La empresa puede asignar,
+      // pero no crear/mover/eliminar puestos.
       const gotoP = document.querySelector("#modalBox [data-goto-puesto]");
-      if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, empresa ? { focusPuestoId: pid, readonly: true, verNombres: true } : { focusPuestoId: pid }); });
+      if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, empresa ? { focusPuestoId: pid, readonly: true, verNombres: true, permitirAsignar: true } : { focusPuestoId: pid }); });
       // Tocar el RUT lo copia completo al portapapeles.
       const rutBtn = $("#dg_rut");
       if (rutBtn) rutBtn.addEventListener("click", async () => {
@@ -3827,6 +3828,10 @@
       // (readonly sin verNombres) se ocultan por privacidad; la empresa (readonly + verNombres)
       // ve lo mismo que el admin: nombres y facciones, pero en solo lectura (no puede editar).
       const verNombres = !readonly || !!opts.verNombres;
+      // ¿Puede ASIGNAR guardias a las facciones? El admin (no readonly) siempre puede. La empresa
+      // recibe permitirAsignar: puede asignar/mover guardias entre facciones, PERO no crear, mover
+      // ni eliminar puestos (eso queda solo para el admin).
+      const puedeAsignar = !readonly || !!opts.permitirAsignar;
       // Leaflet se carga diferido; si aún no está listo, esperar un momento a que cargue.
       if (!window.L) {
         await new Promise(res => { let n = 0; const t = setInterval(() => { if (window.L || ++n > 50) { clearInterval(t); res(); } }, 100); });
@@ -3848,7 +3853,7 @@
           <button id="dist_close" class="${btnCls.replace('hover:bg-white/20', 'hover:bg-red-700').replace('border', 'border-red-600 bg-red-600 text-white')}">✕ Cerrar mapa</button>`;
       ov.innerHTML = `
         <div class="brand-bg text-white px-3 py-2 flex items-center gap-2 flex-shrink-0 relative">
-          <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ ${esc(ev.nombre_evento)}${readonly ? ' <span class="opacity-80 font-normal">· solo lectura</span>' : ""}</div>
+          <div class="font-semibold text-sm flex-1 min-w-0 truncate">🗺️ ${esc(ev.nombre_evento)}${readonly ? ` <span class="opacity-80 font-normal">· ${puedeAsignar ? "asignar guardias" : "solo lectura"}</span>` : ""}</div>
           <div id="dist_actions" class="hidden md:flex flex-col md:flex-row absolute md:static right-2 top-[48px] z-[600] md:z-auto bg-[#0f5323] md:bg-transparent rounded-xl md:rounded-none shadow-2xl md:shadow-none p-3 md:p-0 gap-2 min-w-[170px] md:min-w-0">${acciones}</div>
           <button id="dist_menu" class="md:hidden btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
         </div>
@@ -4162,10 +4167,10 @@
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
         const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
-        const acciones = readonly ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
-            <button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>
-            <button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
-            <button id="pp_del" class="btn btn-ghost text-red-600">🗑 Eliminar</button>
+        const acciones = (readonly && !puedeAsignar) ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
+            ${puedeAsignar ? `<button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>` : ""}
+            ${!readonly ? `<button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
+            <button id="pp_del" class="btn btn-ghost text-red-600">🗑 Eliminar</button>` : ""}
           </div>`;
         openModal(`<div class="flex items-center justify-between mb-1">
             <h2 class="font-bold text-slate-800">${esc(p.nombre)}</h2>
@@ -4176,9 +4181,9 @@
           ${acciones}
           <div class="mt-2"><button id="pp_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
         $("#pp_close").addEventListener("click", closeModal);
+        if (puedeAsignar) { const bAsig = $("#pp_asig"); if (bAsig) bAsig.addEventListener("click", () => modalAsignar(p)); }
         if (!readonly) {
           $("#pp_edit").addEventListener("click", () => formPuesto(p));
-          $("#pp_asig").addEventListener("click", () => modalAsignar(p));
           $("#pp_del").addEventListener("click", () => confirmar(`¿Eliminar el puesto "${p.nombre}"? Los guardias asignados quedarán sin puesto.`, async () => { try { await Data.deletePuesto(p.id); closeModal(); await recargar(); } catch (e) { toast("Error: " + (e.message || e), false); } }));
         }
       }
@@ -5538,11 +5543,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
-        // La empresa ve la MISMA distribución que el admin (puestos, guardias por faccion y sus
-        // nombres), pero en solo lectura: no puede agregar, mover, eliminar ni reasignar puestos.
-        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev, { readonly: true, verNombres: true }));
-        // Tocar la faccion (columna Distribución / línea móvil) abre el mapa en ese puesto (solo lectura).
-        app.querySelectorAll("[data-goto-puesto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); abrirDistribucion(ev, { readonly: true, verNombres: true, focusPuestoId: x.dataset.gotoPuesto }); }));
+        // La empresa puede ASIGNAR guardias a las facciones (permitirAsignar), pero NO crear, mover
+        // ni eliminar puestos: esa estructura del mapa la define solo el admin.
+        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev, { readonly: true, verNombres: true, permitirAsignar: true }));
+        // Tocar la faccion (columna Distribución / línea móvil) abre el mapa en ese puesto.
+        app.querySelectorAll("[data-goto-puesto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); abrirDistribucion(ev, { readonly: true, verNombres: true, permitirAsignar: true, focusPuestoId: x.dataset.gotoPuesto }); }));
         // Descargar el listado del TURNO VIGENTE (guardias + supervisores activos) en Excel o PDF.
         // Los turnos anteriores se descargan desde la carpeta 📁 Historial.
         if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(ev, asistActiva));
