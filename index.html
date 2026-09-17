@@ -1419,6 +1419,8 @@
         const esSup = !!(superSel && superSel.value === "supervisor");
         if (fechaLabel) fechaLabel.textContent = esSup ? "Fecha de autorización de la resolución" : "Fecha último examen OS10";
         if (vigBoxLabel) vigBoxLabel.textContent = esSup ? "Estado de la autorización" : "Estado del curso";
+        // Los supervisores NO llevan vigencia OS10 (prórroga / sin prórroga): se oculta el recuadro de estado.
+        if (esSup) vigBox.hidden = true; else mostrarVigencia(fecha.value);
       }
       if (superSel) superSel.addEventListener("change", aplicarRotuloSupervisor);
 
@@ -1474,7 +1476,7 @@
           vigBox.hidden = true; actualizarBtn();
         }
       }
-      function mostrarVigencia(f) { if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
+      function mostrarVigencia(f) { if (superSel && superSel.value === "supervisor") { vigBox.hidden = true; return; } if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
       function actualizarBtn() {
         // La fecha futura sí bloquea; un solo nombre/apellido solo avisa (no bloquea)
         if (fecha.value && fechaFutura(fecha.value)) { submit.disabled = true; submit.textContent = "Fecha de examen inválida"; return; }
@@ -1492,21 +1494,24 @@
       // Pantalla de ÉXITO — solo se muestra cuando la escritura quedó CONFIRMADA por el servidor.
       function mostrarIngresoExitoso(asisRec) {
         sonarIngreso(); // sonido de confirmación de ingreso
-        const v = calcularVigencia(fecha.value);
+        const esSup = !!(superSel && superSel.value === "supervisor");
+        const v = esSup ? null : calcularVigencia(fecha.value);
         const tn = calcularTurno((asisRec && asisRec.hora_ingreso) || nowISO(), ev);
         app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
         <div class="text-5xl mb-3">✅</div>
         <h1 class="font-bold text-xl text-slate-800">Ingreso registrado</h1>
         <p class="text-slate-600 mt-1">${esc(formatNombre(nombres.value))} ${esc(formatNombre(apellidos.value))}</p>
         ${tn ? `<div class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">🕑 ${esc(tn.etiqueta)} · ${esc(tn.rango)}</div>` : ""}
-        <div class="mt-3" id="vigReveal">${badge(v)} ${v.siges ? `<span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""}</div>
-        ${!v.puedeTrabajar ? `<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>` : ""}
+        ${esSup
+          ? `<div class="mt-3"><span class="badge b-celeste">🤵 SUPERVISOR</span></div>`
+          : `<div class="mt-3" id="vigReveal">${badge(v)} ${v.siges ? `<span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""}</div>
+        ${!v.puedeTrabajar ? `<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>` : ""}`}
         <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt((asisRec && asisRec.hora_ingreso) || nowISO())}</p>
         <button id="otroRegistro" class="btn btn-p w-full mt-5">➕ Ingresar otro registro</button>
         <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">10</span> s…</p>
       </div></div>`;
-        // Prórroga: primero "NO VIGENTE" (amarillo) y luego revela "CON PRÓRROGA" en verde con tic
-        if (v.estado === "VENCIDO_CON_PRORROGA") {
+        // Prórroga: primero "NO VIGENTE" (amarillo) y luego revela "CON PRÓRROGA" en verde con tic (solo guardias)
+        if (!esSup && v.estado === "VENCIDO_CON_PRORROGA") {
           setTimeout(() => {
             const vr = $("#vigReveal");
             if (vr) vr.innerHTML = `<span class="badge b-verde">✅ CON PRÓRROGA</span> <span class="text-xs text-slate-500">(${esc(v.siges)})</span>`;
@@ -2101,8 +2106,9 @@
       const nX = filas.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
       const nS = filas.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "SIN_CURSO").length;
       const nSup = filasSup.length;
-      const totalProrrogas = nP + filasSup.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_CON_PRORROGA").length;
-      const totalVencidos = nX + filasSup.filter(a => calcularVigencia(a.guardia?.fecha_ultimo_examen).estado === "VENCIDO_SIN_PRORROGA").length;
+      // Los supervisores no llevan vigencia OS10, por lo que no se cuentan en prórrogas ni vencidos.
+      const totalProrrogas = nP;
+      const totalVencidos = nX;
       // Conteo aproximado de hombres/mujeres por primer nombre (ver generoDeNombre).
       const nH = filas.filter(a => sexoGuardia(a.guardia) === "H").length;
       const nM = filas.filter(a => sexoGuardia(a.guardia) === "M").length;
@@ -2402,10 +2408,11 @@
       asist.forEach(a => { const d = new Date(a.hora_ingreso); if (!isNaN(d.getTime())) horas[d.getHours()].count++; });
       const maxHora = Math.max(1, ...horas.map(h => h.count));
 
-      // --- Estado de vigencia ---
+      // --- Estado de vigencia (solo guardias: los supervisores no llevan vigencia OS10) ---
+      const asistVig = asist.filter(a => !a.es_supervisor);
       const vig = { VIGENTE: 0, VENCIDO_CON_PRORROGA: 0, VENCIDO_SIN_PRORROGA: 0, SIN_CURSO: 0 };
-      asist.forEach(a => { const e = calcularVigencia(a.guardia?.fecha_ultimo_examen).estado; if (e in vig) vig[e]++; });
-      const totalV = asist.length;
+      asistVig.forEach(a => { const e = calcularVigencia(a.guardia?.fecha_ultimo_examen).estado; if (e in vig) vig[e]++; });
+      const totalV = asistVig.length;
       const vigItems = [
         { l: "Vigentes", n: vig.VIGENTE, c: "#16a34a" },
         { l: "Prórroga", n: vig.VENCIDO_CON_PRORROGA, c: "#d97706" },
@@ -2495,6 +2502,7 @@
     function fichaTitle(g) { return getInfracciones(g).map(r => { const d = recDetalle(r); return recFrase(r) + (d ? ` (${d})` : ""); }).join(" | "); }
     function fila(a, i, ev, rutCount, nomCount, usaT) {
       const g = a.guardia || {};
+      const esSup = !!a.es_supervisor;
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
@@ -2520,9 +2528,9 @@
     <td data-label="Nombre" class="pr-2 font-medium ${nomCls}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
     <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
-    <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
-    <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
-    <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td>
+    <td data-label="${esSup ? 'Autorización' : 'Examen'}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
+    <td data-label="Vigencia" class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td>
+    <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
     <td class="acciones whitespace-nowrap">
@@ -2549,6 +2557,7 @@
     }
     function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
+      const esSup = !!a.es_supervisor;
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
       const primerNombre = (g.nombres || "").trim().split(/\s+/)[0] || "";
@@ -2571,7 +2580,7 @@
       // Mostrar rut, curso y hora de ingreso para todos
       const mapaP = modo === "empresa" ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap;
       const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
-      const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
+      const segunda = `<span class="font-mono">${esc(a.rut)}</span> · ${esSup ? "Autorización" : "Curso"}: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseSexo}"${rowStyle}>
       <span class="text-xs font-bold ${nCls} w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
@@ -2579,13 +2588,14 @@
         <span class="block text-[11px] ${segCls} truncate">${segunda}</span>
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer underline decoration-dotted">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
-      ${vigenciaPill(v)}
+      ${esSup ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:84px">SUPERVISOR</span>` : vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
     </button>`;
     }
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
     function filaEmpresa(a, i, ev) {
       const g = a.guardia || {};
+      const esSup = !!a.es_supervisor;
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const tf = normalizarTelefono(g.telefono);
@@ -2610,8 +2620,8 @@
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
-        <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
-        <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td>
+        <td data-label="Vigencia" class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td>
+        <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
         <td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>
         <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
       </tr>`;
@@ -2636,6 +2646,7 @@
       if (!a) return;
       const empresa = !!(opts && opts.empresa);           // vista de empresa = solo lectura, sin datos privados
       const g = a.guardia || {};
+      const esSup = !!a.es_supervisor;
       const v = calcularVigencia(g.fecha_ultimo_examen);
       const tn = calcularTurno(a.hora_ingreso, ev);
       const nomFull = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
@@ -2666,7 +2677,7 @@
     </div>
     <div class="text-center mb-3">
       <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1 ' + nameBox : ''}">${esc(nomFull)}</span></div>
-      <div class="inline-block mt-1.5">${vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">Examen: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
+      <div class="inline-block mt-1.5">${esSup ? "" : vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">${esSup ? "Autorización" : "Examen"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
       <div class="text-center text-red-800 font-extrabold text-xs mb-1">⚠ ${getInfracciones(g).length === 1 ? "OBSERVACIÓN" : getInfracciones(g).length + " OBSERVACIONES"}</div>
@@ -2678,8 +2689,8 @@
     <div class="text-sm">
       ${detalleFila("🪪", "RUT", `<button id="dg_rut" type="button" data-rut="${esc(a.rut)}" class="font-mono text-base font-bold text-slate-800 active:opacity-60 inline-flex items-center gap-1" title="Tocar para copiar el RUT">${esc(a.rut)} <span class="text-slate-400 text-xs">⧉</span></button>`)}
       ${detalleFila("📅", a.es_supervisor ? "Fecha Resolución" : "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
-      ${detalleFila("⏱️", "Vigencia", badge(v))}
-      ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
+      ${esSup ? "" : detalleFila("⏱️", "Vigencia", badge(v))}
+      ${esSup ? "" : detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${telHTML}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
       ${(() => { const mp = empresa ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap; return (a.puesto_id && mp && mp[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<button data-goto-puesto="${esc(a.puesto_id)}" class="font-semibold text-indigo-600 underline decoration-dotted cursor-pointer" title="Ver en el mapa">${esc(mp[a.puesto_id])} ›</button>`) : ""; })()}
@@ -2839,9 +2850,11 @@
       const usaT = eventoUsaTurnos(ev);
       return asist.map((a, i) => {
         const g = a.guardia || {};
+        // Los supervisores no llevan vigencia OS10 (prórroga / sin prórroga): sus celdas van con "—".
+        const esSup = !!a.es_supervisor;
         const v = calcularVigencia(g.fecha_ultimo_examen);
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
-        const row = [i + 1, a.rut, nom || "—", g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), v.vigencia, v.siges || "—"];
+        const row = [i + 1, a.rut, nom || "—", g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), esSup ? "—" : v.vigencia, esSup ? "—" : (v.siges || "—")];
         if (usaT) { const tn = calcularTurno(a.hora_ingreso, ev); row.push(tn ? `${tn.fecha} ${tn.etiqueta}` : "—"); }
         row.push(horaFmt(a.hora_ingreso));
         return row;
@@ -2854,13 +2867,15 @@
       const usaT = eventoUsaTurnos(ev);
       return asist.map((a, i) => {
         const g = a.guardia || {};
+        // Los supervisores no llevan vigencia OS10 (prórroga / sin prórroga): sus celdas van con "—" y sin color.
+        const esSup = !!a.es_supervisor;
         const v = calcularVigencia(g.fecha_ultimo_examen);
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
         const tn = usaT ? calcularTurno(a.hora_ingreso, ev) : null;
-        const cells = [String(i + 1), a.rut, nom, g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), v.vigencia, v.siges || "—"];
+        const cells = [String(i + 1), a.rut, nom, g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), esSup ? "—" : v.vigencia, esSup ? "—" : (v.siges || "—")];
         if (usaT) cells.push(tn ? `${tn.fecha} ${tn.etiqueta}` : "—");
         cells.push(horaFmt(a.hora_ingreso));
-        return { cells, vigIdx: 5, vigColor: VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO };
+        return { cells, vigIdx: esSup ? -1 : 5, vigColor: esSup ? "#64748b" : (VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO) };
       });
     }
 
@@ -3617,8 +3632,8 @@
         asistS.forEach((a, i) => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
-          const v = calcularVigencia(g.fecha_ultimo_examen);
-          L.push(`${i + 1}. ${a.rut} — ${nom} — ${v.vigencia} — ${horaFmt(a.hora_ingreso)}`);
+          // Los supervisores no llevan vigencia OS10: solo RUT, nombre y hora de ingreso.
+          L.push(`${i + 1}. ${a.rut} — ${nom} — ${horaFmt(a.hora_ingreso)}`);
         });
       }
       return L.join("\n");
@@ -3787,9 +3802,10 @@
       const recsS = g.recs.filter(a => a.es_supervisor);
       const filaDet = (a, i) => {
         const gu = a.guardia || {};
+        const esSup = !!a.es_supervisor;
         const v = calcularVigencia(gu.fecha_ultimo_examen);
         const nom = ((gu.nombres || "") + " " + (gu.apellidos || "")).trim() || "—";
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
       const evP = turnoEvPseudo(ev, g);
