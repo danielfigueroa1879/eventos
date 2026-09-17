@@ -2703,10 +2703,9 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
-      // Tocar la facción en el detalle abre el mapa en ese puesto. La empresa puede asignar,
-      // pero no crear/mover/eliminar puestos.
+      // Tocar la facción en el detalle abre el mapa en ese puesto (edición completa en admin y empresa).
       const gotoP = document.querySelector("#modalBox [data-goto-puesto]");
-      if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, empresa ? { focusPuestoId: pid, readonly: true, verNombres: true, permitirAsignar: true } : { focusPuestoId: pid }); });
+      if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, { focusPuestoId: pid }); });
       // Tocar el RUT lo copia completo al portapapeles.
       const rutBtn = $("#dg_rut");
       if (rutBtn) rutBtn.addEventListener("click", async () => {
@@ -5543,11 +5542,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
-        // La empresa puede ASIGNAR guardias a las facciones (permitirAsignar), pero NO crear, mover
-        // ni eliminar puestos: esa estructura del mapa la define solo el admin.
-        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev, { readonly: true, verNombres: true, permitirAsignar: true }));
+        // La empresa tiene acceso COMPLETO a la distribución: crear/editar/mover/eliminar puestos y
+        // asignar guardias (igual que el admin). El mapa se abre en modo edición.
+        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev));
         // Tocar la faccion (columna Distribución / línea móvil) abre el mapa en ese puesto.
-        app.querySelectorAll("[data-goto-puesto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); abrirDistribucion(ev, { readonly: true, verNombres: true, permitirAsignar: true, focusPuestoId: x.dataset.gotoPuesto }); }));
+        app.querySelectorAll("[data-goto-puesto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); abrirDistribucion(ev, { focusPuestoId: x.dataset.gotoPuesto }); }));
         // Descargar el listado del TURNO VIGENTE (guardias + supervisores activos) en Excel o PDF.
         // Los turnos anteriores se descargan desde la carpeta 📁 Historial.
         if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(ev, asistActiva));
