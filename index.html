@@ -2567,12 +2567,13 @@
       const segCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-700' : (esHombre ? 'text-blue-700' : 'text-slate-600'));
       // Mostrar rut, curso y hora de ingreso para todos
       const puestoNom = (modo !== "empresa" && a.puesto_id && ADMIN_STATE._puestosMap) ? ADMIN_STATE._puestosMap[a.puesto_id] : null;
-      const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}${puestoNom ? ` · <span class="font-semibold text-indigo-600">📍 ${esc(puestoNom)}</span>` : ""}`;
+      const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseSexo}"${rowStyle}>
       <span class="text-xs font-bold ${nCls} w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-sm truncate flex items-center ${nomCls}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
         <span class="block text-[11px] ${segCls} truncate">${segunda}</span>
+        ${puestoNom ? `<span class="block text-[11px] font-semibold text-indigo-600 truncate">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
       ${vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
@@ -2676,6 +2677,7 @@
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${telHTML}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
+      ${(!empresa && a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<span class="font-semibold text-indigo-600">${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</span>`) : ""}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
     </div>
