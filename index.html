@@ -2024,6 +2024,11 @@
       if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>${ADMIN_STATE.eventos.length ? "Selecciona un evento de la lista para ver el detalle." : "Crea un evento para comenzar."}</div>`; return; }
       const asist = await Data.listAsistencias(ev.id);
 
+      // Mapa puesto_id -> nombre del puesto (facción) para mostrarlo junto al teléfono.
+      let puestosMap = {};
+      try { (await Data.listPuestos(ev.id)).forEach(p => { puestosMap[p.id] = p.nombre; }); } catch (_) { puestosMap = {}; }
+      ADMIN_STATE._puestosMap = puestosMap;
+
       // Aviso en tiempo real: guardias nuevos o con datos modificados (pendientes de aprobación)
       detectarAvisosGuardias(ev, asist);
 
@@ -2511,7 +2516,7 @@
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
     <td data-label="Nombre" class="pr-2 font-medium ${nomCls}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
-    <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
+    <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? ` <span class="badge ml-1 whitespace-nowrap" style="background:#e0e7ff;color:#3730a3" title="Distribución de facciones">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</span>` : ""}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td>
@@ -2561,7 +2566,8 @@
       const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-900'));
       const segCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-700' : (esHombre ? 'text-blue-700' : 'text-slate-600'));
       // Mostrar rut, curso y hora de ingreso para todos
-      const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
+      const puestoNom = (modo !== "empresa" && a.puesto_id && ADMIN_STATE._puestosMap) ? ADMIN_STATE._puestosMap[a.puesto_id] : null;
+      const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}${puestoNom ? ` · <span class="font-semibold text-indigo-600">📍 ${esc(puestoNom)}</span>` : ""}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseSexo}"${rowStyle}>
       <span class="text-xs font-bold ${nCls} w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
