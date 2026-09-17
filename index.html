@@ -3879,7 +3879,14 @@
         });
         return Object.values(by);
       };
-      const cargarAsist = async () => asistUnica(await Data.listAsistencias(ev.id));
+      // En la distribución NO se muestran los guardias que estuvieron de NOCHE: solo los de día.
+      // Se aplica antes de deduplicar, para que un guardia que trabajó noche y también día quede
+      // por su registro de día.
+      const sinNoche = (arr) => {
+        if (!eventoUsaTurnos(ev)) return arr || [];
+        return (arr || []).filter(a => { const tn = calcularTurno(a.hora_ingreso, ev); return !tn || tn.nombre !== "Noche"; });
+      };
+      const cargarAsist = async () => asistUnica(sinNoche(await Data.listAsistencias(ev.id)));
       const cerrar = () => { try { state.map && state.map.remove(); } catch (e) { } ov.remove(); };
       $("#dist_close", ov).addEventListener("click", cerrar);
       // Menú hamburguesa (celular): abrir/cerrar el grupo de acciones
