@@ -1897,7 +1897,7 @@
           const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
           infractoresAct.set(a.rut, { nombre, registros: getInfracciones(g) });
         }
-        if (g && g.spd) {
+        if (esSPD(g, a)) {
           const nombre = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
           spdAct.set(a.rut, { nombre });
         }
@@ -1993,6 +1993,20 @@
       if (g && g.spd_verificado) return true;
       return !!(ev && spdVisto(ev.id, a.rut));
     }
+    // ¿El examen OS10 es de este año (año en curso)?
+    function examenEsteAno(fechaStr) {
+      const d = parseFecha(fechaStr);
+      return !!d && d.getFullYear() === new Date().getFullYear();
+    }
+    // ¿El guardia requiere autorización / resolución SPD? Sí cuando el administrador lo marcó
+    // manualmente (g.spd) o, AUTOMÁTICAMENTE, cuando su examen OS10 es de este año: una
+    // autorización reciente debe estar respaldada por la resolución de la SPD. Los supervisores
+    // no se auto-marcan (solo aplica el marcado manual).
+    function esSPD(g, a) {
+      if (g && g.spd) return true;
+      if (a && a.es_supervisor) return false;
+      return !!(g && examenEsteAno(g.fecha_ultimo_examen));
+    }
     // Quita el aviso "pedir resolución" de un guardia: lo marca visto y lo borra del DOM.
     function quitarAvisoSpd(evId, rut) {
       marcarSpdVisto(evId, rut);
@@ -2002,7 +2016,7 @@
     // Aviso "pedir resolución" junto al nombre, como estado (igual que "Datos editados").
     // En celular es tocable (marca verificado); en PC solo es indicador y se aprueba con el botón de la fila.
     function spdAvisoHTML(ev, a, g, tocable = true) {
-      if (!g || !g.spd || spdVerificado(ev, a, g)) return "";
+      if (!g || !esSPD(g, a) || spdVerificado(ev, a, g)) return "";
       const tap = tocable ? ` data-spdtap="1" role="button" tabindex="0"` : "";
       const cur = tocable ? " cursor-pointer" : "";
       const title = tocable ? "Tocar para marcar la resolución como verificada" : "Solicitar la resolución de autorización SPD";
@@ -2510,7 +2524,7 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="badge" style="background:#e0f2fe;color:#075985;margin-left:4px" title="Supervisor">🤵 SUPERVISOR</span>` : '';
-      const spd = g.spd ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
+      const spd = esSPD(g, a) ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2535,7 +2549,7 @@
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
-      ${g.spd && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
+      ${esSPD(g, a) && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
       <button data-edit="${a.id}" class="text-slate-500 hover:text-green-700 px-1" title="Editar">✎</button>
       <button data-del="${a.id}" class="text-slate-500 hover:text-red-600 px-1" title="Quitar">🗑</button>
     </td>
@@ -2566,7 +2580,7 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${esNuevoG ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} ml-1 whitespace-nowrap">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 ml-1 whitespace-nowrap">🤵 SUPERVISOR</span>` : '';
-      const spd = g.spd ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#1b3a8f;color:#ffffff" title="Autorizado por SPD">SPD</span>${spdAvisoHTML(ev, a, g, modo !== "empresa")}` : '';
+      const spd = esSPD(g, a) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#1b3a8f;color:#ffffff" title="Autorizado por SPD">SPD</span>${spdAvisoHTML(ev, a, g, modo !== "empresa")}` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2601,7 +2615,7 @@
       const tf = normalizarTelefono(g.telefono);
       const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—";
       const sup = a.es_supervisor ? ' <span class="badge" style="background:#e0f2fe;color:#075985" title="Supervisor">🤵 SUP</span>' : '';
-      const spd = g.spd ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
+      const spd = esSPD(g, a) ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2677,7 +2691,7 @@
     </div>
     <div class="text-center mb-3">
       <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1 ' + nameBox : ''}">${esc(nomFull)}</span></div>
-      <div class="inline-block mt-1.5">${esSup ? "" : vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">${esSup ? "Autorización" : "Examen"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${g.spd ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
+      <div class="inline-block mt-1.5">${esSup ? "" : vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">${esSup ? "Autorización" : "Examen"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${esSPD(g, a) ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
       <div class="text-center text-red-800 font-extrabold text-xs mb-1">⚠ ${getInfracciones(g).length === 1 ? "OBSERVACIÓN" : getInfracciones(g).length + " OBSERVACIONES"}</div>
@@ -2698,7 +2712,7 @@
     </div>
     </div>
     ${!empresa && g.aprobado === false ? `<div class="mt-4"><button id="dg_approve" class="btn w-full text-white shadow-sm flex items-center justify-center gap-2" style="background:${g.revision_tipo === 'NUEVO' ? '#ef4444' : '#eab308'}">✔ Aprobar ${g.revision_tipo === 'NUEVO' ? 'nuevo guardia' : 'datos editados'}</button></div>` : ""}
-    ${g.spd ? `<div class="mt-4 rounded-xl px-3 py-2 border border-blue-200 bg-blue-50">
+    ${esSPD(g, a) ? `<div class="mt-4 rounded-xl px-3 py-2 border border-blue-200 bg-blue-50">
       <div class="text-sm font-semibold mb-1 text-blue-800">🪪 SPD — Solicitar resolución</div>
       <p class="text-xs text-slate-500 mb-2">Guardia autorizado por la Subsecretaría de Prevención del Delito. Pídele la resolución de autorización.</p>
       ${spdVerificado(ev, a, g)
@@ -2743,7 +2757,7 @@
         });
       }
       // Verificar la resolución SPD: se marca al instante (memoria + navegador) y quita el aviso.
-      if (!empresa && g.spd && !spdVerificado(ev, a, g)) {
+      if (!empresa && esSPD(g, a) && !spdVerificado(ev, a, g)) {
         const btnSpdVer = $("#dg_spd_ver");
         if (btnSpdVer) btnSpdVer.addEventListener("click", () => {
           quitarAvisoSpd(ev.id, a.rut);
