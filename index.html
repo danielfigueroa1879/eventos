@@ -2214,10 +2214,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="px-2">Distribución</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -2238,10 +2238,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="px-2">Distribución</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 10 : 9}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
+            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -2366,6 +2366,8 @@
         refreshAdmin();
       }));
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
+      // Tocar la facción (columna Distribución / línea móvil) abre el mapa en ese puesto.
+      main.querySelectorAll("[data-goto-puesto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); abrirDistribucion(ev, { focusPuestoId: x.dataset.gotoPuesto }); }));
     }
     function chip(label, n, color) { return `<div class="rounded-lg py-1.5 b-${color}"><div class="text-lg font-bold leading-tight">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
     // Filtra en vivo el listado de guardias (móvil y escritorio) sin re-renderizar
@@ -2516,12 +2518,13 @@
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}">${esc(a.rut)}${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
     <td data-label="Nombre" class="pr-2 font-medium ${nomCls}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
-    <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? ` <span class="badge ml-1 whitespace-nowrap" style="background:#e0e7ff;color:#3730a3" title="Distribución de facciones">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</span>` : ""}</td>
+    <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="Examen" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
     <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400'}">${esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
+    <td data-label="Distribución" class="pr-2">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge whitespace-nowrap hover:brightness-95 cursor-pointer" style="background:#e0e7ff;color:#3730a3" title="Ver en el mapa">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
       ${g.spd && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
@@ -2573,7 +2576,7 @@
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-sm truncate flex items-center ${nomCls}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
         <span class="block text-[11px] ${segCls} truncate">${segunda}</span>
-        ${puestoNom ? `<span class="block text-[11px] font-semibold text-indigo-600 truncate">📍 ${esc(puestoNom)}</span>` : ""}
+        ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer underline decoration-dotted">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
       ${vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
@@ -2677,7 +2680,7 @@
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${telHTML}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
-      ${(!empresa && a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<span class="font-semibold text-indigo-600">${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</span>`) : ""}
+      ${(!empresa && a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<button data-goto-puesto="${esc(a.puesto_id)}" class="font-semibold text-indigo-600 underline decoration-dotted cursor-pointer" title="Ver en el mapa">${esc(ADMIN_STATE._puestosMap[a.puesto_id])} ›</button>`) : ""}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
     </div>
@@ -2696,6 +2699,9 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
+      // Tocar la facción en el detalle abre el mapa en ese puesto.
+      const gotoP = document.querySelector("#modalBox [data-goto-puesto]");
+      if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, { focusPuestoId: pid }); });
       // Tocar el RUT lo copia completo al portapapeles.
       const rutBtn = $("#dg_rut");
       if (rutBtn) rutBtn.addEventListener("click", async () => {
@@ -4012,6 +4018,20 @@
       }
       function refreshMarkers() { Object.values(state.markers).forEach(m => map.removeLayer(m)); state.markers = {}; state.puestos.forEach(addMarker); }
       refreshMarkers();
+
+      // Si se pidió enfocar un puesto (al tocar la facción en la lista), centrar el mapa en su ubicación.
+      if (opts.focusPuestoId) {
+        const fp = state.puestos.find(p => p.id === opts.focusPuestoId);
+        if (fp && fp.lat != null && fp.lng != null) {
+          setTimeout(() => {
+            try { map.setView([fp.lat, fp.lng], 18, { animate: true }); } catch (_) { }
+            const m = state.markers[fp.id];
+            if (m) { try { m.openTooltip(); } catch (_) { } }
+          }, 450);
+        } else if (fp) {
+          toast(`"${fp.nombre}" aún no tiene ubicación marcada en el mapa`, false);
+        }
+      }
 
       async function recargar() {
         try { state.puestos = await Data.listPuestos(ev.id); } catch (e) { }
