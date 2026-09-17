@@ -2569,7 +2569,8 @@
       const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-900'));
       const segCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-700' : (esHombre ? 'text-blue-700' : 'text-slate-600'));
       // Mostrar rut, curso y hora de ingreso para todos
-      const puestoNom = (modo !== "empresa" && a.puesto_id && ADMIN_STATE._puestosMap) ? ADMIN_STATE._puestosMap[a.puesto_id] : null;
+      const mapaP = modo === "empresa" ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap;
+      const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
       const segunda = `<span class="font-mono">${esc(a.rut)}</span> · Curso: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseSexo}"${rowStyle}>
       <span class="text-xs font-bold ${nCls} w-6 flex-shrink-0">${i + 1}</span>
@@ -2606,6 +2607,7 @@
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}">${esc(a.rut)}</td>
         <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${nomClsE}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}</td>
+        <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
         <td data-label="Vigencia" class="pr-2">${badge(v)}</td>
@@ -2680,7 +2682,7 @@
       ${detalleFila("🛡️", "SIGES", esc(v.siges || "—"))}
       ${telHTML}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
-      ${(!empresa && a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<button data-goto-puesto="${esc(a.puesto_id)}" class="font-semibold text-indigo-600 underline decoration-dotted cursor-pointer" title="Ver en el mapa">${esc(ADMIN_STATE._puestosMap[a.puesto_id])} ›</button>`) : ""}
+      ${(() => { const mp = empresa ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap; return (a.puesto_id && mp && mp[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<button data-goto-puesto="${esc(a.puesto_id)}" class="font-semibold text-indigo-600 underline decoration-dotted cursor-pointer" title="Ver en el mapa">${esc(mp[a.puesto_id])} ›</button>`) : ""; })()}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
     </div>
     </div>
@@ -2699,9 +2701,9 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
-      // Tocar la facción en el detalle abre el mapa en ese puesto.
+      // Tocar la facción en el detalle abre el mapa en ese puesto. En la empresa, solo lectura.
       const gotoP = document.querySelector("#modalBox [data-goto-puesto]");
-      if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, { focusPuestoId: pid }); });
+      if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, empresa ? { focusPuestoId: pid, readonly: true, verNombres: true } : { focusPuestoId: pid }); });
       // Tocar el RUT lo copia completo al portapapeles.
       const rutBtn = $("#dg_rut");
       if (rutBtn) rutBtn.addEventListener("click", async () => {
@@ -3819,6 +3821,10 @@
 
     async function abrirDistribucion(ev, opts = {}) {
       const readonly = !!opts.readonly;
+      // ¿Se muestran los nombres de los guardias en el tooltip del mapa? En el link PÚBLICO
+      // (readonly sin verNombres) se ocultan por privacidad; la empresa (readonly + verNombres)
+      // ve lo mismo que el admin: nombres y facciones, pero en solo lectura (no puede editar).
+      const verNombres = !readonly || !!opts.verNombres;
       // Leaflet se carga diferido; si aún no está listo, esperar un momento a que cargue.
       if (!window.L) {
         await new Promise(res => { let n = 0; const t = setInterval(() => { if (window.L || ++n > 50) { clearInterval(t); res(); } }, 100); });
@@ -3930,9 +3936,8 @@
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
       }
       function tooltipFor(p) {
-        // En modo readonly (link público compartido) no se muestran los nombres de los guardias,
-        // solo el nombre del puesto y N/M.
-        if (readonly) {
+        // Sin permiso de ver nombres (link público) solo se muestra el nombre del puesto y N/M.
+        if (!verNombres) {
           return `<div style="font:600 11px system-ui,sans-serif;color:#111"><div style="font-weight:800;color:${colorAnillo(p.anillo)}">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div></div>`;
         }
         const nombres = guardiasDePuesto(p.id);
@@ -5383,6 +5388,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
       const paint = async () => {
         let asist = []; try { asist = await Data.listAsistencias(ev.id); } catch (e) { }
+        // Mapa puesto_id -> nombre de la faccion, para la columna "Distribución" (igual que el admin).
+        try { const ps = {}; (await Data.listPuestos(ev.id)).forEach(p => { ps[p.id] = p.nombre; }); EMPRESA_STATE._puestosMap = ps; } catch (_) { EMPRESA_STATE._puestosMap = {}; }
         // Supervisores en su propio listado, no se mezclan con los guardias.
         const asistGuardiasE = asist.filter(a => !a.es_supervisor);
         const asistSupervisoresE = asist.filter(a => a.es_supervisor);
@@ -5481,8 +5488,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla completa -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -5499,8 +5506,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${filasS.length ? filasS.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <tbody>${filasS.length ? filasS.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -5526,7 +5533,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
         const empDist = document.getElementById("empDist");
-        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev));
+        // La empresa ve la MISMA distribución que el admin (puestos, guardias por faccion y sus
+        // nombres), pero en solo lectura: no puede agregar, mover, eliminar ni reasignar puestos.
+        if (empDist) empDist.addEventListener("click", () => abrirDistribucion(ev, { readonly: true, verNombres: true }));
+        // Tocar la faccion (columna Distribución / línea móvil) abre el mapa en ese puesto (solo lectura).
+        app.querySelectorAll("[data-goto-puesto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); abrirDistribucion(ev, { readonly: true, verNombres: true, focusPuestoId: x.dataset.gotoPuesto }); }));
         // Descargar el listado del TURNO VIGENTE (guardias + supervisores activos) en Excel o PDF.
         // Los turnos anteriores se descargan desde la carpeta 📁 Historial.
         if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(ev, asistActiva));
