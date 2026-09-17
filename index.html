@@ -3879,6 +3879,15 @@
         });
         return Object.values(by);
       };
+      // La distribución es del TURNO VIGENTE: se dejan solo los guardias del/los turno(s) que no
+      // han finalizado (hasta 2 h después de su término). Los de turnos anteriores no aparecen en
+      // el mapa ni en la asignación de facciones. Se aplica ANTES de deduplicar para que un guardia
+      // reingresado se cuente por su registro del turno actual.
+      const soloVigentes = (arr) => {
+        if (!eventoUsaTurnos(ev)) return arr || [];
+        return (arr || []).filter(a => { const tn = calcularTurno(a.hora_ingreso, ev); return !tn || Date.now() <= tn.fin.getTime() + GRACIA_TURNO_MS; });
+      };
+      const cargarAsist = async () => asistUnica(soloVigentes(await Data.listAsistencias(ev.id)));
       const cerrar = () => { try { state.map && state.map.remove(); } catch (e) { } ov.remove(); };
       $("#dist_close", ov).addEventListener("click", cerrar);
       // Menú hamburguesa (celular): abrir/cerrar el grupo de acciones
@@ -3897,7 +3906,7 @@
 
       try { state.puestos = await Data.listPuestos(ev.id); }
       catch (e) { toast("Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
-      try { state.asist = asistUnica(await Data.listAsistencias(ev.id)); } catch (e) { }
+      try { state.asist = await cargarAsist(); } catch (e) { }
 
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
@@ -4046,7 +4055,7 @@
 
       async function recargar() {
         try { state.puestos = await Data.listPuestos(ev.id); } catch (e) { }
-        try { state.asist = asistUnica(await Data.listAsistencias(ev.id)); } catch (e) { }
+        try { state.asist = await cargarAsist(); } catch (e) { }
         refreshMarkers(); if (state.panelOpen) renderPanel();
       }
 
