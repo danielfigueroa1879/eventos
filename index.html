@@ -3879,15 +3879,7 @@
         });
         return Object.values(by);
       };
-      // La distribución es del TURNO VIGENTE: se dejan solo los guardias del/los turno(s) que no
-      // han finalizado (hasta 2 h después de su término). Los de turnos anteriores no aparecen en
-      // el mapa ni en la asignación de facciones. Se aplica ANTES de deduplicar para que un guardia
-      // reingresado se cuente por su registro del turno actual.
-      const soloVigentes = (arr) => {
-        if (!eventoUsaTurnos(ev)) return arr || [];
-        return (arr || []).filter(a => { const tn = calcularTurno(a.hora_ingreso, ev); return !tn || Date.now() <= tn.fin.getTime() + GRACIA_TURNO_MS; });
-      };
-      const cargarAsist = async () => asistUnica(soloVigentes(await Data.listAsistencias(ev.id)));
+      const cargarAsist = async () => asistUnica(await Data.listAsistencias(ev.id));
       const cerrar = () => { try { state.map && state.map.remove(); } catch (e) { } ov.remove(); };
       $("#dist_close", ov).addEventListener("click", cerrar);
       // Menú hamburguesa (celular): abrir/cerrar el grupo de acciones
