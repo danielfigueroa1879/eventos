@@ -483,33 +483,41 @@
     /* =========================================================================
        MODO OSCURO — tonos grises (no negro puro), para PC y celular
        ========================================================================= */
+    /* Toggle de modo día/noche: pequeño, arriba a la derecha (junto al título), sin sol ni luna */
     #themeToggle {
       position: fixed;
-      right: 1rem;
-      bottom: 4.25rem;           /* sobre el pie de créditos fijo */
-      z-index: 70;
-      width: 2.5rem;
-      height: 2.5rem;
+      right: .55rem;
+      top: calc(env(safe-area-inset-top, 0px) + .5rem);
+      z-index: 80;
+      height: 1.7rem;
+      padding: 0 .6rem;
       border-radius: 9999px;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      font-size: 1.05rem;
+      gap: .3rem;
+      font-size: .72rem;
+      font-weight: 700;
       cursor: pointer;
-      background: transparent;    /* semi-transparente, sin color propio */
-      border: 1px solid rgba(100, 116, 139, .22);
-      color: inherit;
-      box-shadow: none;
-      opacity: .38;               /* discreto, casi no se nota */
-      transition: opacity .15s ease, transform .15s ease
+      background: rgba(255, 255, 255, .92);
+      border: 1px solid rgba(100, 116, 139, .28);
+      color: #334155;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, .18);
+      transition: transform .15s ease, background .15s ease;
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
     }
 
-    #themeToggle:hover {
-      opacity: .9
+    #themeToggle::before {
+      content: "";
+      width: .55rem;
+      height: .55rem;
+      border-radius: 9999px;
+      background: #f59e0b;         /* punto ámbar = día */
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, .25);
     }
 
     #themeToggle:active {
-      transform: scale(.92)
+      transform: scale(.94)
     }
 
     html[data-theme="dark"] body {
@@ -518,9 +526,53 @@
     }
 
     html[data-theme="dark"] #themeToggle {
-      background: transparent;
-      border-color: rgba(148, 163, 184, .25);
-      color: inherit
+      background: rgba(30, 34, 40, .92);
+      border-color: rgba(148, 163, 184, .3);
+      color: #e2e8f0
+    }
+
+    html[data-theme="dark"] #themeToggle::before {
+      background: #60a5fa;         /* punto azul = noche */
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, .25);
+    }
+
+    /* Botón "subir" (chevron hacia arriba) que aparece al hacer scroll */
+    #scrollTopBtn {
+      position: fixed;
+      right: .7rem;
+      bottom: 4.25rem;
+      z-index: 75;
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background: rgba(255, 255, 255, .94);
+      border: 1px solid rgba(100, 116, 139, .28);
+      color: #0f5323;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, .22);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+    }
+
+    #scrollTopBtn.show {
+      opacity: .95;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #scrollTopBtn:active { transform: scale(.92) }
+
+    html[data-theme="dark"] #scrollTopBtn {
+      background: rgba(30, 34, 40, .94);
+      border-color: rgba(148, 163, 184, .3);
+      color: #7ee0a1;
     }
 
     html[data-theme="dark"] .brand-bg {
@@ -668,11 +720,32 @@
       50%      { filter: drop-shadow(0 0 6px #22c55e) drop-shadow(0 0 11px #22c55e); }
     }
 
-    /* Separador un poco más visible entre guardias en la lista de celular */
-    @media (max-width: 767px) {
-      .filaMov + .filaMov { border-top: 1px solid #cbd5e1 !important; }
+    /* Lista de guardias en celular: cada uno en su propia tarjeta blanca, separada,
+       redondeada y con sombra; el nombre en negro sobre blanco. */
+    .gCardWrap { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .filaMov {
+      background: #fff;
+      border: 1px solid #eef2f7;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, .12), 0 1px 2px rgba(15, 23, 42, .06);
+      transition: transform .12s ease, box-shadow .12s ease;
     }
-    html[data-theme="dark"] .filaMov + .filaMov { border-top-color: #3f4650 !important; }
+    .filaMov:active { transform: scale(.99); box-shadow: 0 1px 2px rgba(15, 23, 42, .12); }
+    .gNum {
+      font-weight: 800;
+      color: #64748b;
+      text-shadow: 0 1px 1px rgba(15, 23, 42, .18);
+    }
+    .gName { color: #0f172a !important; font-weight: 700; }
+    .gChev { color: #cbd5e1; font-size: 1.55rem; line-height: 1; }
+    html[data-theme="dark"] .filaMov {
+      background: #232830;
+      border-color: #343b45;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+    }
+    html[data-theme="dark"] .gName { color: #f1f5f9 !important; }
+    html[data-theme="dark"] .gNum { color: #cbd5e1; }
+    html[data-theme="dark"] .gChev { color: #64748b; }
 
     /* ===== Optimización para celulares pequeños y medianos (iPhone SE/mini, Android chicos) ===== */
     @media (max-width: 430px) {
@@ -703,7 +776,10 @@
     <div class="card w-full max-w-md p-5 max-h-[90vh] overflow-auto" id="modalBox"></div>
   </div>
   <div id="toast" class="fixed bottom-16 left-1/2 -translate-x-1/2 z-50" style="display:none"></div>
-  <button id="themeToggle" type="button" aria-label="Cambiar modo claro/oscuro" title="Modo claro/oscuro">🌙</button>
+  <button id="themeToggle" type="button" aria-label="Cambiar modo día/noche" title="Cambiar modo día/noche"></button>
+  <button id="scrollTopBtn" type="button" aria-label="Subir al inicio" title="Subir">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+  </button>
 
   <script>
     /* =========================================================================
@@ -1127,7 +1203,7 @@
       const btn = $("#themeToggle");
       if (!btn) return;
       const isDark = () => document.documentElement.getAttribute("data-theme") === "dark";
-      const paint = () => { btn.textContent = isDark() ? "☀️" : "🌙"; };
+      const paint = () => { btn.textContent = isDark() ? "Noche" : "Día"; };
       btn.addEventListener("click", () => {
         const dark = !isDark();
         if (dark) document.documentElement.setAttribute("data-theme", "dark");
@@ -1136,6 +1212,17 @@
         paint();
       });
       paint();
+    })();
+
+    /* ---- Botón "subir": chevron que aparece al bajar y vuelve al inicio ---- */
+    (function initScrollTop() {
+      const btn = $("#scrollTopBtn");
+      if (!btn) return;
+      const scroller = () => document.scrollingElement || document.documentElement;
+      const onScroll = () => { btn.classList.toggle("show", (window.scrollY || scroller().scrollTop || 0) > 300); };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+      onScroll();
     })();
 
     function toast(msg, ok = true, ms = 3200) {
@@ -2276,7 +2363,7 @@
       ${turnosBar ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
 
       <!-- Móvil: listado compacto con detalle en ventana -->
-      <div class="md:hidden divide-y divide-slate-100">
+      <div class="md:hidden gCardWrap">
         ${filas.length ? filas.map((a, i) => filaMovil(a, i, ev, rutCount, nomCount)).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asist.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</div>`}
       </div>
 
@@ -2300,7 +2387,7 @@
       </div>
 
       <!-- Móvil: listado compacto con detalle en ventana -->
-      <div class="md:hidden divide-y divide-slate-100">
+      <div class="md:hidden gCardWrap">
         ${filasSup.length ? filasSup.map((a, i) => filaMovil(a, i, ev, rutCount, nomCount)).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</div>`}
       </div>
 
@@ -2646,16 +2733,16 @@
       const mapaP = modo === "empresa" ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap;
       const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
       const segunda = `🪪 <span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · 📅 ${esSup ? "Autoriz." : "Curso"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
-      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2 px-3 py-2 text-left${claseSexo}"${rowStyle}>
-      <span class="text-[11px] font-bold ${nCls} w-4 flex-shrink-0 text-center">${i + 1}</span>
+      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2 px-3 py-2 text-left"${rowStyle}>
+      <span class="gNum text-[11px] w-4 flex-shrink-0 text-center">${i + 1}</span>
       <span class="w-8 h-8 rounded-full flex items-center justify-center text-lg flex-shrink-0" style="background:${av.bg}" aria-hidden="true">${av.e}</span>
       <span class="flex-1 min-w-0">
-        <span class="block font-semibold text-sm truncate flex items-center ${nomCls}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
-        <span class="block text-[11px] ${segCls} truncate">${segunda}</span>
+        <span class="gName block text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
+        <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
       ${esSup ? `<span class="vigPill text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:84px">SUPERVISOR</span>` : vigenciaPill(v)}
-      <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
+      <span class="gChev flex-shrink-0">›</span>
     </button>`;
     }
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
@@ -5748,7 +5835,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           </span>
         </div>
         <!-- Móvil: listado compacto con detalle en ventana (solo lectura) -->
-        <div class="md:hidden divide-y divide-slate-100">
+        <div class="md:hidden gCardWrap">
           ${filasG.length ? filasG.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</div>`}
         </div>
         <!-- Escritorio: tabla completa -->
@@ -5766,7 +5853,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           <span>Supervisores (${filasS.length})${usaT ? ` <span class="text-indigo-600 font-normal text-xs">· turno vigente</span>` : ""}</span>
         </div>
         <!-- Móvil: listado compacto (solo lectura) -->
-        <div class="md:hidden divide-y divide-slate-100">
+        <div class="md:hidden gCardWrap">
           ${filasS.length ? filasS.map((a, i) => filaMovil(a, i, ev, rutCountE, nomCountE, "empresa")).join("") : `<div class="text-center text-slate-400 py-6 text-sm">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</div>`}
         </div>
         <!-- Escritorio: tabla -->
