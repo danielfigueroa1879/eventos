@@ -136,8 +136,11 @@ create table if not exists partidos_historial_asist (
   telefono            text,
   fecha_ultimo_examen date,
   vigencia            text,
-  hora_ingreso        timestamptz
+  hora_ingreso        timestamptz,
+  puesto              text                    -- facción / puesto de distribución asignado al guardia
 );
+-- Migración para bases ya existentes: guarda la facción (puesto) en el historial de partidos.
+alter table partidos_historial_asist add column if not exists puesto text;
 create index if not exists idx_hist_evento on partidos_historial(evento_id);
 create index if not exists idx_hista_hist  on partidos_historial_asist(historial_id);
 
