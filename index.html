@@ -52,7 +52,7 @@
     }
 
     body {
-      background-color: #eef2f0;
+      background-color: #e6f2fe;
       font-family: ui-sans-serif, system-ui, Arial, sans-serif;
       -webkit-tap-highlight-color: transparent;
       min-height: 100vh;
@@ -67,27 +67,20 @@
     #creditos { flex-shrink: 0; }
 
     /* Fondo (imagen) con leve desenfoque, en una capa detrás del contenido */
+    /* Fondo de toda la app: color sólido #e6f2fe (oscuro en modo noche) */
     body::before {
       content: "";
       position: fixed;
-      inset: -12px;
-      z-index: -2;
-      background: url("images/fondo.webp") center center / cover no-repeat;
-      filter: blur(3px);
-    }
-
-    /* Velo claro encima del fondo para mantener la legibilidad */
-    body::after {
-      content: "";
-      position: fixed;
       inset: 0;
-      z-index: -1;
-      background: rgba(238, 242, 240, .60);
+      z-index: -2;
+      background: #e6f2fe;
     }
 
-    html[data-theme="dark"] body::after {
-      background: rgba(27, 30, 35, .84);
+    html[data-theme="dark"] body::before {
+      background: #1b1e23;
     }
+
+    body::after { content: none; }
 
     .brand-bg {
       background: linear-gradient(135deg, #0a3d18 0%, #0f5323 55%, #15662f 100%)
