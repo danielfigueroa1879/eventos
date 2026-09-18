@@ -2751,7 +2751,7 @@
       const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
       const ic = v.estado === "VIGENTE" ? "✓ " : "";
       // Píldora de color sólido con letras blancas (VIGENTE verde, PRÓRROGA ámbar, resto rojo).
-      return `<span class="vigPill text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c};color:#fff;display:inline-flex;align-items:center;justify-content:center;min-width:60px">${ic}${txt}</span>`;
+      return `<span class="vigPill text-[10px] font-bold px-1.5 py-[1px] rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c};color:#fff;display:inline-flex;align-items:center;justify-content:center;min-width:52px">${ic}${txt}</span>`;
     }
     function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
@@ -2784,9 +2784,9 @@
       const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
       const segunda = `<span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · ${esSup ? "Aut" : "Ex"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
       const pillDer = esSup
-        ? `<span class="vigPill text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:60px">SUPERVISOR</span>`
+        ? `<span class="vigPill text-[10px] font-bold px-1.5 py-[1px] rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:52px">SUPERVISOR</span>`
         : (esSpdG
-          ? `<span class="vigPill text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:#1b3a8f;color:#fff;display:inline-flex;align-items:center;justify-content:center;min-width:52px" title="Autorizado por SPD">SPD</span>`
+          ? `<span class="vigPill text-[10px] font-bold px-1.5 py-[1px] rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:#1b3a8f;color:#fff;display:inline-flex;align-items:center;justify-content:center;min-width:46px" title="Autorizado por SPD">SPD</span>`
           : vigenciaPill(v));
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2 pl-3 pr-2 py-2 text-left"${rowStyle}>
       <span class="gNum text-[11px] w-4 flex-shrink-0 text-center">${i + 1}</span>
@@ -2797,7 +2797,7 @@
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
       ${pillDer}
-      <span class="gChev flex-shrink-0" style="margin-left:-4px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+      <span class="gChev flex-shrink-0" style="margin-left:-7px"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
     </button>`;
     }
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
