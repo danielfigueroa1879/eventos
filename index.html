@@ -667,6 +667,19 @@
       0%, 100% { filter: drop-shadow(0 0 2px #16a34a) drop-shadow(0 0 4px #16a34a); }
       50%      { filter: drop-shadow(0 0 6px #22c55e) drop-shadow(0 0 11px #22c55e); }
     }
+
+    /* ===== Optimización para celulares pequeños y medianos (iPhone SE/mini, Android chicos) ===== */
+    @media (max-width: 430px) {
+      #main { padding: 0.6rem !important; }                 /* más área útil */
+      .filaMov { gap: 0.5rem !important; padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
+      .vigPill { min-width: 74px !important; }
+    }
+    @media (max-width: 360px) {
+      #main { padding: 0.45rem !important; }
+      .filaMov { gap: 0.4rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+      .vigPill { min-width: 64px !important; font-size: 10px !important; padding-left: 0.35rem !important; padding-right: 0.35rem !important; }
+      .card { border-radius: 0.75rem; }
+    }
   </style>
 </head>
 
@@ -2598,7 +2611,7 @@
     function vigenciaPill(v) {
       const txt = v.estado === "VIGENTE" ? "VIGENTE" : v.estado === "VENCIDO_CON_PRORROGA" ? "PRÓRROGA" : v.estado === "SIN_CURSO" ? "SIN CURSO" : "NO VIGENTE";
       const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
-      return `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c}1a;color:${c};display:inline-flex;align-items:center;justify-content:center;min-width:84px">${txt}</span>`;
+      return `<span class="vigPill text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c}1a;color:${c};display:inline-flex;align-items:center;justify-content:center;min-width:84px">${txt}</span>`;
     }
     function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
@@ -2626,14 +2639,14 @@
       const mapaP = modo === "empresa" ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap;
       const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
       const segunda = `<span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · ${esSup ? "Autorización" : "Curso"}: ${esc(fechaFmt(g.fecha_ultimo_examen))} · Ingreso: ${esc(horaFmt(a.hora_ingreso))}`;
-      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseSexo}"${rowStyle}>
+      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2.5 px-3 py-1.5 text-left${claseSexo}"${rowStyle}>
       <span class="text-xs font-bold ${nCls} w-6 flex-shrink-0">${i + 1}</span>
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-sm truncate flex items-center ${nomCls}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
         <span class="block text-[11px] ${segCls} truncate">${segunda}</span>
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer underline decoration-dotted">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
-      ${esSup ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:84px">SUPERVISOR</span>` : vigenciaPill(v)}
+      ${esSup ? `<span class="vigPill text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:84px">SUPERVISOR</span>` : vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
     </button>`;
     }
