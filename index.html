@@ -668,6 +668,12 @@
       50%      { filter: drop-shadow(0 0 6px #22c55e) drop-shadow(0 0 11px #22c55e); }
     }
 
+    /* Separador un poco más visible entre guardias en la lista de celular */
+    @media (max-width: 767px) {
+      .filaMov + .filaMov { border-top: 1px solid #cbd5e1 !important; }
+    }
+    html[data-theme="dark"] .filaMov + .filaMov { border-top-color: #3f4650 !important; }
+
     /* ===== Optimización para celulares pequeños y medianos (iPhone SE/mini, Android chicos) ===== */
     @media (max-width: 430px) {
       #main { padding: 0.6rem !important; }                 /* más área útil */
