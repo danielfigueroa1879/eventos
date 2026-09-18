@@ -2867,8 +2867,11 @@
       })();
       openModal(`
     <div class="flex items-center justify-between mb-3 -mt-1">
-      <h2 class="font-bold text-slate-800 text-sm tracking-wide">DETALLE DE GUARDIA</h2>
-      <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/10" aria-hidden="true">${avatarSVG(_sexG, a.rut)}</span>
+        <h2 class="font-bold text-slate-800 text-sm tracking-wide">DETALLE DE GUARDIA</h2>
+      </div>
+      <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none flex-shrink-0">✕</button>
     </div>
     <div class="text-center mb-3">
       <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1 ' + nameBox : ''}">${esc(nomFull)}</span></div>
