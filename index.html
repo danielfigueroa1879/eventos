@@ -2788,16 +2788,16 @@
         : (esSpdG
           ? `<span class="vigPill text-[10px] font-bold px-1 py-[3px] rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:#1b3a8f;color:#fff;display:inline-flex;align-items:center;justify-content:center;min-width:40px" title="Autorizado por SPD">SPD</span>`
           : vigenciaPill(v));
-      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2 pl-3 pr-2 py-2 text-left"${rowStyle}>
-      <span class="gNum text-[11px] w-4 flex-shrink-0 text-center">${i + 1}</span>
-      <span class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo)}</span>
+      return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-1.5 pl-1.5 pr-1 py-2 text-left"${rowStyle}>
+      <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
+      <span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo)}</span>
       <span class="flex-1 min-w-0">
-        <span class="gName block text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
+        <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
       ${pillDer}
-      <span class="gChev flex-shrink-0" style="margin-left:-7px"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+      <span class="gChev flex-shrink-0" style="margin-left:-1px"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
     </button>`;
     }
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
