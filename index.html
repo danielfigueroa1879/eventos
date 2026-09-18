@@ -1022,7 +1022,8 @@
           const hid = uid();
           const hp = get(K.hp); hp.push({ id: hid, evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length, cerrado_at: nowISO() }); set(K.hp, hp);
           const hpa = get(K.hpa);
-          asist.forEach(a => { const g = a.guardia || {}; hpa.push({ id: uid(), historial_id: hid, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso }); });
+          const puMap = {}; get(K.pu).forEach(p => { if (p.evento_id === ev.id) puMap[p.id] = p.nombre; });
+          asist.forEach(a => { const g = a.guardia || {}; hpa.push({ id: uid(), historial_id: hid, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null }); });
           set(K.hpa, hpa);
           set(K.as, get(K.as).filter(x => x.evento_id !== ev.id));
           ping(); return hid;
@@ -1073,8 +1074,13 @@
         async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
         async cerrarPartido(ev, asist) {
           const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
-          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso }; });
-          if (rows.length) ok(await sb.from("partidos_historial_asist").insert(rows));
+          // Mapa puesto_id -> nombre para guardar la facción de cada guardia.
+          const puMap = {}; try { (ok(await sb.from("puestos").select("id,nombre").eq("evento_id", ev.id)) || []).forEach(p => { puMap[p.id] = p.nombre; }); } catch (_) {}
+          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null }; });
+          if (rows.length) {
+            try { ok(await sb.from("partidos_historial_asist").insert(rows)); }
+            catch (e) { const rowsSin = rows.map(({ puesto, ...r }) => r); ok(await sb.from("partidos_historial_asist").insert(rowsSin)); } // por si falta la columna 'puesto'
+          }
           ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
           return hp.id;
         },
@@ -3765,15 +3771,15 @@
       const filas = rows.length ? rows.map((r, i) => {
         const v = calcularVigencia(r.fecha_ultimo_examen);
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
-      }).join("") : `<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2">${badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
+      }).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
       openModal(`<div class="flex items-center justify-between mb-1">
           <h2 class="font-bold text-slate-800">${esc(h.partido || ev.nombre_evento)}</h2>
           <button id="hg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.length} guardia(s)</p>
         <div class="overflow-x-auto"><table class="w-full text-sm">
-          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
         </table></div>
         <div class="grid grid-cols-2 gap-2 mt-3">
@@ -3792,15 +3798,15 @@
       const filas = rows.length ? rows.map((r, i) => {
         const v = calcularVigencia(r.fecha_ultimo_examen);
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
-      }).join("") : `<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2">${badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
+      }).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800 truncate">${esc(h.partido || ev.nombre_evento)}</h2>
           <div class="flex gap-2 flex-shrink-0"><button id="hpv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="hpv_pdf" class="btn btn-ghost text-sm">📄 PDF</button><button id="hpv_del" class="btn btn-ghost text-sm text-red-600">🗑</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.length} guardia(s)</p>
         <div class="overflow-x-auto"><table class="w-full text-sm">
-          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
         </table></div>`;
     }
@@ -3885,6 +3891,8 @@
       try { asist = await Data.listAsistencias(ev.id); }
       catch (e) { openModal(`<p class="text-red-600 text-sm">Error al cargar el historial: ${esc(e.message || String(e))}</p><div class="mt-3"><button id="ht_close" class="btn btn-ghost w-full">Cerrar</button></div>`); cerrarBtn(); return; }
       const finalizados = turnosHistorial(ev, asist);
+      // Mapa puesto_id -> nombre (facción) para mostrarlo en el detalle de cada turno.
+      try { _puMapHistTurno = {}; (await Data.listPuestos(ev.id)).forEach(p => { _puMapHistTurno[p.id] = p.nombre; }); } catch (_) { _puMapHistTurno = {}; }
       // En escritorio se abre a pantalla completa (lista de turnos a la izquierda, detalle a la derecha).
       if (window.innerWidth >= 768) { closeModal(); overlayHistorialTurnos(ev, finalizados); return; }
       const cuerpo = finalizados.length ? finalizados.map((g, i) => {
@@ -3921,9 +3929,10 @@
         const esSup = !!a.es_supervisor;
         const v = calcularVigencia(gu.fecha_ultimo_examen);
         const nom = ((gu.nombres || "") + " " + (gu.apellidos || "")).trim() || "—";
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
-      const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
+      const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
       const evP = turnoEvPseudo(ev, g);
       openModalWide(`<div class="flex items-center justify-between mb-1">
           <h2 class="font-bold text-slate-800">📁 Día ${idx + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</h2>
@@ -3931,11 +3940,11 @@
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
         <div class="overflow-x-auto"><table class="w-full text-sm">
-          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
           <tbody>${cuerpoG}</tbody>
         </table></div>
         ${recsS.length ? `<p class="text-xs font-bold text-sky-800 mt-3 mb-1">🤵 Supervisores (${recsS.length})</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}
+        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="htd_xls" class="btn btn-ghost text-sm">📊 Excel</button>
           <button id="htd_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
@@ -3948,6 +3957,7 @@
     }
 
     // HTML del detalle de un turno (tablas de guardias y supervisores). Reutilizable.
+    let _puMapHistTurno = {};   // puesto_id -> nombre (facción), para el historial de turnos
     function historialTurnoDetalleHTML(ev, g, idx) {
       const recsG = g.recs.filter(a => !a.es_supervisor);
       const recsS = g.recs.filter(a => a.es_supervisor);
@@ -3955,20 +3965,21 @@
         const gu = a.guardia || {};
         const v = calcularVigencia(gu.fecha_ultimo_examen);
         const nom = ((gu.nombres || "") + " " + (gu.apellidos || "")).trim() || "—";
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2">${a.es_supervisor ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2">${a.es_supervisor ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
-      const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
+      const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="6" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
+      const thead = `<thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>`;
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800">📁 Día ${idx + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</h2>
           <div class="flex gap-2 flex-shrink-0"><button id="htv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="htv_pdf" class="btn btn-ghost text-sm">📄 PDF</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm">
-          <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+        <div class="overflow-x-auto"><table class="w-full text-sm">${thead}
           <tbody>${cuerpoG}</tbody>
         </table></div>
         ${recsS.length ? `<p class="text-xs font-bold text-sky-800 mt-3 mb-1">🤵 Supervisores (${recsS.length})</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}`;
+        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Vigencia</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}`;
     }
 
     // Historial de turnos a PANTALLA COMPLETA (escritorio): lista de turnos a la izquierda,
