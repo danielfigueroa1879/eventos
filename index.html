@@ -52,7 +52,7 @@
     }
 
     body {
-      background-color: #e6f2fe;
+      background-color: #eef2f0;
       font-family: ui-sans-serif, system-ui, Arial, sans-serif;
       -webkit-tap-highlight-color: transparent;
       min-height: 100vh;
@@ -67,20 +67,37 @@
     #creditos { flex-shrink: 0; }
 
     /* Fondo (imagen) con leve desenfoque, en una capa detrás del contenido */
-    /* Fondo de toda la app: color sólido #e6f2fe (oscuro en modo noche) */
     body::before {
       content: "";
       position: fixed;
-      inset: 0;
+      inset: -12px;
       z-index: -2;
-      background: #e6f2fe;
+      background: url("images/fondo.webp") center center / cover no-repeat;
+      filter: blur(3px);
     }
 
-    html[data-theme="dark"] body::before {
-      background: #1b1e23;
+    /* Velo claro encima del fondo para mantener la legibilidad */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: rgba(238, 242, 240, .60);
     }
 
-    body::after { content: none; }
+    html[data-theme="dark"] body::after {
+      background: rgba(27, 30, 35, .84);
+    }
+
+    /* Solo en el PANEL ADMIN y en CELULAR: fondo sólido #e6f2fe (no la imagen). */
+    @media (max-width: 767px) {
+      body.vista-admin::before { background: #e6f2fe; filter: none; inset: 0; }
+      body.vista-admin::after { background: #e6f2fe; }
+    }
+    html[data-theme="dark"] body.vista-admin::before { background: #1b1e23; }
+    @media (max-width: 767px) {
+      html[data-theme="dark"] body.vista-admin::after { background: #1b1e23; }
+    }
 
     .brand-bg {
       background: linear-gradient(135deg, #0a3d18 0%, #0f5323 55%, #15662f 100%)
@@ -1339,6 +1356,7 @@
        ROUTER
        ========================================================================= */
     function route() {
+      document.body.classList.remove("vista-admin"); // solo el panel admin marca el fondo #e6f2fe
       const params = new URLSearchParams(location.search);
       const e = params.get("e");
       if (e) return renderGuard(e);
@@ -1725,6 +1743,7 @@
     let EMPRESA_STATE = { showQR: true, showResumen: true };
 
     async function renderAdmin() {
+      document.body.classList.add("vista-admin"); // fondo sólido #e6f2fe en celular (solo admin)
       app.innerHTML = `
   <div class="min-h-screen flex flex-col md:flex-row">
     <!-- Topbar móvil -->
@@ -5859,16 +5878,21 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       </div>
       </div><!-- fin envoltura angosta: desde aquí los listados van más anchos -->
       <div class="card mt-2">
-        <div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center justify-between flex-wrap gap-2">
-          <span class="flex items-center gap-1.5 flex-wrap">Listado guardias (${filasG.length})${usaT ? ` <span class="text-indigo-600 font-normal text-xs">· turno vigente</span>` : ""}
-            <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${contarHM(filasG).h} <span class="text-slate-400 font-normal">H</span></span>
-            <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${contarHM(filasG).m} <span class="text-slate-400 font-normal">M</span></span>
-          </span>
-          <span class="flex items-center gap-2 flex-wrap">
-            <button id="empXls" class="text-xs font-bold px-2.5 py-1 border border-green-200 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 whitespace-nowrap" title="Descargar el listado del turno vigente en Excel">📊 Excel</button>
-            <button id="empPdf" class="text-xs font-bold px-2.5 py-1 border border-red-200 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 whitespace-nowrap" title="Descargar el listado del turno vigente en PDF">📄 PDF</button>
-            <span class="text-xs font-normal">${eventoInfoHTML(ev)}</span>
-          </span>
+        <div class="px-3 py-2 border-b border-slate-100">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="font-semibold text-slate-700">Guardias <span class="text-slate-400 font-normal">(${filasG.length})</span></span>
+            <span class="flex items-center gap-1.5">
+              <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${contarHM(filasG).h} <span class="text-slate-400 font-normal">H</span></span>
+              <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${contarHM(filasG).m} <span class="text-slate-400 font-normal">M</span></span>
+            </span>
+          </div>
+          <div class="flex items-center justify-between gap-2 flex-wrap mt-2">
+            <span class="text-xs font-normal">${eventoInfoHTML(ev)}${usaT ? ` <span class="text-indigo-600">· turno vigente</span>` : ""}</span>
+            <span class="flex items-center gap-2">
+              <button id="empXls" class="text-xs font-bold px-2.5 py-1 border border-green-200 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 whitespace-nowrap" title="Descargar el listado del turno vigente en Excel">📊 Excel</button>
+              <button id="empPdf" class="text-xs font-bold px-2.5 py-1 border border-red-200 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 whitespace-nowrap" title="Descargar el listado del turno vigente en PDF">📄 PDF</button>
+            </span>
+          </div>
         </div>
         <!-- Móvil: listado compacto con detalle en ventana (solo lectura) -->
         <div class="md:hidden gCardWrap">
