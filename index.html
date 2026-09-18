@@ -2641,14 +2641,18 @@
       const nCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-600'));
       const nomCls = tieneInf ? 'text-slate-900' : (esMujer ? 'text-red-800' : (esHombre ? 'text-blue-900' : 'text-slate-900'));
       const segCls = tieneInf ? 'text-slate-600' : (esMujer ? 'text-red-700' : (esHombre ? 'text-blue-700' : 'text-slate-600'));
-      // Mostrar rut, curso y hora de ingreso para todos
-      // Avatar chico según sexo (hombre / mujer / sin dato). El detalle se ve al tocar la fila.
+      // Avatar chico según sexo (hombre / mujer / sin dato).
       const av = esMujer ? { e: "👩", bg: "#fde7ee" } : (esHombre ? { e: "👨", bg: "#e6f0ff" } : { e: "👤", bg: "#eef2f7" });
+      const mapaP = modo === "empresa" ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap;
+      const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
+      const segunda = `🪪 <span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · 📅 ${esSup ? "Autoriz." : "Curso"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2 px-3 py-2 text-left${claseSexo}"${rowStyle}>
       <span class="text-[11px] font-bold ${nCls} w-4 flex-shrink-0 text-center">${i + 1}</span>
       <span class="w-8 h-8 rounded-full flex items-center justify-center text-lg flex-shrink-0" style="background:${av.bg}" aria-hidden="true">${av.e}</span>
       <span class="flex-1 min-w-0">
         <span class="block font-semibold text-sm truncate flex items-center ${nomCls}">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
+        <span class="block text-[11px] ${segCls} truncate">${segunda}</span>
+        ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
       ${esSup ? `<span class="vigPill text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:84px">SUPERVISOR</span>` : vigenciaPill(v)}
       <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span>
