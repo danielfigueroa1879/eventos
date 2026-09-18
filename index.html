@@ -3788,21 +3788,21 @@
       const cuerpo = finalizados.length ? finalizados.map((g, i) => {
         const nG = g.recs.filter(a => !a.es_supervisor).length;
         const nS = g.recs.filter(a => a.es_supervisor).length;
-        return `<div class="border border-slate-200 rounded-xl p-3">
+        return `<div class="border border-slate-200 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
           <div class="min-w-0">
-            <div class="font-semibold text-slate-800 truncate">📁 Día ${i + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</div>
-            <div class="text-xs text-slate-500">${esc(g.tn.rango)} · ${nG} guardia${nG === 1 ? "" : "s"}${nS ? " · " + nS + " supervisor" + (nS === 1 ? "" : "es") : ""}</div>
+            <div class="font-semibold text-slate-800 truncate text-[13px] leading-tight">📁 Día ${i + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</div>
+            <div class="text-[11px] text-slate-500 leading-tight">${esc(g.tn.rango)} · ${nG} guardia${nG === 1 ? "" : "s"}${nS ? " · " + nS + " sup." : ""}</div>
           </div>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <button data-vt="${g.tn.clave}" class="btn btn-ghost text-xs">👁 Ver detalle</button>
-            <button data-xt="${g.tn.clave}" class="btn btn-ghost text-xs">📊 Excel</button>
-            <button data-pt="${g.tn.clave}" class="btn btn-ghost text-xs">📄 PDF</button>
+          <div class="flex gap-1 flex-shrink-0">
+            <button data-vt="${g.tn.clave}" class="btn btn-ghost text-xs px-2 py-1" title="Ver detalle">👁<span class="hidden sm:inline"> Ver</span></button>
+            <button data-xt="${g.tn.clave}" class="btn btn-ghost text-xs px-2 py-1" title="Descargar Excel">📊<span class="hidden sm:inline"> Excel</span></button>
+            <button data-pt="${g.tn.clave}" class="btn btn-ghost text-xs px-2 py-1" title="Descargar PDF">📄<span class="hidden sm:inline"> PDF</span></button>
           </div>
         </div>`;
       }).join("") : `<p class="text-sm text-slate-400 text-center py-6">Aún no hay turnos en el historial. Cada turno pasa aquí 2 h después de terminar.</p>`;
-      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📁 Historial de turnos</h2>
+      openModalWide(`<h2 class="font-bold text-lg text-slate-800 mb-1">📁 Historial de turnos</h2>
         <p class="text-sm text-slate-500 mb-3">Turnos anteriores de "<b>${esc(ev.nombre_evento)}</b>". Abre cada turno para ver el detalle y descargar su Excel o PDF.</p>
-        <div class="space-y-2">${cuerpo}</div>
+        <div class="space-y-1.5 md:grid md:grid-cols-2 md:gap-2 md:space-y-0">${cuerpo}</div>
         <div class="mt-3"><button id="ht_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
       cerrarBtn();
       const byClave = clave => finalizados.find(g => String(g.tn.clave) === String(clave));
