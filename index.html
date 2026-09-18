@@ -3906,9 +3906,9 @@
       const rows = finalizados.length ? finalizados.map((g, i) => {
         const nG = g.recs.filter(a => !a.es_supervisor).length;
         const nS = g.recs.filter(a => a.es_supervisor).length;
-        return `<button data-htsel="${g.tn.clave}" class="w-full text-left border border-slate-200 rounded-lg px-3 py-2 hover:bg-slate-50 flex items-center justify-between gap-2 transition-colors">
-          <span class="min-w-0"><span class="block font-semibold text-slate-800 truncate text-sm">📁 Día ${i + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</span>
-          <span class="block text-[11px] text-slate-500">${esc(g.tn.rango)} · ${nG} guardia${nG === 1 ? "" : "s"}${nS ? " · " + nS + " sup." : ""}</span></span>
+        return `<button data-htsel="${g.tn.clave}" class="evItem w-full text-left rounded-lg pl-2.5 pr-3 py-2 border-l-4 border-transparent hover:bg-slate-50 flex items-center gap-1.5">
+          <span class="flex-1 min-w-0"><span class="block font-semibold text-sm text-slate-800 leading-tight truncate">📁 Día ${i + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</span>
+          <span class="block text-[11px] text-slate-500 mt-0.5">${esc(g.tn.rango)} · ${nG} guardia${nG === 1 ? "" : "s"}${nS ? " · " + nS + " sup." : ""}</span></span>
           <span class="text-slate-300 text-lg leading-none flex-shrink-0">›</span></button>`;
       }).join("") : `<p class="text-sm text-slate-400 py-6 text-center">Aún no hay turnos en el historial. Cada turno pasa aquí 2 h después de terminar.</p>`;
       ov.innerHTML = `
@@ -3917,10 +3917,19 @@
           <div class="font-semibold text-sm flex-1 min-w-0 truncate">📁 Historial de turnos · ${esc(ev.nombre_evento)}</div>
         </div>
         <div class="flex-1 min-h-0 flex flex-col md:flex-row">
-          <div class="md:w-96 md:max-w-[38%] md:border-r border-slate-200 overflow-y-auto p-3 space-y-2 flex-shrink-0 bg-slate-50/40">
-            <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Turnos (${finalizados.length})</div>
-            ${rows}
-          </div>
+          <aside class="bg-white border-b md:border-b-0 md:border-r border-slate-200 overflow-y-auto flex-shrink-0 md:w-72 md:max-w-none">
+            <div class="brand-bg text-white p-4 flex items-center gap-3">
+              <img src="images/logo-os10-original.webp" class="w-10 h-10 rounded-full bg-white/90" alt="OS10">
+              <div class="flex-1 min-w-0"><div class="font-bold text-base leading-tight">HISTORIAL</div><div class="text-xs opacity-80 truncate">Turnos anteriores</div></div>
+            </div>
+            <div class="p-3">
+              <div class="flex items-center justify-between px-1 mb-1.5">
+                <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Turnos</h2>
+                <span class="text-[11px] font-medium text-slate-300">${finalizados.length}</span>
+              </div>
+              <div id="htLista" class="space-y-1">${rows}</div>
+            </div>
+          </aside>
           <div id="ht_detalle" class="flex-1 min-h-0 overflow-y-auto p-4"><div class="text-slate-400 text-sm text-center py-16">Selecciona un turno para ver el detalle.</div></div>
         </div>`;
       document.body.appendChild(ov);
@@ -3936,10 +3945,11 @@
         const bp = $("#htv_pdf", det); if (bp) bp.addEventListener("click", () => descargarPDF(evP, g.recs));
         det.scrollTop = 0;
       };
+      const claseAct = ["bg-green-50", "border-green-600", "md:bg-green-100", "md:shadow-sm"];
       ov.querySelectorAll("[data-htsel]").forEach(b => b.addEventListener("click", () => {
         const g = byClave(b.dataset.htsel); if (!g) return;
-        ov.querySelectorAll("[data-htsel]").forEach(x => x.classList.remove("bg-indigo-50", "border-indigo-300"));
-        b.classList.add("bg-indigo-50", "border-indigo-300");
+        ov.querySelectorAll("[data-htsel]").forEach(x => { x.classList.remove(...claseAct); x.classList.add("border-transparent"); });
+        b.classList.remove("border-transparent"); b.classList.add(...claseAct);
         pintar(g);
       }));
       // Abrir automáticamente el primer turno.
