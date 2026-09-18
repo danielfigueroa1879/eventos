@@ -498,14 +498,17 @@
       font-size: .72rem;
       font-weight: 700;
       cursor: pointer;
-      background: rgba(255, 255, 255, .92);
-      border: 1px solid rgba(100, 116, 139, .28);
-      color: #334155;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, .18);
-      transition: transform .15s ease, background .15s ease;
-      -webkit-backdrop-filter: blur(4px);
-      backdrop-filter: blur(4px);
+      background: rgba(255, 255, 255, .45);   /* semi-transparente sobre el banner */
+      border: 1px solid rgba(255, 255, 255, .5);
+      color: #1f2937;
+      opacity: .72;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, .15);
+      transition: transform .15s ease, opacity .15s ease, background .15s ease;
+      -webkit-backdrop-filter: blur(5px);
+      backdrop-filter: blur(5px);
     }
+
+    #themeToggle:hover { opacity: 1 }
 
     #themeToggle::before {
       content: "";
@@ -526,9 +529,9 @@
     }
 
     html[data-theme="dark"] #themeToggle {
-      background: rgba(30, 34, 40, .92);
-      border-color: rgba(148, 163, 184, .3);
-      color: #e2e8f0
+      background: rgba(20, 24, 30, .4);
+      border-color: rgba(255, 255, 255, .28);
+      color: #f1f5f9
     }
 
     html[data-theme="dark"] #themeToggle::before {
@@ -2697,33 +2700,32 @@
     const VIG_COLOR = { VIGENTE: "#16a34a", VENCIDO_CON_PRORROGA: "#d97706", VENCIDO_SIN_PRORROGA: "#dc2626", SIN_CURSO: "#b91c1c" };
     function inicialGuardia(g) { const s = ((g.nombres || "") + (g.apellidos || "")).trim(); return (s ? s[0] : "?").toUpperCase(); }
     // Avatar ilustrado (retrato plano) según sexo: mujer (M) / hombre (H) / sin dato. SVG en línea (sin assets).
+    // Fondo del círculo azul-gris claro uniforme (igual que la referencia).
     function avatarSVG(sexo) {
-      let bg, fig;
-      if (sexo === "M") {            // MUJER
-        bg = "#f7dbe6";
+      const bg = "#d6dfe9";
+      let fig;
+      if (sexo === "M") {            // MUJER: pelo castaño suelto + polera de color
         fig = `
-          <path d="M6 40c0-8 6.5-12 14-12s14 4 14 12z" fill="#e2749a"/>
-          <rect x="17.2" y="23" width="5.6" height="6" rx="2.8" fill="#eab58f"/>
-          <path d="M9.5 21C9.5 12 13 6.5 20 6.5S30.5 12 30.5 21c0 5.2-2.4 8.4-2.4 8.4l-1.3-8.1s-2.9 2.2-6.8 2.2-6.8-2.2-6.8-2.2l-1.3 8.1S9.5 26.2 9.5 21z" fill="#6b4426"/>
-          <circle cx="20" cy="17.8" r="7.6" fill="#f2c6a0"/>
-          <path d="M12.4 17.5C12 10.5 16 7 20 7s8 3.5 7.6 10.5c-.2-3-3.1-4.8-7.6-4.8s-7.4 1.8-7.6 4.8z" fill="#6b4426"/>
-          <circle cx="17.2" cy="18" r="1" fill="#5b3a29"/><circle cx="22.8" cy="18" r="1" fill="#5b3a29"/>
-          <path d="M17.6 21q2.4 1.7 4.8 0" stroke="#b07a54" stroke-width="1" fill="none" stroke-linecap="round"/>`;
-      } else if (sexo === "H") {     // HOMBRE
-        bg = "#d8e6fb";
+          <path d="M5.5 40c0-8.6 6.4-12.6 14.5-12.6S34.5 31.4 34.5 40Z" fill="#d16f92"/>
+          <path d="M16.9 24.2h6.2v5.2h-6.2z" fill="#eab991"/>
+          <path d="M9.6 21.4c0-8.4 4.6-13.4 10.4-13.4s10.4 5 10.4 13.4c0 4.2-1.4 7.2-2.8 9l-1.3-9.6c-1.6 1.5-4.1 2.3-6.3 2.3s-4.7-.8-6.3-2.3l-1.3 9.6c-1.4-1.8-2.8-4.8-2.8-9z" fill="#5a4130"/>
+          <ellipse cx="20" cy="18" rx="7.1" ry="7.9" fill="#f1c49b"/>
+          <path d="M12.8 17.4C12.8 10.8 16.2 7.6 20 7.6s7.2 3.2 7.2 9.8c-1.1-3.3-3.5-4.7-7.2-4.7s-6.1 1.4-7.2 4.7z" fill="#5a4130"/>
+          <circle cx="17.3" cy="18.2" r=".95" fill="#4a3324"/><circle cx="22.7" cy="18.2" r=".95" fill="#4a3324"/>
+          <path d="M17.9 21.2q2.1 1.5 4.2 0" stroke="#c78a63" stroke-width="1" fill="none" stroke-linecap="round"/>`;
+      } else if (sexo === "H") {     // HOMBRE: pelo corto + camisa/traje con cuello
         fig = `
-          <path d="M6 40c0-8 6.5-12 14-12s14 4 14 12z" fill="#2b3a55"/>
-          <path d="M16.7 28 20 33.5l3.3-5.5z" fill="#ffffff"/>
-          <rect x="17.2" y="23" width="5.6" height="6" rx="2.8" fill="#e3a877"/>
-          <circle cx="20" cy="17.8" r="7.6" fill="#efb98c"/>
-          <path d="M12.4 16.8C12.4 10.3 16 7 20 7s7.6 3.3 7.6 9.8c0-2.3-1.7-4.4-7.6-4.4s-7.6 2.1-7.6 4.4z" fill="#3a2c20"/>
-          <circle cx="17.2" cy="18" r="1" fill="#4a3524"/><circle cx="22.8" cy="18" r="1" fill="#4a3524"/>
-          <path d="M17.6 21q2.4 1.6 4.8 0" stroke="#a76f47" stroke-width="1" fill="none" stroke-linecap="round"/>`;
+          <path d="M5.5 40c0-8.6 6.4-12.6 14.5-12.6S34.5 31.4 34.5 40Z" fill="#3f6f9e"/>
+          <path d="M16.6 27.6 20 33.2l3.4-5.6 -3.4-1z" fill="#f4f7fb"/>
+          <path d="M16.9 24.2h6.2v5.2h-6.2z" fill="#e6a878"/>
+          <ellipse cx="20" cy="18" rx="7.1" ry="7.9" fill="#efb98c"/>
+          <path d="M12.6 17C12.6 10.6 16 7.4 20 7.4s7.4 3.2 7.4 9.6c0-2.6-2.2-4.6-7.4-4.6s-7.4 2-7.4 4.6z" fill="#3a2c20"/>
+          <circle cx="17.3" cy="18.2" r=".95" fill="#42301f"/><circle cx="22.7" cy="18.2" r=".95" fill="#42301f"/>
+          <path d="M17.9 21.2q2.1 1.4 4.2 0" stroke="#a76f47" stroke-width="1" fill="none" stroke-linecap="round"/>`;
       } else {                        // SIN DATO
-        bg = "#e6ecf3";
         fig = `
-          <path d="M7 40c0-8 6-12 13-12s13 4 13 12z" fill="#94a3b8"/>
-          <circle cx="20" cy="17" r="7.4" fill="#cbd5e1"/>`;
+          <path d="M6.5 40c0-8.2 6-12.2 13.5-12.2S33.5 31.8 33.5 40Z" fill="#9aa7b6"/>
+          <circle cx="20" cy="17" r="7.3" fill="#c3cdd8"/>`;
       }
       return `<svg viewBox="0 0 40 40" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="display:block"><rect width="40" height="40" fill="${bg}"/>${fig}</svg>`;
     }
@@ -2763,10 +2765,10 @@
       const avSexo = esMujer ? "M" : (esHombre ? "H" : "");
       const mapaP = modo === "empresa" ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap;
       const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
-      const segunda = `🪪 <span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · 📅 ${esSup ? "Autoriz." : "Curso"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
+      const segunda = `<span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · ${esSup ? "Autoriz." : "Curso"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2 px-3 py-2 text-left"${rowStyle}>
       <span class="gNum text-[11px] w-4 flex-shrink-0 text-center">${i + 1}</span>
-      <span class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo)}</span>
+      <span class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo)}</span>
       <span class="flex-1 min-w-0">
         <span class="gName block text-sm truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
