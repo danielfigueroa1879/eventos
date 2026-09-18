@@ -724,31 +724,34 @@
     }
 
     /* Lista de guardias en celular: cada uno en su propia tarjeta blanca, separada,
-       redondeada y con sombra; el nombre en negro sobre blanco. */
-    .gCardWrap { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+       redondeada y con sombra; el nombre en negro sobre blanco. El área detrás de las
+       tarjetas lleva un fondo azul-gris claro. */
+    .gCardWrap { padding: 10px; display: flex; flex-direction: column; gap: 11px; background: #e9eff6; border-radius: 12px; }
     .filaMov {
       background: #fff;
-      border: 1px solid #eef2f7;
+      border: 1px solid #e8edf3;
       border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, .12), 0 1px 2px rgba(15, 23, 42, .06);
+      box-shadow: 0 3px 8px rgba(15, 23, 42, .12), 0 1px 2px rgba(15, 23, 42, .07);
       transition: transform .12s ease, box-shadow .12s ease;
     }
-    .filaMov:active { transform: scale(.99); box-shadow: 0 1px 2px rgba(15, 23, 42, .12); }
+    .filaMov:active { transform: scale(.99); box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
     .gNum {
-      font-weight: 800;
-      color: #64748b;
-      text-shadow: 0 1px 1px rgba(15, 23, 42, .18);
+      font-weight: 900;
+      font-size: 12.5px;
+      color: #334155;
+      text-shadow: 0 1px 1px rgba(15, 23, 42, .22);
     }
     .gName { color: #0f172a !important; font-weight: 700; }
-    .gChev { color: #cbd5e1; font-size: 1.55rem; line-height: 1; }
+    .gChev { color: #64748b; display: flex; align-items: center; }
+    html[data-theme="dark"] .gCardWrap { background: #1b2027; }
     html[data-theme="dark"] .filaMov {
       background: #232830;
       border-color: #343b45;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, .5);
     }
     html[data-theme="dark"] .gName { color: #f1f5f9 !important; }
-    html[data-theme="dark"] .gNum { color: #cbd5e1; }
-    html[data-theme="dark"] .gChev { color: #64748b; }
+    html[data-theme="dark"] .gNum { color: #e2e8f0; }
+    html[data-theme="dark"] .gChev { color: #94a3b8; }
 
     /* ===== Optimización para celulares pequeños y medianos (iPhone SE/mini, Android chicos) ===== */
     @media (max-width: 430px) {
@@ -2737,7 +2740,9 @@
     function vigenciaPill(v) {
       const txt = v.estado === "VIGENTE" ? "VIGENTE" : v.estado === "VENCIDO_CON_PRORROGA" ? "PRÓRROGA" : v.estado === "SIN_CURSO" ? "SIN CURSO" : "NO VIGENTE";
       const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
-      return `<span class="vigPill text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c}1a;color:${c};display:inline-flex;align-items:center;justify-content:center;min-width:84px">${txt}</span>`;
+      const ic = v.estado === "VIGENTE" ? "✓ " : "";
+      // Píldora de color sólido con letras blancas (VIGENTE verde, PRÓRROGA ámbar, resto rojo).
+      return `<span class="vigPill text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c};color:#fff;display:inline-flex;align-items:center;justify-content:center;min-width:84px">${ic}${txt}</span>`;
     }
     function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
@@ -2765,7 +2770,7 @@
       const avSexo = esMujer ? "M" : (esHombre ? "H" : "");
       const mapaP = modo === "empresa" ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap;
       const puestoNom = (a.puesto_id && mapaP) ? mapaP[a.puesto_id] : null;
-      const segunda = `<span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · ${esSup ? "Autoriz." : "Curso"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
+      const segunda = `<span data-copyrut="${esc(a.rut)}" role="button" class="font-mono underline decoration-dotted" title="Tocar para copiar el RUT">${esc(a.rut)}</span> · ${esSup ? "Autoriz." : "Examen"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}`;
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-2 px-3 py-2 text-left"${rowStyle}>
       <span class="gNum text-[11px] w-4 flex-shrink-0 text-center">${i + 1}</span>
       <span class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo)}</span>
@@ -2775,7 +2780,7 @@
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
       ${esSup ? `<span class="vigPill text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 text-center bg-sky-100 text-sky-800" style="min-width:84px">SUPERVISOR</span>` : vigenciaPill(v)}
-      <span class="gChev flex-shrink-0">›</span>
+      <span class="gChev flex-shrink-0"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
     </button>`;
     }
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
