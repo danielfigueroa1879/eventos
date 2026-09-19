@@ -3339,7 +3339,9 @@
     async function modalResumenFiestasPatrias() {
       openModal(`<div class="text-center py-10 text-slate-500">Calculando resumen…</div>`);
       try {
-        const eventos = (ADMIN_STATE.eventos || []).filter(e => !esPartido(e));
+        // Excluye los partidos de estadio y el "Show Teletón La Serena 2026" (no cuenta para el resumen).
+        const _norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+        const eventos = (ADMIN_STATE.eventos || []).filter(e => !esPartido(e) && !_norm(e.nombre_evento).includes("teleton"));
         if (!eventos.length) {
           openModal(`<div><h2 class="font-bold text-slate-800 mb-2">📊 Resumen Fiestas Patrias</h2><p class="text-slate-500 text-sm">No hay eventos para resumir (los partidos de estadio quedan excluidos).</p><button id="rfp_close" class="btn btn-ghost w-full mt-4">Cerrar</button></div>`);
           const b = $("#rfp_close"); if (b) b.addEventListener("click", closeModal);
@@ -3348,6 +3350,7 @@
         const listas = await Promise.all(eventos.map(e => Data.listAsistencias(e.id).catch(() => [])));
         const perDay = new Map();   // "YYYY-MM-DD" -> { g, s }
         const perEv = [];           // { nombre, g, s }
+        const vig = { VIGENTE: 0, VENCIDO_CON_PRORROGA: 0, VENCIDO_SIN_PRORROGA: 0, SIN_CURSO: 0 };
         let totG = 0, totS = 0;
         eventos.forEach((e, idx) => {
           let eg = 0, es = 0;
@@ -3356,12 +3359,26 @@
             if (!k) return;
             if (!perDay.has(k)) perDay.set(k, { g: 0, s: 0 });
             const d = perDay.get(k);
-            if (a.es_supervisor) { d.s++; es++; totS++; } else { d.g++; eg++; totG++; }
+            if (a.es_supervisor) { d.s++; es++; totS++; }
+            else {
+              d.g++; eg++; totG++;
+              const est = calcularVigencia(a.guardia && a.guardia.fecha_ultimo_examen).estado;
+              if (est in vig) vig[est]++; else vig.SIN_CURSO++;
+            }
           });
           perEv.push({ nombre: e.nombre_evento || "—", g: eg, s: es });
         });
         const dias = [...perDay.keys()].sort();   // ascendente: desde el primer día
-        ADMIN_STATE._rfp = { eventos, perDay, dias, perEv, totG, totS };
+        ADMIN_STATE._rfp = { eventos, perDay, dias, perEv, totG, totS, vig };
+        const chip = (label, val, bg, fg) => `<div class="rounded-lg px-1 py-2 text-center" style="background:${bg}"><div class="font-extrabold text-lg leading-none" style="color:${fg}">${val}</div><div class="text-[10px] font-semibold mt-1" style="color:${fg}">${label}</div></div>`;
+        const chips = `<div class="grid grid-cols-3 gap-2 mb-3">
+        ${chip("Guardias Total", totG, "#dbeafe", "#1e3a8a")}
+        ${chip("Vigentes", vig.VIGENTE, "#dcfce7", "#166534")}
+        ${chip("Prórroga", vig.VENCIDO_CON_PRORROGA, "#fef9c3", "#854d0e")}
+        ${chip("No vigente", vig.VENCIDO_SIN_PRORROGA, "#fee2e2", "#991b1b")}
+        ${chip("Sin curso", vig.SIN_CURSO, "#fee2e2", "#b91c1c")}
+        ${chip("Supervisores", totS, "#e0f2fe", "#075985")}
+      </div>`;
         const filasDia = dias.map((k, i) => {
           const d = perDay.get(k);
           return `<tr class="border-b border-slate-100"><td class="py-1.5 px-2 text-slate-400">${i + 1}</td><td class="py-1.5 px-2 whitespace-nowrap font-medium">${esc(fechaFmt(k))}</td><td class="py-1.5 px-2 text-right font-semibold">${d.g}</td><td class="py-1.5 px-2 text-right text-sky-700 font-semibold">${d.s}</td><td class="py-1.5 px-2 text-right font-bold">${d.g + d.s}</td></tr>`;
@@ -3371,7 +3388,8 @@
         <h2 class="font-bold text-slate-800 text-base">📊 Resumen Fiestas Patrias</h2>
         <button id="rfp_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
       </div>
-      <p class="text-xs text-slate-500 mb-3">Guardias y supervisores controlados por día (excluye los partidos de estadio). Total por día: cada ingreso cuenta.</p>
+      <p class="text-xs text-slate-500 mb-3">Guardias y supervisores controlados (excluye partidos de estadio y el Show Teletón). Total por día: cada ingreso cuenta.</p>
+      ${chips}
       <div class="overflow-x-auto rounded-lg border border-slate-200">
         <table class="w-full text-sm">
           <thead><tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide">
@@ -3400,9 +3418,18 @@
       const data = ADMIN_STATE._rfp;
       if (!data || !window.XLSX) { toast("No se pudo generar el Excel", false); return; }
       const gen = new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" });
+      const v = data.vig || { VIGENTE: 0, VENCIDO_CON_PRORROGA: 0, VENCIDO_SIN_PRORROGA: 0, SIN_CURSO: 0 };
       const aoa = [
         ["Resumen Fiestas Patrias — Guardias y supervisores controlados"],
-        ["Total por día (cada ingreso cuenta) · Excluye partidos de estadio · Generado " + gen],
+        ["Total por día (cada ingreso cuenta) · Excluye partidos de estadio y Show Teletón · Generado " + gen],
+        [],
+        ["DETALLE (guardias controlados)", ""],
+        ["Guardias Total", data.totG],
+        ["Vigentes", v.VIGENTE],
+        ["Prórroga", v.VENCIDO_CON_PRORROGA],
+        ["No vigente", v.VENCIDO_SIN_PRORROGA],
+        ["Sin curso", v.SIN_CURSO],
+        ["Supervisores", data.totS],
         [],
         ["Día", "Guardias", "Supervisores", "Total"],
       ];
