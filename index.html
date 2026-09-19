@@ -775,6 +775,20 @@
       -webkit-backdrop-filter: blur(5px);
       backdrop-filter: blur(5px);
     }
+
+    /* ===== Resaltado temporal de la fila del RUT consultado (al cerrar la consulta) ===== */
+    .rutFlash {
+      animation: rutFlash 2.4s ease-in-out;
+      border-radius: 10px;
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes rutFlash {
+      0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      15%  { box-shadow: 0 0 0 3px rgba(16, 185, 129, .85); }
+      70%  { box-shadow: 0 0 0 3px rgba(16, 185, 129, .55); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
   </style>
 </head>
 
@@ -2173,9 +2187,29 @@
         if (!el) return;
         e.stopPropagation(); e.preventDefault();
         const rut = el.getAttribute("data-copyrut") || "";
+        window._lastConsultRut = rut;   // recordar el último RUT consultado (para volver a él al cerrar la consulta)
         const ok = await copiarAlPortapapeles(rut);
         try { toast(ok ? ("RUT copiado: " + rut) : "No se pudo copiar el RUT", ok); } catch (_) {}
       }, true);
+    }
+    // Baja/lleva la pantalla a la fila del RUT indicado dentro de la lista visible y la resalta un momento.
+    if (!window.resaltarRutEnLista) {
+      window.resaltarRutEnLista = function (rut) {
+        const rl = String(rut || "").trim().toLowerCase();
+        if (!rl) return;
+        let fila = null;
+        document.querySelectorAll("[data-search]").forEach(el => {
+          if (fila || el.offsetParent === null) return;   // solo la fila visible (móvil o escritorio)
+          const ds = el.dataset.search || "";
+          if (ds.indexOf(rl) === 0 || ds.includes(rl)) fila = el;
+        });
+        if (!fila) return;
+        setTimeout(() => {
+          try { fila.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) { try { fila.scrollIntoView(); } catch (__) {} }
+          fila.classList.add("rutFlash");
+          setTimeout(() => fila.classList.remove("rutFlash"), 2400);
+        }, 140);
+      };
     }
     // Un solo manejador (en fase de captura) para que tocar el aviso lo quite y NO abra el detalle.
     if (!window._spdAvisoWired) {
@@ -4857,6 +4891,8 @@
         if (autoTimer) clearTimeout(autoTimer);
         restoreBody();
         win.remove();
+        // Al cerrar la consulta, volver a la fila del RUT consultado en la lista.
+        try { window.resaltarRutEnLista && window.resaltarRutEnLista(window._lastConsultRut); } catch (_) {}
       });
 
       // Arrastre desde la barra de titulo (mouse y touch unificados).
