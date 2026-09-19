@@ -581,6 +581,37 @@
       color: #7ee0a1;
     }
 
+    /* Lupa flotante "Consultar guardia": semi-transparente, siempre a mano arriba del chevron */
+    #lupaConsultaBtn {
+      position: fixed;
+      right: .7rem;
+      bottom: 7.35rem;                 /* justo arriba del botón "subir" (chevron) */
+      z-index: 55;                      /* debajo de modales (60) y ventana de consulta (70) */
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: 9999px;
+      display: none;                    /* solo visible en la vista admin */
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background: rgba(255, 255, 255, .55);
+      border: 1px solid rgba(15, 83, 35, .28);
+      color: #0f5323;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, .18);
+      opacity: .6;
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      transition: opacity .2s ease, transform .15s ease;
+    }
+    body.vista-admin #lupaConsultaBtn { display: flex; }
+    #lupaConsultaBtn:hover { opacity: 1; }
+    #lupaConsultaBtn:active { transform: scale(.92); opacity: 1; }
+    html[data-theme="dark"] #lupaConsultaBtn {
+      background: rgba(30, 34, 40, .55);
+      border-color: rgba(126, 224, 161, .35);
+      color: #7ee0a1;
+    }
+
     html[data-theme="dark"] .brand-bg {
       background: linear-gradient(135deg, #0a2e12 0%, #0e401b 55%, #114f24 100%)
     }
@@ -808,6 +839,9 @@
   <div id="toast" class="fixed bottom-16 left-1/2 -translate-x-1/2 z-50" style="display:none"></div>
   <button id="scrollTopBtn" type="button" aria-label="Subir al inicio" title="Subir">
     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+  </button>
+  <button id="lupaConsultaBtn" type="button" aria-label="Consultar guardia" title="Consultar guardia">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
   </button>
 
   <script>
@@ -1253,6 +1287,13 @@
       window.addEventListener("scroll", onScroll, { passive: true });
       btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
       onScroll();
+    })();
+
+    /* ---- Lupa flotante: abre la ventana "Consultar guardia" en cualquier momento ---- */
+    (function initLupaFlotante() {
+      const lupa = $("#lupaConsultaBtn");
+      if (!lupa) return;
+      lupa.addEventListener("click", () => { try { modalConsultarGuardia(); } catch (_) {} });
     })();
 
     function toast(msg, ok = true, ms = 3200) {
