@@ -3343,7 +3343,7 @@
         const _norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
         const eventos = (ADMIN_STATE.eventos || []).filter(e => !esPartido(e) && !_norm(e.nombre_evento).includes("teleton"));
         if (!eventos.length) {
-          openModal(`<div><h2 class="font-bold text-slate-800 mb-2">Resumen Fiestas Patrias</h2><p class="text-slate-500 text-sm">No hay eventos para resumir (los partidos de estadio quedan excluidos).</p><button id="rfp_close" class="btn btn-ghost w-full mt-4">Cerrar</button></div>`);
+          openModal(`<div><h2 class="font-bold text-slate-800 mb-2">Resumen Fiestas Patrias O.S.10 Coquimbo</h2><p class="text-slate-500 text-sm">No hay eventos para resumir (los partidos de estadio quedan excluidos).</p><button id="rfp_close" class="btn btn-ghost w-full mt-4">Cerrar</button></div>`);
           const b = $("#rfp_close"); if (b) b.addEventListener("click", closeModal);
           return;
         }
@@ -3385,7 +3385,7 @@
         }).join("");
         openModal(`
       <div class="flex items-center justify-between mb-3">
-        <h2 class="font-bold text-slate-800 text-base">Resumen Fiestas Patrias</h2>
+        <h2 class="font-bold text-slate-800 text-base">Resumen Fiestas Patrias O.S.10 Coquimbo</h2>
         <button id="rfp_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
       </div>
       <p class="text-xs text-slate-500 mb-3">Guardias y supervisores controlados. Total por día: cada ingreso cuenta.</p>
