@@ -1187,6 +1187,7 @@
         async createAsistencia(evId, rut, esSupervisor) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
         async setAsistenciaSupervisor(id, esSup) { const a = get(K.as); const r = a.find(x => x.id === id); if (r) { r.es_supervisor = !!esSup; set(K.as, a); ping(); } return r; },
         async setAsistenciaHora(id, iso) { const a = get(K.as); const r = a.find(x => x.id === id); if (r) { r.hora_ingreso = iso; set(K.as, a); ping(); } return r; },
+        async setAsistenciaRut(id, rut) { const a = get(K.as); const r = a.find(x => x.id === id); if (r) { r.rut = rut; set(K.as, a); ping(); } return r; },
         async deleteAsistencia(id) { set(K.as, get(K.as).filter(x => x.id !== id)); ping(); },
         async cerrarPartido(ev, asist) {
           const hid = uid();
@@ -1241,6 +1242,7 @@
         async createAsistencia(evId, rut, esSupervisor) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }).select().single()); },
         async setAsistenciaSupervisor(id, esSup) { ok(await sb.from("asistencias").update({ es_supervisor: !!esSup }).eq("id", id)); },
         async setAsistenciaHora(id, iso) { ok(await sb.from("asistencias").update({ hora_ingreso: iso }).eq("id", id)); },
+        async setAsistenciaRut(id, rut) { ok(await sb.from("asistencias").update({ rut }).eq("id", id)); },
         async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
         async cerrarPartido(ev, asist) {
           const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
@@ -5699,8 +5701,9 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       </div>` : "";
       openModal(`
     <h2 class="font-bold text-base text-slate-800 mb-0.5">Editar guardia${esSup ? ' <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle ml-1">🤵 SUPERVISOR</span>' : ''}</h2>
-    <p class="text-xs text-slate-400 mb-2">RUT: ${esc(a.rut)}</p>
     <div class="space-y-2">
+      <div><label class="text-xs font-semibold text-slate-600">RUT</label><input id="e_rut" class="fld fld-sm font-mono" inputmode="text" autocomplete="off" value="${esc(a.rut || "")}"/>
+        <p class="text-[11px] text-slate-400 mt-0.5">Corrige el RUT solo si se escribió mal.</p></div>
       <div><label class="text-xs font-semibold text-slate-600">Nombres</label><input id="e_nom" class="fld fld-sm" value="${esc(g.nombres || "")}"/></div>
       <div><label class="text-xs font-semibold text-slate-600">Apellidos</label><input id="e_ape" class="fld fld-sm" value="${esc(g.apellidos || "")}"/></div>
       <div class="grid grid-cols-2 gap-2">
@@ -5747,6 +5750,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       const _mo = $("#modal"); if (_mo) _mo.style.alignItems = "flex-start";
       $("#e_nom").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
       $("#e_ape").addEventListener("input", e => e.target.value = formatNombre(e.target.value));
+      { const rEl = $("#e_rut"); if (rEl) rEl.addEventListener("input", e => e.target.value = formatRut(e.target.value)); }
       // Al cambiar el rol, actualiza el rótulo de la fecha (supervisor = autorización; guardia = examen).
       $("#e_super").addEventListener("change", e => {
         const lbl = $("#e_fec_lbl");
@@ -5870,8 +5874,14 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const infracciones = existentes.concat(nuevas);
         const esInfractor = infracciones.length > 0;
         const prim = infracciones[infracciones.length - 1] || {};
+        // Corrección de RUT (solo si se escribió mal): valida y actualiza la ficha y la asistencia.
+        const rutOrig = a.rut;
+        const rutFinal = formatRut($("#e_rut") ? $("#e_rut").value : rutOrig) || rutOrig;
+        const rutCambio = rutFinal !== rutOrig;
+        if (rutCambio && !rutValido(rutFinal)) { toast("El RUT corregido no es válido", false); return; }
         try {
-          await Data.upsertGuardia({ rut: a.rut, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), sexo: $("#e_sexo").value || null, fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
+          await Data.upsertGuardia({ rut: rutFinal, nombres: formatNombre($("#e_nom").value).trim(), apellidos: formatNombre($("#e_ape").value).trim(), telefono: $("#e_tel").value.trim(), sexo: $("#e_sexo").value || null, fecha_ultimo_examen: fx || null, spd: $("#e_spd").checked, infractor: esInfractor, infracciones, infractor_tipo: esInfractor ? prim.tipo : null, infractor_motivo: esInfractor ? (prim.motivo || null) : null, infractor_fecha: esInfractor ? (prim.fecha || null) : null, infractor_lugar: esInfractor ? (prim.lugar || null) : null, aprobado: true, revision_tipo: null });
+          if (rutCambio && a.id) await Data.setAsistenciaRut(a.id, rutFinal);
           if (nuevoSup !== esSup && a.id) await Data.setAsistenciaSupervisor(a.id, nuevoSup);
           // Cambio de turno: si se eligió un turno distinto al actual, ajusta la hora de ingreso
           // para que el guardia quede clasificado en ese turno (ej: de Noche a Día).
@@ -5886,6 +5896,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
             }
           }
           closeModal(); refreshAdmin();
+          if (rutCambio) toast("RUT corregido: " + rutFinal, true);
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
     }
