@@ -3013,6 +3013,20 @@
           ? `<div class="text-xs font-bold text-amber-700">⚠ Pendiente: pedir la resolución de autorización</div>`
           : `<button id="dg_spd_ver" class="btn w-full text-white shadow-sm" style="background:#1b3a8f">✔ Resolución verificada</button>`)}
     </div>` : ""}
+    ${(!empresa && a.id && eventoUsaTurnos(ev)) ? (() => {
+      const ciclo = turnosDelCiclo(ev, a.hora_ingreso);
+      if (ciclo.length < 2) return "";
+      return `<div class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2">
+      <label class="text-xs font-semibold text-indigo-800 flex items-center gap-1 mb-1">🕑 Cambiar turno</label>
+      <div class="flex gap-2">
+        <select id="dg_turno" class="fld fld-sm flex-1">
+          ${ciclo.map(t => `<option value="${t.clave}" ${t.actual ? "selected" : ""}>${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)}</option>`).join("")}
+        </select>
+        <button id="dg_turno_ok" class="btn btn-p text-sm px-3 flex-shrink-0">Cambiar</button>
+      </div>
+      <p class="text-[11px] text-slate-500 mt-1">Pasa al guardia de un turno a otro (ej: de Noche a Día).</p>
+    </div>`;
+    })() : ""}
     ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
       <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
@@ -3020,6 +3034,24 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
+      // Admin: cambiar el turno del guardia (ej: de Noche a Día) ajustando la hora de ingreso.
+      if (!empresa && a.id && eventoUsaTurnos(ev)) {
+        const selT = $("#dg_turno"), btnT = $("#dg_turno_ok");
+        if (selT && btnT) btnT.addEventListener("click", async () => {
+          const ciclo = turnosDelCiclo(ev, a.hora_ingreso);
+          const dest = ciclo.find(t => String(t.clave) === selT.value);
+          if (!dest) { closeModal(); return; }
+          if (dest.actual) { toast("El guardia ya está en ese turno", false); return; }
+          try {
+            const now = Date.now();
+            const dentro = now >= dest.inicio.getTime() && now < dest.fin.getTime();
+            const ts = dentro ? now : dest.inicio.getTime() + 60000; // dentro de la ventana del turno destino
+            await Data.setAsistenciaHora(a.id, new Date(ts).toISOString());
+            closeModal(); refreshAdmin();
+            toast("Turno cambiado a " + dest.etiqueta, true);
+          } catch (err) { toast("Error: " + (err.message || err), false); }
+        });
+      }
       // Tocar la facción en el detalle abre el mapa en ese puesto (edición completa en admin y empresa).
       const gotoP = document.querySelector("#modalBox [data-goto-puesto]");
       if (gotoP) gotoP.addEventListener("click", () => { const pid = gotoP.dataset.gotoPuesto; closeModal(); abrirDistribucion(ev, { focusPuestoId: pid }); });
