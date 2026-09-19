@@ -5881,6 +5881,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
             <span class="flex items-center gap-1.5">
               <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${contarHM(filasG).h} <span class="text-slate-400 font-normal">H</span></span>
               <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${contarHM(filasG).m} <span class="text-slate-400 font-normal">M</span></span>
+              ${themeBtnHTML("themeBtnEmp")}
             </span>
           </div>
           <div class="flex items-center justify-between gap-2 flex-wrap mt-2">
@@ -5952,6 +5953,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         // Los turnos anteriores se descargan desde la carpeta 📁 Historial.
         if ($("#empXls")) $("#empXls").addEventListener("click", () => descargarExcel(ev, asistActiva));
         if ($("#empPdf")) $("#empPdf").addEventListener("click", () => descargarPDF(ev, asistActiva));
+        bindThemeToggle($("#themeBtnEmp")); // botón día/noche junto a los chips H/M (vista empresa)
         // Carpeta Historial (dentro del QR): abre los turnos anteriores para ver/descargar.
         if ($("#empHist")) $("#empHist").addEventListener("click", () => modalHistorialTurnos(ev));
       };
