@@ -1843,7 +1843,7 @@
       </div>
       <div class="p-3">
         <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
-        <button id="resumenFP" class="btn btn-ghost w-full mb-2 text-sm font-bold" style="border:1.5px solid #0f5323;color:#0f5323" title="Resumen de guardias y supervisores controlados por día en los eventos de Fiestas Patrias (excluye los partidos de estadio)">📊 Resumen Fiestas Patrias</button>
+        <button id="resumenFP" class="btn btn-ghost w-full mb-2 text-sm font-bold" style="border:1.5px solid #0f5323;color:#0f5323" title="Resumen de guardias y supervisores controlados por día en los eventos de Fiestas Patrias (excluye los partidos de estadio)">Resumen Fiestas Patrias</button>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
         <div class="flex items-center justify-between px-1 mb-1.5">
           <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
@@ -3343,7 +3343,7 @@
         const _norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
         const eventos = (ADMIN_STATE.eventos || []).filter(e => !esPartido(e) && !_norm(e.nombre_evento).includes("teleton"));
         if (!eventos.length) {
-          openModal(`<div><h2 class="font-bold text-slate-800 mb-2">📊 Resumen Fiestas Patrias</h2><p class="text-slate-500 text-sm">No hay eventos para resumir (los partidos de estadio quedan excluidos).</p><button id="rfp_close" class="btn btn-ghost w-full mt-4">Cerrar</button></div>`);
+          openModal(`<div><h2 class="font-bold text-slate-800 mb-2">Resumen Fiestas Patrias</h2><p class="text-slate-500 text-sm">No hay eventos para resumir (los partidos de estadio quedan excluidos).</p><button id="rfp_close" class="btn btn-ghost w-full mt-4">Cerrar</button></div>`);
           const b = $("#rfp_close"); if (b) b.addEventListener("click", closeModal);
           return;
         }
@@ -3385,7 +3385,7 @@
         }).join("");
         openModal(`
       <div class="flex items-center justify-between mb-3">
-        <h2 class="font-bold text-slate-800 text-base">📊 Resumen Fiestas Patrias</h2>
+        <h2 class="font-bold text-slate-800 text-base">Resumen Fiestas Patrias</h2>
         <button id="rfp_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
       </div>
       <p class="text-xs text-slate-500 mb-3">Guardias y supervisores controlados. Total por día: cada ingreso cuenta.</p>
