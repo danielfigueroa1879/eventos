@@ -998,8 +998,15 @@
       if (!rec || !rec.hora_ingreso) return false;
       const t = new Date(rec.hora_ingreso).getTime();
       if (isNaN(t)) return false;
-      const tn = calcularTurno(rec.hora_ingreso, ev);
-      if (tn) return Date.now() <= tn.fin.getTime() + GRACIA_TURNO_MS;
+      // Eventos con turnos (no partidos): bloquea SOLO si el registro anterior es del MISMO turno
+      // que el vigente ahora. Así, un guardia que ya hizo el turno Día puede volver a ingresar en
+      // el turno Noche (o el siguiente). Dentro del mismo turno sigue evitando el doble registro.
+      if (!esPartido(ev) && eventoUsaTurnos(ev)) {
+        const tPrev = calcularTurno(rec.hora_ingreso, ev);
+        const tNow = calcularTurno(new Date().toISOString(), ev);
+        if (tPrev && tNow) return tPrev.clave === tNow.clave;
+      }
+      // Partidos y eventos sin turnos: mantiene el bloqueo por 2 h (evita el doble registro inmediato).
       return (Date.now() - t) <= GRACIA_TURNO_MS;
     }
 
