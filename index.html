@@ -581,12 +581,12 @@
       color: #7ee0a1;
     }
 
-    /* Lupa flotante "Consultar guardia": semi-transparente, siempre a mano arriba del chevron */
+    /* Lupa flotante "Consultar guardia": azul con lupa blanca, siempre a mano arriba del chevron */
     #lupaConsultaBtn {
       position: fixed;
       right: .7rem;
       bottom: 7.35rem;                 /* justo arriba del botón "subir" (chevron) */
-      z-index: 55;                      /* debajo de modales (60) y ventana de consulta (70) */
+      z-index: 72;                      /* sobre la ventana de consulta (70): sigue visible al consultar */
       width: 2.6rem;
       height: 2.6rem;
       border-radius: 9999px;
@@ -594,22 +594,20 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      background: rgba(255, 255, 255, .55);
-      border: 1px solid rgba(15, 83, 35, .28);
-      color: #0f5323;
-      box-shadow: 0 3px 10px rgba(15, 23, 42, .18);
-      opacity: .6;
-      -webkit-backdrop-filter: blur(4px);
-      backdrop-filter: blur(4px);
-      transition: opacity .2s ease, transform .15s ease;
+      background: #1d4ed8;               /* azul */
+      border: 1px solid rgba(255, 255, 255, .55);
+      color: #ffffff;                    /* lupa blanca */
+      box-shadow: 0 4px 12px rgba(29, 78, 216, .40);
+      opacity: .96;
+      transition: opacity .2s ease, transform .15s ease, background .2s ease;
     }
     body.vista-admin #lupaConsultaBtn { display: flex; }
-    #lupaConsultaBtn:hover { opacity: 1; }
+    #lupaConsultaBtn:hover { opacity: 1; background: #1e40af; }
     #lupaConsultaBtn:active { transform: scale(.92); opacity: 1; }
     html[data-theme="dark"] #lupaConsultaBtn {
-      background: rgba(30, 34, 40, .55);
-      border-color: rgba(126, 224, 161, .35);
-      color: #7ee0a1;
+      background: #2563eb;
+      border-color: rgba(255, 255, 255, .35);
+      color: #ffffff;
     }
 
     html[data-theme="dark"] .brand-bg {
@@ -1326,10 +1324,12 @@
       const c = err && (err.code || ""); const m = ((err && (err.message || err.details)) || "").toLowerCase();
       return c === "23505" || m.includes("duplicate") || m.includes("unique") || m.includes("ya registrad");
     }
-    function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; const mo = $("#modal"); mo.style.alignItems = ""; mo.style.display = "flex"; }
+    // Oculta/mostrar la lupa flotante mientras hay un modal abierto (no debe tapar el modal).
+    function lupaFlotante(mostrar) { const l = $("#lupaConsultaBtn"); if (l) l.style.display = mostrar ? "" : "none"; }
+    function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; const mo = $("#modal"); mo.style.alignItems = ""; mo.style.display = "flex"; lupaFlotante(false); }
     // Modal ancho (para tablas tipo escritorio); en celular ocupa todo el ancho disponible.
-    function openModalWide(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
-    function closeModal() { $("#modal").style.display = "none"; }
+    function openModalWide(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; lupaFlotante(false); }
+    function closeModal() { $("#modal").style.display = "none"; lupaFlotante(true); }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
     function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }); }
@@ -2817,10 +2817,13 @@
     }
     function vigenciaPill(v) {
       const txt = v.estado === "VIGENTE" ? "VIGENTE" : v.estado === "VENCIDO_CON_PRORROGA" ? "PRÓRROGA" : v.estado === "SIN_CURSO" ? "SIN CURSO" : "NO VIGENTE";
-      const c = VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO;
       const ic = v.estado === "VIGENTE" ? "✓ " : "";
-      // Píldora de color sólido con letras blancas (VIGENTE verde, PRÓRROGA ámbar, resto rojo).
-      return `<span class="vigPill text-[10px] font-bold px-1 py-[6px] rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${c};color:#fff;display:inline-flex;align-items:center;justify-content:center;min-width:78px">${ic}${txt}</span>`;
+      // PRÓRROGA usa el MISMO color que en PC (badge ámbar claro con texto oscuro).
+      // El resto son píldoras de color sólido con letras blancas (VIGENTE verde, resto rojo).
+      const esProrroga = v.estado === "VENCIDO_CON_PRORROGA";
+      const bg = esProrroga ? "#fef9c3" : (VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO);
+      const fg = esProrroga ? "#854d0e" : "#fff";
+      return `<span class="vigPill text-[10px] font-bold px-1 py-[6px] rounded-full whitespace-nowrap flex-shrink-0 text-center" style="background:${bg};color:${fg};display:inline-flex;align-items:center;justify-content:center;min-width:78px">${ic}${txt}</span>`;
     }
     function filaMovil(a, i, ev, rutCount, nomCount, modo) {
       const g = a.guardia || {};
