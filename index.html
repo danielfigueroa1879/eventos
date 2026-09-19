@@ -555,30 +555,31 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      background: rgba(255, 255, 255, .94);
-      border: 1px solid rgba(100, 116, 139, .28);
-      color: #0f5323;
-      box-shadow: 0 3px 10px rgba(15, 23, 42, .22);
+      background: #1d4ed8;               /* azul, igual que la lupa */
+      border: 1px solid rgba(255, 255, 255, .55);
+      color: #ffffff;                    /* flecha blanca */
+      box-shadow: 0 4px 12px rgba(29, 78, 216, .40);
       opacity: 0;
       transform: translateY(8px);
       pointer-events: none;
-      transition: opacity .2s ease, transform .2s ease;
+      transition: opacity .2s ease, transform .2s ease, background .2s ease;
       -webkit-backdrop-filter: blur(4px);
       backdrop-filter: blur(4px);
     }
 
     #scrollTopBtn.show {
-      opacity: .95;
+      opacity: .7;                       /* semi-transparente */
       transform: translateY(0);
       pointer-events: auto;
     }
 
-    #scrollTopBtn:active { transform: scale(.92) }
+    #scrollTopBtn:hover { opacity: 1; background: #1e40af; }
+    #scrollTopBtn:active { transform: scale(.92); opacity: 1; }
 
     html[data-theme="dark"] #scrollTopBtn {
-      background: rgba(30, 34, 40, .94);
-      border-color: rgba(148, 163, 184, .3);
-      color: #7ee0a1;
+      background: #2563eb;
+      border-color: rgba(255, 255, 255, .35);
+      color: #ffffff;
     }
 
     /* Lupa flotante "Consultar guardia": azul con lupa blanca, siempre a mano arriba del chevron */
@@ -598,7 +599,9 @@
       border: 1px solid rgba(255, 255, 255, .55);
       color: #ffffff;                    /* lupa blanca */
       box-shadow: 0 4px 12px rgba(29, 78, 216, .40);
-      opacity: .96;
+      opacity: .7;                       /* semi-transparente, igual que el chevron */
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
       transition: opacity .2s ease, transform .15s ease, background .2s ease;
     }
     body.vista-admin #lupaConsultaBtn { display: flex; }
