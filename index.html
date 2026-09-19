@@ -1843,6 +1843,7 @@
       </div>
       <div class="p-3">
         <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
+        <button id="resumenFP" class="btn btn-ghost w-full mb-2 text-sm font-bold" style="border:1.5px solid #0f5323;color:#0f5323" title="Resumen de guardias y supervisores controlados por día en los eventos de Fiestas Patrias (excluye los partidos de estadio)">📊 Resumen Fiestas Patrias</button>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
         <div class="flex items-center justify-between px-1 mb-1.5">
           <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
@@ -1861,6 +1862,7 @@
   </div>`;
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
+      $("#resumenFP").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalResumenFiestasPatrias(); });
       $("#importar").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalImportar(); });
       $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); route(); });
       const hamb = $("#hamb"), sidebar = $("#sidebar"), drawerBk = $("#drawerBk"), cerrarMenu = $("#cerrarMenu");
@@ -3323,6 +3325,98 @@
       // Excel real (.xlsx); si la librería no cargó, respaldo al .xls con formato.
       const f = xlsxFileListado(ev, asist);
       descargarArchivo(f || xlsFile(ev, asist));
+    }
+
+    // ===== Resumen de guardias/supervisores controlados en eventos de Fiestas Patrias =====
+    // Excluye los partidos de estadio (tipo 'partido'). Conteo TOTAL por día: cada ingreso suma.
+    function diaKeyLocal(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), da = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${da}`;
+    }
+    async function modalResumenFiestasPatrias() {
+      openModal(`<div class="text-center py-10 text-slate-500">Calculando resumen…</div>`);
+      try {
+        const eventos = (ADMIN_STATE.eventos || []).filter(e => !esPartido(e));
+        if (!eventos.length) {
+          openModal(`<div><h2 class="font-bold text-slate-800 mb-2">📊 Resumen Fiestas Patrias</h2><p class="text-slate-500 text-sm">No hay eventos para resumir (los partidos de estadio quedan excluidos).</p><button id="rfp_close" class="btn btn-ghost w-full mt-4">Cerrar</button></div>`);
+          const b = $("#rfp_close"); if (b) b.addEventListener("click", closeModal);
+          return;
+        }
+        const listas = await Promise.all(eventos.map(e => Data.listAsistencias(e.id).catch(() => [])));
+        const perDay = new Map();   // "YYYY-MM-DD" -> { g, s }
+        const perEv = [];           // { nombre, g, s }
+        let totG = 0, totS = 0;
+        eventos.forEach((e, idx) => {
+          let eg = 0, es = 0;
+          (listas[idx] || []).forEach(a => {
+            const k = diaKeyLocal(a.hora_ingreso);
+            if (!k) return;
+            if (!perDay.has(k)) perDay.set(k, { g: 0, s: 0 });
+            const d = perDay.get(k);
+            if (a.es_supervisor) { d.s++; es++; totS++; } else { d.g++; eg++; totG++; }
+          });
+          perEv.push({ nombre: e.nombre_evento || "—", g: eg, s: es });
+        });
+        const dias = [...perDay.keys()].sort();   // ascendente: desde el primer día
+        ADMIN_STATE._rfp = { eventos, perDay, dias, perEv, totG, totS };
+        const filasDia = dias.map((k, i) => {
+          const d = perDay.get(k);
+          return `<tr class="border-b border-slate-100"><td class="py-1.5 px-2 text-slate-400">${i + 1}</td><td class="py-1.5 px-2 whitespace-nowrap font-medium">${esc(fechaFmt(k))}</td><td class="py-1.5 px-2 text-right font-semibold">${d.g}</td><td class="py-1.5 px-2 text-right text-sky-700 font-semibold">${d.s}</td><td class="py-1.5 px-2 text-right font-bold">${d.g + d.s}</td></tr>`;
+        }).join("");
+        openModal(`
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-bold text-slate-800 text-base">📊 Resumen Fiestas Patrias</h2>
+        <button id="rfp_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+      </div>
+      <p class="text-xs text-slate-500 mb-3">Guardias y supervisores controlados por día (excluye los partidos de estadio). Total por día: cada ingreso cuenta.</p>
+      <div class="overflow-x-auto rounded-lg border border-slate-200">
+        <table class="w-full text-sm">
+          <thead><tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide">
+            <th class="py-2 px-2 text-left">#</th><th class="py-2 px-2 text-left">Día</th>
+            <th class="py-2 px-2 text-right">Guardias</th><th class="py-2 px-2 text-right">Superv.</th><th class="py-2 px-2 text-right">Total</th>
+          </tr></thead>
+          <tbody>${filasDia || `<tr><td colspan="5" class="py-3 px-2 text-center text-slate-400">Sin ingresos registrados.</td></tr>`}</tbody>
+          <tfoot><tr class="bg-slate-100 font-bold text-slate-800"><td class="py-2 px-2" colspan="2">TOTAL</td><td class="py-2 px-2 text-right">${totG}</td><td class="py-2 px-2 text-right text-sky-800">${totS}</td><td class="py-2 px-2 text-right">${totG + totS}</td></tr></tfoot>
+        </table>
+      </div>
+      <div class="text-[11px] text-slate-400 mt-2">Eventos incluidos (${eventos.length}): ${esc(eventos.map(e => e.nombre_evento).join(" · "))}</div>
+      <div class="flex gap-2 mt-4">
+        <button id="rfp_xls" class="btn flex-1 text-white font-bold" style="background:#0f5323;border-color:#0f5323">📊 Descargar Excel</button>
+        <button id="rfp_close" class="btn btn-ghost flex-1">Cerrar</button>
+      </div>`);
+        $("#rfp_x").addEventListener("click", closeModal);
+        $("#rfp_close").addEventListener("click", closeModal);
+        $("#rfp_xls").addEventListener("click", descargarResumenFiestasPatrias);
+      } catch (err) {
+        console.error(err);
+        openModal(`<div><h2 class="font-bold text-red-700 mb-2">Error</h2><p class="text-slate-600 text-sm">No se pudo generar el resumen: ${esc(err.message || String(err))}</p><button id="rfp_close" class="btn btn-ghost w-full mt-4">Cerrar</button></div>`);
+        const b = $("#rfp_close"); if (b) b.addEventListener("click", closeModal);
+      }
+    }
+    function descargarResumenFiestasPatrias() {
+      const data = ADMIN_STATE._rfp;
+      if (!data || !window.XLSX) { toast("No se pudo generar el Excel", false); return; }
+      const gen = new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" });
+      const aoa = [
+        ["Resumen Fiestas Patrias — Guardias y supervisores controlados"],
+        ["Total por día (cada ingreso cuenta) · Excluye partidos de estadio · Generado " + gen],
+        [],
+        ["Día", "Guardias", "Supervisores", "Total"],
+      ];
+      data.dias.forEach(k => { const d = data.perDay.get(k); aoa.push([fechaFmt(k), d.g, d.s, d.g + d.s]); });
+      aoa.push(["TOTAL", data.totG, data.totS, data.totG + data.totS]);
+      aoa.push([]);
+      aoa.push([`Eventos incluidos (${data.eventos.length})`, "Guardias", "Supervisores", "Total"]);
+      data.perEv.forEach(e => aoa.push([e.nombre, e.g, e.s, e.g + e.s]));
+      const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [{ wch: 34 }, { wch: 12 }, { wch: 14 }, { wch: 10 }];
+      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }];
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "Fiestas Patrias");
+      descargarArchivo(xlsxToFile(wb, "Resumen-Fiestas-Patrias.xlsx"));
     }
 
     // --- Excel de TODOS los eventos (en el orden del panel) con los datos de la empresa ---
