@@ -1353,7 +1353,13 @@
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
-    function horaFmt(iso) { const d = new Date(iso); return d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }); }
+    // Fecha y hora del ingreso SIEMPRE en 24 h (ej: 21:30), sin AM/PM. Se arma a mano para no
+    // depender del locale del dispositivo (en algunos iPhone toLocaleString mostraba "9:30 p. m.").
+    function horaFmt(iso) {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "";
+      return pad2(d.getDate()) + "-" + pad2(d.getMonth() + 1) + "-" + d.getFullYear() + ", " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+    }
     // Fecha en formato día/mes/año (acepta 'YYYY-MM-DD' o 'YYYY-MM-DDT...')
     function fechaFmt(s) { if (!s) return "—"; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s)); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s); }
     // Formatea la fecha de vencimiento (objeto Date que devuelve calcularVigencia) como dd/mm/aaaa.
