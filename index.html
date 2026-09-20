@@ -2892,7 +2892,8 @@
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
-      const dobleT = (modo !== "empresa" && ADMIN_STATE._dobleTurno && ADMIN_STATE._dobleTurno.has(a.rut)) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
+      const _dtSet = modo === "empresa" ? EMPRESA_STATE._dobleTurno : ADMIN_STATE._dobleTurno;
+      const dobleT = (_dtSet && _dtSet.has(a.rut)) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
       const rowStyle = '';
@@ -2935,6 +2936,7 @@
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
+      const dobleT = (EMPRESA_STATE._dobleTurno && EMPRESA_STATE._dobleTurno.has(a.rut)) ? ` <span class="badge" style="background:#ede9fe;color:#6d28d9;font-weight:bold" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
@@ -2946,7 +2948,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${nomClsE}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}</td>
+        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${nomClsE}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}${dobleT}</td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -6080,6 +6082,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
       const paint = async () => {
         let asist = []; try { asist = await Data.listAsistencias(ev.id); } catch (e) { }
+        EMPRESA_STATE._dobleTurno = rutsDobleTurnoHoy(asist, ev);   // RUT con doble turno hoy (empresa)
         // Mapa puesto_id -> nombre de la faccion, para la columna "Distribución" (igual que el admin).
         try { const ps = {}; (await Data.listPuestos(ev.id)).forEach(p => { ps[p.id] = p.nombre; }); EMPRESA_STATE._puestosMap = ps; } catch (_) { EMPRESA_STATE._puestosMap = {}; }
         // Supervisores en su propio listado, no se mezclan con los guardias.
