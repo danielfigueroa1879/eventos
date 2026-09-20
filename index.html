@@ -5243,8 +5243,29 @@
         cctv_cant: saved.cctv_cant || "01",
 
         personal_os10: saved.personal_os10 || "Sgto. 1ro. Daniel Figueroa Chacama.",
-        estado: saved.estado || "Sin novedad."
+        estado: saved.estado || "Sin novedad.",
+
+        // --- Datos para el formato narrativo "Cuenta al Coronel" ---
+        som_nombre: saved.som_nombre || "Luis Sáez Toledo",
+        organizador_nombre: saved.organizador_nombre || "",
+        organizador_rut: saved.organizador_rut || "",
+        coronel_venue: saved.coronel_venue || (ev.direccion || ev.nombre_evento || ""),
+        coronel_direccion: saved.coronel_direccion || [ev.direccion, ev.comuna].filter(Boolean).join(", ")
       };
+      let formatoInforme = saved.formato || "estructurado"; // "estructurado" | "coronel"
+
+      // Observaciones (infracciones / detenciones) tomadas de la asistencia real del evento.
+      function observacionesTexto() {
+        const conObs = (asist || []).filter(a => tieneFicha(a.guardia));
+        if (!conObs.length) return "Sin Observaciones.";
+        const partes = conObs.map(a => {
+          const g = a.guardia || {};
+          const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut;
+          const fr = getInfracciones(g).map(r => recFrase(r)).join("; ");
+          return `${nom} (${a.rut}): ${fr}`;
+        });
+        return "Con Observaciones: " + partes.join(" / ") + ".";
+      }
 
       function obtenerSaludoHorario() {
         const h = new Date().getHours();
@@ -5253,9 +5274,23 @@
         return "Buenas noches";
       }
 
+      // Formato narrativo para "cuenta al Coronel" (un párrafo por evento, estilo oficio).
+      function buildTextCoronel() {
+        const nSup = parseInt(state.supervisores, 10) || 0;
+        const supTxt = nSup === 1 ? "01 Supervisor" : String(nSup).padStart(2, "0") + " Supervisores";
+        const org = (state.organizador_nombre || "").trim();
+        const orgTxt = org ? `organizado por la Empresa ${org}${state.organizador_rut ? `, RUT ${state.organizador_rut}` : ""}, que requirió los servicios de Seguridad Privada a la ` : "con servicios de Seguridad Privada de la ";
+        const venue = (state.coronel_venue || "").trim();
+        const dir = (state.coronel_direccion || "").trim();
+        const lugarTxt = venue ? `realizada en ${venue}${dir ? `, ubicado ${dir}` : ""}` : (dir ? `ubicada en ${dir}` : "");
+        const resTxt = state.ddff_num ? `, autorizado mediante Resolución ${state.ddff_num}${state.ddff_fecha ? `, de fecha ${state.ddff_fecha}` : ""}` : "";
+        const cuerpo = `${state.partido_o_nombre}${lugarTxt ? ", " + lugarTxt : ""}, ${orgTxt}Empresa de RR.HH. "${state.empresa_nombre}"${state.empresa_rut ? `, RUT ${state.empresa_rut}` : ""}${resTxt}, quienes mantienen ${state.total_ggss} GG.SS, y ${supTxt}, ${observacionesTexto()}`;
+        return `El S.O.M. ${state.som_nombre} acompañado del ${state.personal_os10}\n\n${cuerpo}`;
+      }
       function buildText() {
+        if (formatoInforme === "coronel") return buildTextCoronel();
         const saludo = obtenerSaludoHorario();
-        const header = isPart 
+        const header = isPart
           ? "*🏟️ INFORME ESTADIO*" 
           : `*🎪 INFORME EVENTO: ${state.partido_o_nombre}*`;
 
@@ -5323,6 +5358,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
               <span id="pdfUploadLabel">Autocompletar PDF</span>
             </label>
+          </div>
+
+          <div class="flex gap-2 mb-2">
+            <button type="button" id="fmt_estructurado" class="btn flex-1 py-2 text-xs font-bold rounded-xl">Estructurado</button>
+            <button type="button" id="fmt_coronel" class="btn flex-1 py-2 text-xs font-bold rounded-xl">Cuenta al Coronel</button>
           </div>
 
           <div class="relative">
@@ -5398,6 +5438,15 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
               <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">🚔 Personal OS.10</div>
               <div><label class="font-medium text-slate-600">Personal OS.10 a Cargo</label><input id="r_os10" class="fld text-xs py-1" value="${esc(state.personal_os10)}"/></div>
               <div><label class="font-medium text-slate-600">Estado del Evento</label><input id="r_estado" class="fld text-xs py-1" value="${esc(state.estado)}"/></div>
+
+              <div class="font-semibold text-slate-800 text-xs text-indigo-700 pt-1">🎖️ Cuenta al Coronel <span class="font-normal text-slate-400">(formato narrativo)</span></div>
+              <div><label class="font-medium text-slate-600">S.O.M. a cargo</label><input id="r_som" class="fld text-xs py-1" value="${esc(state.som_nombre)}"/></div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="font-medium text-slate-600">Organizador (Empresa)</label><input id="r_org_nom" class="fld text-xs py-1" value="${esc(state.organizador_nombre)}"/></div>
+                <div><label class="font-medium text-slate-600">RUT Organizador</label><input id="r_org_rut" class="fld text-xs py-1" value="${esc(state.organizador_rut)}"/></div>
+              </div>
+              <div><label class="font-medium text-slate-600">Realizada en (recinto)</label><input id="r_venue" class="fld text-xs py-1" value="${esc(state.coronel_venue)}"/></div>
+              <div><label class="font-medium text-slate-600">Dirección</label><input id="r_direccion" class="fld text-xs py-1" value="${esc(state.coronel_direccion)}"/></div>
             </div>
           </details>
 
@@ -5443,8 +5492,28 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         state.personal_os10 = $("#r_os10").value.trim();
         state.estado = $("#r_estado").value.trim();
 
+        { const e = $("#r_som"); if (e) state.som_nombre = e.value.trim(); }
+        { const e = $("#r_org_nom"); if (e) state.organizador_nombre = e.value.trim(); }
+        { const e = $("#r_org_rut"); if (e) state.organizador_rut = e.value.trim(); }
+        { const e = $("#r_venue"); if (e) state.coronel_venue = e.value.trim(); }
+        { const e = $("#r_direccion"); if (e) state.coronel_direccion = e.value.trim(); }
+        state.formato = formatoInforme;
+
         prev.value = buildText();
       };
+
+      // Botones para alternar el formato del informe (estructurado / narrativo al Coronel).
+      const pintarToggle = () => {
+        const bE = $("#fmt_estructurado"), bC = $("#fmt_coronel");
+        const on = "bg-emerald-600 text-white", off = "btn-ghost";
+        if (bE) bE.className = "btn flex-1 py-2 text-xs font-bold rounded-xl " + (formatoInforme === "coronel" ? off : on);
+        if (bC) bC.className = "btn flex-1 py-2 text-xs font-bold rounded-xl " + (formatoInforme === "coronel" ? on : off);
+      };
+      { const bE = $("#fmt_estructurado"), bC = $("#fmt_coronel");
+        if (bE) bE.addEventListener("click", () => { formatoInforme = "estructurado"; pintarToggle(); updatePreview(); });
+        if (bC) bC.addEventListener("click", () => { formatoInforme = "coronel"; pintarToggle(); updatePreview(); });
+      }
+      pintarToggle();
 
       prev.value = buildText();
 
@@ -5452,7 +5521,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         "r_fecha", "r_hora", "r_partido", "r_lugar", "r_res_num", "r_res_fecha", "r_res_entidad",
         "r_cat", "r_aforo", "r_metales", "r_amb", "r_emp_nom", "r_emp_rut", "r_ddff_num", "r_ddff_fecha",
         "r_rep_nom", "r_rep_rut", "r_jefe_nom", "r_jefe_rut", "r_total_ggss", "r_hombres", "r_mujeres",
-        "r_supervisores", "r_jefe_cant", "r_cctv_cant", "r_os10", "r_estado"
+        "r_supervisores", "r_jefe_cant", "r_cctv_cant", "r_os10", "r_estado",
+        "r_som", "r_org_nom", "r_org_rut", "r_venue", "r_direccion"
       ];
       inputs.forEach(id => {
         const el = $("#" + id);
