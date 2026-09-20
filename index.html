@@ -1052,6 +1052,24 @@
       return arr;
     }
 
+    // Conjunto de RUT que hicieron DOBLE TURNO en el ciclo vigente (ej: turno Día y luego Noche
+    // el mismo día). Se usa solo en la vista admin para marcar "(Doble turno)" junto al nombre.
+    function rutsDobleTurnoHoy(asist, ev) {
+      const set = new Set();
+      if (!eventoUsaTurnos(ev)) return set;
+      const ciclo = turnosDelCiclo(ev, new Date().toISOString());
+      if (ciclo.length < 2) return set;
+      const clavesCiclo = new Set(ciclo.map(t => t.clave));
+      const porRut = {};   // rut -> Set de claves de turno (dentro del ciclo vigente)
+      (asist || []).forEach(a => {
+        const tn = calcularTurno(a.hora_ingreso, ev);
+        if (!tn || !clavesCiclo.has(tn.clave)) return;
+        (porRut[a.rut] = porRut[a.rut] || new Set()).add(tn.clave);
+      });
+      Object.keys(porRut).forEach(rut => { if (porRut[rut].size >= 2) set.add(rut); });
+      return set;
+    }
+
     // Descripción legible de la configuración de turnos de un evento.
     function turnoConfigTexto(ev) {
       let H = parseFloat(ev && ev.turno_horas); if (!(H > 0)) H = TURNO_HORAS_DEFAULT;
@@ -2301,6 +2319,7 @@
       const ev = ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected);
       if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>${ADMIN_STATE.eventos.length ? "Selecciona un evento de la lista para ver el detalle." : "Crea un evento para comenzar."}</div>`; return; }
       const asist = await Data.listAsistencias(ev.id);
+      ADMIN_STATE._dobleTurno = rutsDobleTurnoHoy(asist, ev);   // RUT con doble turno hoy (solo admin)
 
       // Mapa puesto_id -> nombre del puesto (facción) para mostrarlo junto al teléfono.
       let puestosMap = {};
@@ -2791,6 +2810,7 @@
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
+      const dobleT = (ADMIN_STATE._dobleTurno && ADMIN_STATE._dobleTurno.has(a.rut)) ? ` <span class="badge" style="background:#ede9fe;color:#6d28d9;margin-left:4px;font-weight:bold" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
       // Prioridad de fondo: infractor (gris) por sobre sexo (mujer rojo / hombre azul).
@@ -2802,7 +2822,7 @@
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseSexo} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span>${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}">${esc(nom || "—")}${sup}${spd}${inf}${pend}</td>
+    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}">${esc(nom || "—")}${sup}${spd}${inf}${dobleT}${pend}</td>
     <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="${esSup ? 'Autorización' : 'Examen'}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -2872,6 +2892,7 @@
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
+      const dobleT = (modo !== "empresa" && ADMIN_STATE._dobleTurno && ADMIN_STATE._dobleTurno.has(a.rut)) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
       const rowStyle = '';
@@ -2893,7 +2914,7 @@
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
       <span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>
       <span class="flex-1 min-w-0">
-        <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${pend}</span>
+        <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
