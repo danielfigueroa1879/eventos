@@ -1070,6 +1070,35 @@
       return set;
     }
 
+    // Igual que rutsDobleTurnoHoy pero sobre TODO el historial (no solo el ciclo vigente): para
+    // cada ciclo/día detecta a los RUT que trabajaron 2+ turnos distintos (ej: Día y Noche). Así
+    // el "(Doble turno)" también queda guardado y visible en el 📁 Historial de turnos.
+    // Devuelve un Set de claves "cicloBase|rut".
+    function rutsDobleTurnoHistorial(asist, ev) {
+      const set = new Set();
+      if (!eventoUsaTurnos(ev)) return set;
+      let H = parseFloat(ev && ev.turno_horas); if (!(H > 0)) H = TURNO_HORAS_DEFAULT; H = Math.min(24, Math.max(1, H));
+      const porCicloRut = {};   // "cicloBase|rut" -> Set de claves de turno (dentro del mismo ciclo/día)
+      (asist || []).forEach(a => {
+        const tn = calcularTurno(a.hora_ingreso, ev);
+        if (!tn) return;
+        const cicloBase = tn.inicio.getTime() - (tn.numero - 1) * H * 3600000; // inicio del 1er turno del ciclo
+        const k = cicloBase + "|" + a.rut;
+        (porCicloRut[k] = porCicloRut[k] || new Set()).add(tn.clave);
+      });
+      Object.keys(porCicloRut).forEach(k => { if (porCicloRut[k].size >= 2) set.add(k); });
+      return set;
+    }
+    // ¿La asistencia `a` corresponde a un RUT que hizo doble turno en su ciclo? Usa el Set anterior.
+    function esDobleTurnoHist(a, ev, set) {
+      if (!set || !set.size) return false;
+      const tn = calcularTurno(a.hora_ingreso, ev);
+      if (!tn) return false;
+      let H = parseFloat(ev && ev.turno_horas); if (!(H > 0)) H = TURNO_HORAS_DEFAULT; H = Math.min(24, Math.max(1, H));
+      const cicloBase = tn.inicio.getTime() - (tn.numero - 1) * H * 3600000;
+      return set.has(cicloBase + "|" + a.rut);
+    }
+
     // Descripción legible de la configuración de turnos de un evento.
     function turnoConfigTexto(ev) {
       let H = parseFloat(ev && ev.turno_horas); if (!(H > 0)) H = TURNO_HORAS_DEFAULT;
@@ -4336,6 +4365,8 @@
       const finalizados = turnosHistorial(ev, asist);
       // Mapa puesto_id -> nombre (facción) para mostrarlo en el detalle de cada turno.
       try { _puMapHistTurno = {}; (await Data.listPuestos(ev.id)).forEach(p => { _puMapHistTurno[p.id] = p.nombre; }); } catch (_) { _puMapHistTurno = {}; }
+      // RUT que hicieron doble turno (Día y Noche el mismo día) en cualquier ciclo del historial.
+      _dtHistSet = rutsDobleTurnoHistorial(asist, ev);
       // En escritorio se abre a pantalla completa (lista de turnos a la izquierda, detalle a la derecha).
       if (window.innerWidth >= 768) { closeModal(); overlayHistorialTurnos(ev, finalizados); return; }
       const cuerpo = finalizados.length ? finalizados.map((g, i) => {
@@ -4374,7 +4405,8 @@
         const nom = ((gu.nombres || "") + " " + (gu.apellidos || "")).trim() || "—";
         const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        const dobleT = esDobleTurnoHist(a, ev, _dtHistSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
       const evP = turnoEvPseudo(ev, g);
@@ -4402,6 +4434,7 @@
 
     // HTML del detalle de un turno (tablas de guardias y supervisores). Reutilizable.
     let _puMapHistTurno = {};   // puesto_id -> nombre (facción), para el historial de turnos
+    let _dtHistSet = new Set(); // claves "cicloBase|rut" con doble turno, para el historial de turnos
     function historialTurnoDetalleHTML(ev, g, idx) {
       const recsG = g.recs.filter(a => !a.es_supervisor);
       const recsS = g.recs.filter(a => a.es_supervisor);
@@ -4411,7 +4444,8 @@
         const nom = ((gu.nombres || "") + " " + (gu.apellidos || "")).trim() || "—";
         const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${a.es_supervisor ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        const dobleT = esDobleTurnoHist(a, ev, _dtHistSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${a.es_supervisor ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
       const thead = `<thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>`;
