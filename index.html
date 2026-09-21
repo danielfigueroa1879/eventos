@@ -1400,6 +1400,17 @@
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
+    // Distintivo SPD: badge azul con letras blancas.
+    function badgeSPD() { return `<span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>`; }
+    // Contenido de la celda "Vigencia" (PC y también el historial): si el guardia está autorizado
+    // por SPD se muestra el distintivo SPD (azul con blanco) EN LUGAR de "VIGENTE", acompañado del
+    // aviso "⚠ Pedir resolución". Así el SPD y su alerta quedan guardados junto al turno.
+    // (Los supervisores sin SPD siguen mostrando "—".)
+    function badgeVigenciaCelda(v, ev, a, g) {
+      if (g && esSPD(g, a)) return badgeSPD() + spdAvisoHTML(ev, a, g, false);
+      if (a && a.es_supervisor) return '<span class="text-slate-400">—</span>';
+      return badge(v);
+    }
     // Fecha y hora del ingreso SIEMPRE en 24 h (ej: 21:30), sin AM/PM. Se arma a mano para no
     // depender del locale del dispositivo (en algunos iPhone toLocaleString mostraba "9:30 p. m.").
     function horaFmt(iso) {
@@ -2835,7 +2846,8 @@
       const esNuevoG = g.revision_tipo === 'NUEVO';
       const pend = g.aprobado === false ? `<span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'};margin-left:4px" title="Pendiente de revisión">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const sup = a.es_supervisor ? ` <span class="badge" style="background:#e0f2fe;color:#075985;margin-left:4px" title="Supervisor">🤵 SUPERVISOR</span>` : '';
-      const spd = esSPD(g, a) ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold;margin-left:4px" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
+      // El distintivo SPD ya no va junto al nombre: en PC aparece en la columna Vigencia (badgeVigenciaCelda).
+      const spd = '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};margin-left:4px;font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2855,7 +2867,7 @@
     <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="${esSup ? 'Autorización' : 'Examen'}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
-    <td data-label="Vigencia" class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td>
+    <td data-label="Vigencia" class="pr-2">${badgeVigenciaCelda(v, ev, a, g)}</td>
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
@@ -2961,7 +2973,8 @@
       const tf = normalizarTelefono(g.telefono);
       const telCell = tf ? `<a href="https://wa.me/${esc(tf.wa)}" target="_blank" rel="noopener" class="text-green-700 font-medium hover:underline" title="WhatsApp">${esc(tf.display)}</a>` : "—";
       const sup = a.es_supervisor ? ' <span class="badge" style="background:#e0f2fe;color:#075985" title="Supervisor">🤵 SUP</span>' : '';
-      const spd = esSPD(g, a) ? ` <span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD">SPD</span>${spdAvisoHTML(ev, a, g, false)}` : '';
+      // El distintivo SPD ya no va junto al nombre: en PC aparece en la columna Vigencia (badgeVigenciaCelda).
+      const spd = '';
       const infC = fichaColor(g);
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
@@ -2981,7 +2994,7 @@
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
-        <td data-label="Vigencia" class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td>
+        <td data-label="Vigencia" class="pr-2">${badgeVigenciaCelda(v, ev, a, g)}</td>
         <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
         <td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>
         <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
@@ -4406,7 +4419,7 @@
         const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(a, ev, _dtHistSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${esSup ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
       const evP = turnoEvPseudo(ev, g);
@@ -4445,7 +4458,7 @@
         const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(a, ev, _dtHistSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${a.es_supervisor ? '<span class="text-slate-400">—</span>' : badge(v)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-2 font-mono"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
       const thead = `<thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>`;
