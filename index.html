@@ -4637,14 +4637,15 @@
         });
         return Object.values(by);
       };
-      // En la distribución NO se muestran los guardias que estuvieron de NOCHE: solo los de día.
-      // Se aplica antes de deduplicar, para que un guardia que trabajó noche y también día quede
-      // por su registro de día.
-      const sinNoche = (arr) => {
+      // En la distribución se muestran los guardias de los turnos VIGENTES (Día o Noche), igual que
+      // el listado del admin. Los turnos ya finalizados (+2 h tras su término) pasan al historial y
+      // no aparecen. Antes se ocultaban siempre los de Noche, y durante el turno Noche el mapa
+      // quedaba sin guardias. Se aplica antes de deduplicar.
+      const soloTurnosVigentes = (arr) => {
         if (!eventoUsaTurnos(ev)) return arr || [];
-        return (arr || []).filter(a => { const tn = calcularTurno(a.hora_ingreso, ev); return !tn || tn.nombre !== "Noche"; });
+        return (arr || []).filter(a => { const tn = calcularTurno(a.hora_ingreso, ev); return !tn || Date.now() <= tn.fin.getTime() + GRACIA_TURNO_MS; });
       };
-      const cargarAsist = async () => asistUnica(sinNoche(await Data.listAsistencias(ev.id)));
+      const cargarAsist = async () => asistUnica(soloTurnosVigentes(await Data.listAsistencias(ev.id)));
       const cerrar = () => { try { state.map && state.map.remove(); } catch (e) { } ov.remove(); };
       $("#dist_close", ov).addEventListener("click", cerrar);
       // Menú hamburguesa (celular): abrir/cerrar el grupo de acciones
