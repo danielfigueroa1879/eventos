@@ -832,6 +832,16 @@
       90%  { transform: translateY(0); }
       100% { transform: translateY(0); }
     }
+    /* Teléfono faltante en el registro: rótulo y campo en rojo + sacudida del recuadro */
+    @keyframes telShake {
+      0%, 100% { transform: translateX(0); }
+      15%, 55% { transform: translateX(-9px); }
+      35%, 75% { transform: translateX(9px); }
+      90% { transform: translateX(-4px); }
+    }
+    .tel-shake { animation: telShake .55s ease-in-out 2; }
+    .tel-falta label { color: #dc2626 !important; }
+    .tel-falta input { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.2) !important; }
   </style>
 </head>
 
@@ -1603,7 +1613,7 @@
               <input id="g_apellidos" class="fld" placeholder="PÉREZ SOTO" autocomplete="off"/>
               <div id="g_apeMsg" class="text-[11px] mt-0.5"></div>
             </div>
-            <div>
+            <div id="g_telWrap">
               <label class="text-sm font-semibold text-slate-700">Teléfono</label>
               <input id="g_tel" class="fld" inputmode="tel" placeholder="9 1234 5678" autocomplete="off"/>
               <div id="g_telMsg" class="text-[11px] mt-0.5"></div>
@@ -1667,12 +1677,21 @@
       }
       // Aviso: falta el teléfono. Se muestra cuando la persona ya salió del campo o completó los demás datos.
       function avisoTel() {
-        if (!telMsg) return;
+        if (!telMsg) return false;
         const editable = !tel.hasAttribute("readonly");
         const tocado = telTocado || nombres.value.trim() || apellidos.value.trim() || fecha.value;
-        telMsg.innerHTML = editable && modo && !tel.value.trim() && tocado
-          ? `<span class="text-red-600 font-medium">⚠ Ingrese su número de teléfono.</span>` : "";
+        const falta = !!(editable && modo && !tel.value.trim() && tocado);
+        telMsg.innerHTML = falta ? `<span class="text-red-600 font-bold">⚠ Ingrese su número de teléfono.</span>` : "";
+        const w = $("#g_telWrap"); if (w) w.classList.toggle("tel-falta", falta);
+        return falta;
       }
+      // Sacude el recuadro del teléfono (reinicia la animación aunque ya se haya sacudido antes).
+      function sacudirTel() {
+        const w = $("#g_telWrap"); if (!w) return;
+        w.classList.remove("tel-shake"); void w.offsetWidth; w.classList.add("tel-shake");
+        if (navigator.vibrate) { try { navigator.vibrate(200); } catch (e) {} }
+      }
+      { const w = $("#g_telWrap"); if (w) w.addEventListener("animationend", () => w.classList.remove("tel-shake")); }
       function avisoFecha() {
         if (fecha.value && fechaFutura(fecha.value)) { fecMsg.innerHTML = `<span class="text-red-600 font-medium">⚠ La fecha del examen no puede ser futura.</span>`; return false; }
         fecMsg.innerHTML = ""; return true;
@@ -1688,7 +1707,7 @@
       nombres.addEventListener("input", () => { nombres.value = formatNombre(nombres.value); avisoNombres(); actualizarBtn(); });
       apellidos.addEventListener("input", () => { apellidos.value = formatNombre(apellidos.value); avisoApellidos(); actualizarBtn(); });
       tel.addEventListener("input", actualizarBtn);
-      tel.addEventListener("blur", () => { telTocado = true; avisoTel(); });
+      tel.addEventListener("blur", () => { telTocado = true; if (avisoTel()) sacudirTel(); });
       fecha.addEventListener("change", () => { if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); vigBox.hidden = true; } else { avisoFecha(); mostrarVigencia(fecha.value); } actualizarBtn(); });
 
       // El supervisor no da examen OS10: su vigencia (3 años) nace de la fecha de autorización de la resolución.
@@ -1761,13 +1780,18 @@
         // La fecha futura sí bloquea; un solo nombre/apellido solo avisa (no bloquea)
         if (fecha.value && fechaFutura(fecha.value)) { submit.disabled = true; submit.textContent = "Fecha de examen inválida"; return; }
         if (modo === "existe") {
-          const ok = nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
-          submit.disabled = !ok; submit.textContent = ok ? "✔ Confirmar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
+          const resto = nombres.value.trim() && apellidos.value.trim() && fecha.value;
+          const ok = resto && tel.value.trim();
+          // Si solo falta el teléfono (y se puede editar), el botón queda activo: al tocarlo avisa y sacude el recuadro.
+          const soloTel = resto && !tel.value.trim() && registroAbierto;
+          submit.disabled = !(ok || soloTel); submit.textContent = ok ? "✔ Confirmar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
           return;
         }
         if (modo === "nuevo") {
-          const ok = rutValido(rut.value) && nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
-          submit.disabled = !ok; submit.textContent = ok ? "Registrar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
+          const resto = rutValido(rut.value) && nombres.value.trim() && apellidos.value.trim() && fecha.value;
+          const ok = resto && tel.value.trim();
+          // Si solo falta el teléfono, el botón queda activo: al tocarlo avisa y sacude el recuadro.
+          submit.disabled = !resto; submit.textContent = ok ? "Registrar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
         }
       }
 
@@ -1807,7 +1831,7 @@
 
       submit.addEventListener("click", async () => {
         if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); toast("La fecha del examen no puede ser futura", false); actualizarBtn(); return; }
-        if ((modo === "nuevo" || (modo === "existe" && registroAbierto)) && !tel.value.trim()) { telTocado = true; avisoTel(); toast("Ingrese su número de teléfono", false); tel.focus(); actualizarBtn(); return; }
+        if ((modo === "nuevo" || (modo === "existe" && registroAbierto)) && !tel.value.trim()) { telTocado = true; avisoTel(); sacudirTel(); toast("Ingrese su número de teléfono", false); tel.focus(); return; }
         // Sin conexión (modo producción): no se intenta. El guardia simplemente no podrá registrar hasta tener señal.
         if (USING_SUPABASE && navigator.onLine === false) {
           toast("Sin conexión a internet. Verifica tu señal e intenta nuevamente.", "danger", 4000);
