@@ -1920,7 +1920,12 @@
     /* =========================================================================
        PANEL ADMIN
        ========================================================================= */
-    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true };
+    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true, verArchivo: false };
+    // ARCHIVO de eventos: un evento archivado (activo === false) sale de la lista principal del panel
+    // y pasa a la sección "📁 Archivo", donde se ve y se despliega igual que siempre. No se borra nada:
+    // el link de la empresa sigue funcionando hasta que el evento se elimine.
+    const eventoArchivado = e => !!e && e.activo === false;
+    const eventosVisibles = () => (ADMIN_STATE.eventos || []).filter(e => eventoArchivado(e) === !!ADMIN_STATE.verArchivo);
     // Estado propio de la VISTA EMPRESA (solo lectura). Se conserva entre repintados en tiempo real.
     // Ambos paneles arrancan abiertos y se repliegan solos a los 7 s (igual que el Resumen del admin).
     let EMPRESA_STATE = { showQR: true, showResumen: true };
@@ -1954,8 +1959,9 @@
         <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
         <button id="resumenFP" class="btn btn-ghost w-full mb-2 text-sm font-bold" style="border:1.5px solid #0f5323;color:#0f5323" title="Resumen de guardias y supervisores controlados por día en los eventos de Fiestas Patrias (excluye los partidos de estadio)">Resumen Fiestas Patrias</button>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
+        <button id="verArchivo" class="btn btn-ghost w-full mb-3 text-sm font-semibold" style="border:1.5px solid #94a3b8;color:#475569">📁 Archivo</button>
         <div class="flex items-center justify-between px-1 mb-1.5">
-          <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
+          <h2 id="evTitulo" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
           <span id="evCount" class="text-[11px] font-medium text-slate-300"></span>
         </div>
         <div id="listaEventos" class="space-y-1"></div>
@@ -1972,6 +1978,12 @@
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
       $("#resumenFP").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalResumenFiestasPatrias(); });
+      $("#verArchivo").addEventListener("click", () => {
+        ADMIN_STATE.verArchivo = !ADMIN_STATE.verArchivo;
+        ADMIN_STATE.selected = eventosVisibles()[0]?.id || null;
+        ADMIN_STATE.expandido = null; ADMIN_STATE.turnoFiltro = "all";
+        renderSidebarList(); renderMain();
+      });
       $("#importar").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalImportar(); });
       $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); route(); });
       const hamb = $("#hamb"), sidebar = $("#sidebar"), drawerBk = $("#drawerBk"), cerrarMenu = $("#cerrarMenu");
@@ -1992,8 +2004,9 @@
     async function refreshAdmin(first) {
       ADMIN_STATE.eventos = await Data.listEventos();
       // Al entrar se muestra el primer evento en el panel (verde), pero con el RESUMEN cerrado (chevron a la derecha).
-      if (first && !ADMIN_STATE.selected && ADMIN_STATE.eventos[0]) { ADMIN_STATE.selected = ADMIN_STATE.eventos[0].id; ADMIN_STATE.expandido = null; }
-      if (ADMIN_STATE.selected && !ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected)) ADMIN_STATE.selected = ADMIN_STATE.eventos[0]?.id || null;
+      const vis = eventosVisibles();
+      if (first && !ADMIN_STATE.selected && vis[0]) { ADMIN_STATE.selected = vis[0].id; ADMIN_STATE.expandido = null; }
+      if (!vis.find(e => e.id === ADMIN_STATE.selected)) ADMIN_STATE.selected = vis[0]?.id || null;
       renderSidebarList();
       await renderMain();
     }
@@ -2005,10 +2018,15 @@
     }
     function renderSidebarList() {
       const cont = $("#listaEventos"); if (!cont) return;
-      if (!ADMIN_STATE.eventos.length) { cont.innerHTML = `<p class="text-sm text-slate-400 p-2">Aún no hay eventos. Crea el primero.</p>`; return; }
-      const ec = $("#evCount"); if (ec) ec.textContent = ADMIN_STATE.eventos.length;
+      const arch = !!ADMIN_STATE.verArchivo;
+      const nArch = (ADMIN_STATE.eventos || []).filter(eventoArchivado).length;
+      const bA = $("#verArchivo"); if (bA) bA.textContent = arch ? "← Volver a eventos actuales" : `📁 Archivo${nArch ? ` (${nArch})` : ""}`;
+      const tit = $("#evTitulo"); if (tit) tit.textContent = arch ? "📁 Eventos archivados" : "Eventos";
+      const lista = eventosVisibles();
+      const ec = $("#evCount"); if (ec) ec.textContent = lista.length;
+      if (!lista.length) { cont.innerHTML = `<p class="text-sm text-slate-400 p-2">${arch ? "No hay eventos archivados." : (ADMIN_STATE.eventos.length ? "No hay eventos actuales. Revisa el 📁 Archivo." : "Aún no hay eventos. Crea el primero.")}</p>`; return; }
       const chevron = (id, abierto) => `<span data-chev="${id}" class="evChev flex-shrink-0 self-center p-0.5 -mr-1 cursor-pointer ${abierto ? 'text-green-700' : 'text-slate-300'}" title="${abierto ? 'Cerrar resumen' : 'Ver resumen'}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s${abierto ? ';transform:rotate(90deg)' : ''}"><path d="m9 18 6-6-6-6"/></svg></span>`;
-      cont.innerHTML = ADMIN_STATE.eventos.map(e => {
+      cont.innerHTML = lista.map(e => {
         const act = e.id === ADMIN_STATE.selected;
         const abierto = e.id === ADMIN_STATE.expandido;
         const rango = e.fecha_evento ? (fechaFmt(e.fecha_evento) + (e.fecha_hasta && e.fecha_hasta !== e.fecha_evento ? " al " + fechaFmt(e.fecha_hasta) : "")) : "—";
@@ -2067,7 +2085,7 @@
       cont.querySelectorAll(".evHandle").forEach(ha => ha.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }));
       habilitarReordenEventos(cont);
       // contadores + resumen del evento expandido
-      ADMIN_STATE.eventos.forEach(async e => {
+      lista.forEach(async e => {
         let as = [];
         try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
         const g = as.filter(a => !a.es_supervisor), sup = as.filter(a => a.es_supervisor);
@@ -2169,8 +2187,12 @@
     async function guardarOrdenEventos(cont) {
       const ids = Array.from(cont.querySelectorAll(".evRow")).map(r => r.dataset.id);
       const porId = {}; ADMIN_STATE.eventos.forEach(e => porId[e.id] = e);
-      const nuevos = ids.map(id => porId[id]).filter(Boolean);
-      if (nuevos.length !== ADMIN_STATE.eventos.length) return;
+      const visOrd = ids.map(id => porId[id]).filter(Boolean);
+      const idsVis = new Set(visOrd.map(e => e.id));
+      if (visOrd.length !== eventosVisibles().length) return;
+      // Los visibles ocupan sus mismos "lugares" en la lista completa, con el nuevo orden.
+      let k = 0;
+      const nuevos = ADMIN_STATE.eventos.map(e => idsVis.has(e.id) ? visOrd[k++] : e);
       // ¿cambió realmente el orden?
       const cambios = [];
       nuevos.forEach((e, i) => { if (e.orden !== i) { e.orden = i; cambios.push(e); } });
@@ -2392,7 +2414,7 @@
 
     async function renderMain() {
       const main = $("#main"); if (!main) return;
-      const ev = ADMIN_STATE.eventos.find(e => e.id === ADMIN_STATE.selected);
+      const ev = eventosVisibles().find(e => e.id === ADMIN_STATE.selected);
       if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>${ADMIN_STATE.eventos.length ? "Selecciona un evento de la lista para ver el detalle." : "Crea un evento para comenzar."}</div>`; return; }
       const asist = await Data.listAsistencias(ev.id);
       ADMIN_STATE._dobleTurno = rutsDobleTurnoHoy(asist, ev);   // RUT con doble turno hoy (solo admin)
@@ -2556,6 +2578,7 @@
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
         <button id="editEv" class="btn btn-ghost text-sm">${esPartido(ev) ? "✎ Cambiar equipos" : "✎ Editar evento"}</button>
+        <button id="archEv" class="btn btn-ghost text-sm" title="${eventoArchivado(ev) ? "Devolver el evento a la lista de eventos actuales" : "Mover el evento al 📁 Archivo (no se borra; la empresa lo sigue viendo)"}">${eventoArchivado(ev) ? "↩ Desarchivar" : "📁 Archivar"}</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
       </div>
     </div>
@@ -2723,6 +2746,15 @@
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
+      $("#archEv").addEventListener("click", async () => {
+        const archivar = !eventoArchivado(ev);
+        try {
+          await Data.updateEvento(ev.id, { activo: !archivar });
+          ev.activo = !archivar;
+          toast(archivar ? `"${ev.nombre_evento}" movido al 📁 Archivo` : `"${ev.nombre_evento}" devuelto a eventos actuales`);
+          await refreshAdmin();
+        } catch (err) { toast("No se pudo " + (archivar ? "archivar" : "desarchivar") + ": " + (err.message || err), false); }
+      });
       $("#delEv").addEventListener("click", () => { confirmarConClave(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros? Esta acción no se puede deshacer.`, async () => { try { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); toast("Evento eliminado."); } catch (e) { toast("No se pudo eliminar: " + (e.message || e), "danger", 4000); } }); });
       const b = $("#buscar"); if (b) b.addEventListener("input", () => { ADMIN_STATE.search = b.value; filtrarLista(); });
       filtrarLista();
@@ -5907,7 +5939,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         };
         try {
           if (edit) { await Data.updateEvento(ev.id, campos); }
-          else { const nuevo = await Data.createEvento({ ...campos, slug: makeSlug(nombre, empresa) }); ADMIN_STATE.selected = nuevo.id; }
+          else { const nuevo = await Data.createEvento({ ...campos, slug: makeSlug(nombre, empresa) }); ADMIN_STATE.selected = nuevo.id; ADMIN_STATE.verArchivo = false; }
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
