@@ -1606,6 +1606,7 @@
             <div>
               <label class="text-sm font-semibold text-slate-700">Teléfono</label>
               <input id="g_tel" class="fld" inputmode="tel" placeholder="9 1234 5678" autocomplete="off"/>
+              <div id="g_telMsg" class="text-[11px] mt-0.5"></div>
             </div>
             <div>
               <label id="g_fechaLabel" class="text-sm font-semibold text-slate-700">Fecha último examen OS10</label>
@@ -1646,9 +1647,9 @@
         turnoBox = $("#turnoBox"), turnoInfo = $("#turnoInfo"),
         submit = $("#g_submit"), rutMsg = $("#rutMsg"),
         nombres = $("#g_nombres"), apellidos = $("#g_apellidos"), tel = $("#g_tel"), fecha = $("#g_fecha"), sexoSel = $("#g_sexo"),
-        nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg"),
+        nomMsg = $("#g_nomMsg"), apeMsg = $("#g_apeMsg"), fecMsg = $("#g_fecMsg"), telMsg = $("#g_telMsg"),
         superWrap = $("#g_superWrap"), superSel = $("#g_rol");
-      let modo = null, guardiaExiste = false, guardiaCargado = null;
+      let modo = null, guardiaExiste = false, guardiaCargado = null, telTocado = false;
 
       // Fecha del examen: no puede ser futura
       const hoyISO = new Date().toISOString().slice(0, 10);
@@ -1663,6 +1664,14 @@
       function avisoApellidos() {
         const n = nPalabras(apellidos.value);
         apeMsg.innerHTML = n === 1 ? `<span class="text-amber-600">⚠ Solo un apellido. Si tiene 2º apellido agréguelo; si no, puede continuar.</span>` : "";
+      }
+      // Aviso: falta el teléfono. Se muestra cuando la persona ya salió del campo o completó los demás datos.
+      function avisoTel() {
+        if (!telMsg) return;
+        const editable = !tel.hasAttribute("readonly");
+        const tocado = telTocado || nombres.value.trim() || apellidos.value.trim() || fecha.value;
+        telMsg.innerHTML = editable && modo && !tel.value.trim() && tocado
+          ? `<span class="text-red-600 font-medium">⚠ Ingrese su número de teléfono.</span>` : "";
       }
       function avisoFecha() {
         if (fecha.value && fechaFutura(fecha.value)) { fecMsg.innerHTML = `<span class="text-red-600 font-medium">⚠ La fecha del examen no puede ser futura.</span>`; return false; }
@@ -1679,6 +1688,7 @@
       nombres.addEventListener("input", () => { nombres.value = formatNombre(nombres.value); avisoNombres(); actualizarBtn(); });
       apellidos.addEventListener("input", () => { apellidos.value = formatNombre(apellidos.value); avisoApellidos(); actualizarBtn(); });
       tel.addEventListener("input", actualizarBtn);
+      tel.addEventListener("blur", () => { telTocado = true; avisoTel(); });
       fecha.addEventListener("change", () => { if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); vigBox.hidden = true; } else { avisoFecha(); mostrarVigencia(fecha.value); } actualizarBtn(); });
 
       // El supervisor no da examen OS10: su vigencia (3 años) nace de la fecha de autorización de la resolución.
@@ -1740,23 +1750,24 @@
           extra.hidden = false;
           [nombres, apellidos, tel, fecha].forEach(i => i.removeAttribute("readonly"));
           nombres.value = apellidos.value = tel.value = ""; fecha.value = "";
-          nomMsg.innerHTML = apeMsg.innerHTML = fecMsg.innerHTML = "";
+          nomMsg.innerHTML = apeMsg.innerHTML = fecMsg.innerHTML = telMsg.innerHTML = ""; telTocado = false;
           rutMsg.innerHTML = `<span class="text-red-600 font-semibold">⚠ RUT NO ENCONTRADO EN LA BASE DE DATOS. Por favor, ingrese sus datos.</span>`;
           vigBox.hidden = true; actualizarBtn();
         }
       }
       function mostrarVigencia(f) { if (superSel && superSel.value === "supervisor") { vigBox.hidden = true; return; } if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
       function actualizarBtn() {
+        avisoTel();
         // La fecha futura sí bloquea; un solo nombre/apellido solo avisa (no bloquea)
         if (fecha.value && fechaFutura(fecha.value)) { submit.disabled = true; submit.textContent = "Fecha de examen inválida"; return; }
         if (modo === "existe") {
           const ok = nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
-          submit.disabled = !ok; submit.textContent = ok ? "✔ Confirmar ingreso" : "Complete los datos";
+          submit.disabled = !ok; submit.textContent = ok ? "✔ Confirmar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
           return;
         }
         if (modo === "nuevo") {
           const ok = rutValido(rut.value) && nombres.value.trim() && apellidos.value.trim() && tel.value.trim() && fecha.value;
-          submit.disabled = !ok; submit.textContent = ok ? "Registrar ingreso" : "Complete los datos";
+          submit.disabled = !ok; submit.textContent = ok ? "Registrar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
         }
       }
 
@@ -1796,6 +1807,7 @@
 
       submit.addEventListener("click", async () => {
         if (fecha.value && fechaFutura(fecha.value)) { avisoFecha(); toast("La fecha del examen no puede ser futura", false); actualizarBtn(); return; }
+        if ((modo === "nuevo" || (modo === "existe" && registroAbierto)) && !tel.value.trim()) { telTocado = true; avisoTel(); toast("Ingrese su número de teléfono", false); tel.focus(); actualizarBtn(); return; }
         // Sin conexión (modo producción): no se intenta. El guardia simplemente no podrá registrar hasta tener señal.
         if (USING_SUPABASE && navigator.onLine === false) {
           toast("Sin conexión a internet. Verifica tu señal e intenta nuevamente.", "danger", 4000);
