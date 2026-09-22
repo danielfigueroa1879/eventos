@@ -839,6 +839,17 @@
       35%, 75% { transform: translateX(9px); }
       90% { transform: translateX(-4px); }
     }
+    /* Barra lateral: al desplegar las acciones, un contorno gris palpita y luego desaparece */
+    @keyframes accPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(100,116,139,0); border-color: rgba(100,116,139,0); }
+      15%  { box-shadow: 0 0 0 4px rgba(100,116,139,.35); border-color: rgba(100,116,139,.9); }
+      35%  { box-shadow: 0 0 0 0 rgba(100,116,139,.1); border-color: rgba(100,116,139,.6); }
+      55%  { box-shadow: 0 0 0 4px rgba(100,116,139,.35); border-color: rgba(100,116,139,.9); }
+      75%  { box-shadow: 0 0 0 0 rgba(100,116,139,.1); border-color: rgba(100,116,139,.6); }
+      100% { box-shadow: 0 0 0 0 rgba(100,116,139,0); border-color: rgba(100,116,139,0); }
+    }
+    #accPanel { border: 2px solid transparent; border-radius: 12px; padding: 6px; margin: 0 -8px 8px; }
+    #accPanel.acc-pulse { animation: accPulse 2.2s ease-in-out 1; }
     .tel-shake { animation: telShake .55s ease-in-out 2; }
     .tel-falta label { color: #dc2626 !important; }
     .tel-falta input { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.2) !important; }
@@ -1993,7 +2004,14 @@
         $("#accChev").style.transform = ab ? "rotate(90deg)" : "";
         $("#accToggle").setAttribute("aria-expanded", ab ? "true" : "false");
       };
-      $("#accToggle").addEventListener("click", () => { ADMIN_STATE.accAbierto = !ADMIN_STATE.accAbierto; pintarAcc(); });
+      const accPanel = $("#accPanel");
+      accPanel.addEventListener("animationend", () => accPanel.classList.remove("acc-pulse"));
+      $("#accToggle").addEventListener("click", () => {
+        ADMIN_STATE.accAbierto = !ADMIN_STATE.accAbierto; pintarAcc();
+        // Al desplegar: contorno gris que palpita dos veces y se desvanece.
+        accPanel.classList.remove("acc-pulse");
+        if (ADMIN_STATE.accAbierto) { void accPanel.offsetWidth; accPanel.classList.add("acc-pulse"); }
+      });
       pintarAcc();
       $("#verArchivo").addEventListener("click", () => {
         ADMIN_STATE.verArchivo = !ADMIN_STATE.verArchivo;
