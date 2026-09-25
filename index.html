@@ -856,14 +856,25 @@
     /* Modo Archivo desplegado: el contorno VERDE del panel Desplegar se extiende hacia abajo
        y envuelve también los documentos archivados, como una sola pieza continua.
        (Requiere el panel abierto: si se pliega, el contorno no aplica.) */
-    #adminSide.arch-open #accPanel:not([hidden]) {
-      animation: none;
+    /* El botón Desplegar/Plegar hace de tapa superior del contorno (borde verde, abierto abajo). */
+    #adminSide.arch-open #accToggle {
       border-color: rgba(22,163,74,.9);
       border-bottom-color: transparent;
       border-bottom-left-radius: 0; border-bottom-right-radius: 0;
-      margin-bottom: 0; padding-bottom: 0;
+      margin: 0 -8px 0;
+    }
+    /* Tramo central: acciones, abierto arriba y abajo (solo bordes laterales verdes). */
+    #adminSide.arch-open #accPanel:not([hidden]) {
+      animation: none;
+      border-color: rgba(22,163,74,.9);
+      border-top-color: transparent;
+      border-bottom-color: transparent;
+      border-radius: 0;
+      margin: 0 -8px 0;
+      padding-bottom: 0;
     }
     #adminSide.arch-open #accPanel:not([hidden]) #verArchivo { margin-bottom: 0; }
+    /* Base del contorno: los documentos, cerrando abajo con esquinas redondeadas. */
     #adminSide.arch-open #accPanel:not([hidden]) + #listaWrap {
       border: 1px solid rgba(22,163,74,.9);
       border-top: none;
@@ -2030,6 +2041,7 @@
         $("#accLbl").textContent = ab ? "Plegar" : "Desplegar";
         $("#accChev").style.transform = ab ? "rotate(90deg)" : "";
         $("#accToggle").setAttribute("aria-expanded", ab ? "true" : "false");
+        const side = $("#adminSide"); if (side) side.classList.toggle("arch-open", ab && !!ADMIN_STATE.verArchivo);
       };
       const accPanel = $("#accPanel");
       accPanel.addEventListener("animationend", e => { if (e.animationName === "accFade") accPanel.classList.remove("acc-pulse"); });
@@ -2089,7 +2101,7 @@
       // Al desplegar la carpeta, el propio botón (← Volver a eventos actuales) hace de cabecera:
       // se oculta el sub-encabezado "Archivados" y el contorno verde del panel se extiende para
       // envolver los documentos (clase arch-open en #adminSide, ver CSS).
-      const side = $("#adminSide"); if (side) side.classList.toggle("arch-open", arch);
+      const side = $("#adminSide"); if (side) side.classList.toggle("arch-open", arch && !!ADMIN_STATE.accAbierto);
       const evHeader = $("#evHeader"); if (evHeader) evHeader.hidden = arch;
       const tit = $("#evTitulo"); if (tit && !arch) tit.textContent = "Eventos";
       const lista = eventosVisibles();
