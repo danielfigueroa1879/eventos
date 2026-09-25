@@ -854,7 +854,12 @@
     /* Chevron de la carpeta "📁 Archivo": ► cerrado, gira ▼ (90°) al desplegar los documentos. */
     #arcChev { transition: transform .2s ease; }
     /* Contorno que envuelve los documentos archivados cuando la carpeta está desplegada. */
-    #listaWrap.arch-box { border: 1.5px solid #94a3b8; border-radius: 12px; padding: 8px; margin-top: 4px; background: #f8fafc; }
+    #listaWrap.arch-box { border: 1.5px solid #94a3b8; border-radius: 12px; padding: 8px; background: #f8fafc; }
+    /* Carpeta desplegada: el botón y el contorno se sueldan y bajan como UNA sola pieza.
+       El -2px alinea los bordes del contorno con los del botón (accPanel: margen -8px + padding 6px). */
+    #adminSide.arch-open #verArchivo { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    #adminSide.arch-open #accPanel { margin-bottom: 0; padding-bottom: 0; }
+    #adminSide.arch-open #listaWrap.arch-box { margin: 0 -2px; border-top: none; border-top-left-radius: 0; border-top-right-radius: 0; }
     .tel-shake { animation: telShake .55s ease-in-out 2; }
     .tel-falta label { color: #dc2626 !important; }
     .tel-falta input { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.2) !important; }
@@ -1971,7 +1976,7 @@
         <button id="cerrarMenu" class="md:hidden text-white text-2xl leading-none px-1" aria-label="Cerrar menú">✕</button>
         <img src="images/aniversario1.webp" class="w-11 h-11 object-contain hidden md:block" alt="Centenario">
       </div>
-      <div class="p-3">
+      <div class="p-3" id="adminSide">
         <!-- Acciones plegables (ahorra espacio): Nuevo evento, Resumen y Archivo -->
         <button id="accToggle" type="button" class="w-full flex items-center justify-between px-2 py-1.5 mb-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200" aria-expanded="false">
           <span id="accLbl">Desplegar</span>
@@ -1987,7 +1992,7 @@
         </button>
         </div>
         <div id="listaWrap">
-        <div class="flex items-center justify-between px-1 mb-1.5">
+        <div id="evHeader" class="flex items-center justify-between px-1 mb-1.5">
           <h2 id="evTitulo" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
           <span id="evCount" class="text-[11px] font-medium text-slate-300"></span>
         </div>
@@ -2069,11 +2074,11 @@
       const bALbl = $("#verArchivoLbl"); if (bALbl) bALbl.textContent = arch ? "← Volver a eventos actuales" : `📁 Archivo${nArch ? ` (${nArch})` : ""}`;
       const arcChev = $("#arcChev"); if (arcChev) arcChev.style.transform = arch ? "rotate(90deg)" : "";
       const wrap = $("#listaWrap"); if (wrap) wrap.classList.toggle("arch-box", arch);
-      const tit = $("#evTitulo");
-      if (tit) {
-        tit.innerHTML = arch ? `📁 Archivados · <button id="evVolver" type="button" class="normal-case tracking-normal text-green-700 underline">← volver</button>` : "Eventos";
-        const bv = $("#evVolver"); if (bv) bv.addEventListener("click", () => { const bA2 = $("#verArchivo"); if (bA2) bA2.click(); });
-      }
+      const side = $("#adminSide"); if (side) side.classList.toggle("arch-open", arch);
+      // Al desplegar la carpeta, el propio botón (← Volver a eventos actuales) hace de cabecera:
+      // se oculta el sub-encabezado "Archivados" para que los documentos empiecen dentro del mismo contorno.
+      const evHeader = $("#evHeader"); if (evHeader) evHeader.hidden = arch;
+      const tit = $("#evTitulo"); if (tit && !arch) tit.textContent = "Eventos";
       const lista = eventosVisibles();
       const ec = $("#evCount"); if (ec) ec.textContent = lista.length;
       if (!lista.length) { cont.innerHTML = `<p class="text-sm text-slate-400 p-2">${arch ? "No hay eventos archivados." : (ADMIN_STATE.eventos.length ? "No hay eventos actuales. Revisa el 📁 Archivo." : "Aún no hay eventos. Crea el primero.")}</p>`; return; }
