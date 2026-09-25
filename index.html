@@ -853,6 +853,24 @@
     #accPanel.acc-pulse { animation: accPulse 1.25s ease-in-out 0s 19, accFade 1.25s ease-out 23.75s 1 forwards; }
     /* Chevron de la carpeta "📁 Archivo": ► cerrado, gira ▼ (90°) al desplegar los documentos. */
     #arcChev { transition: transform .2s ease; }
+    /* Modo Archivo desplegado: el contorno VERDE del panel Desplegar se extiende hacia abajo
+       y envuelve también los documentos archivados, como una sola pieza continua.
+       (Requiere el panel abierto: si se pliega, el contorno no aplica.) */
+    #adminSide.arch-open #accPanel:not([hidden]) {
+      animation: none;
+      border-color: rgba(22,163,74,.9);
+      border-bottom-color: transparent;
+      border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+      margin-bottom: 0; padding-bottom: 0;
+    }
+    #adminSide.arch-open #accPanel:not([hidden]) #verArchivo { margin-bottom: 0; }
+    #adminSide.arch-open #accPanel:not([hidden]) + #listaWrap {
+      border: 1px solid rgba(22,163,74,.9);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      margin: 0 -8px 8px;
+      padding: 6px;
+    }
     .tel-shake { animation: telShake .55s ease-in-out 2; }
     .tel-falta label { color: #dc2626 !important; }
     .tel-falta input { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.2) !important; }
@@ -2067,8 +2085,9 @@
       const bALbl = $("#verArchivoLbl"); if (bALbl) bALbl.textContent = arch ? "← Volver a eventos actuales" : `📁 Archivo${nArch ? ` (${nArch})` : ""}`;
       const arcChev = $("#arcChev"); if (arcChev) arcChev.style.transform = arch ? "rotate(90deg)" : "";
       // Al desplegar la carpeta, el propio botón (← Volver a eventos actuales) hace de cabecera:
-      // se oculta el sub-encabezado "Archivados" y los documentos se listan directamente debajo,
-      // sin un contorno propio (el contorno verde del panel Desplegar ya enmarca la zona).
+      // se oculta el sub-encabezado "Archivados" y el contorno verde del panel se extiende para
+      // envolver los documentos (clase arch-open en #adminSide, ver CSS).
+      const side = $("#adminSide"); if (side) side.classList.toggle("arch-open", arch);
       const evHeader = $("#evHeader"); if (evHeader) evHeader.hidden = arch;
       const tit = $("#evTitulo"); if (tit && !arch) tit.textContent = "Eventos";
       const lista = eventosVisibles();
