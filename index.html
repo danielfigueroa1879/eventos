@@ -1994,8 +1994,7 @@
           <svg id="accChev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>
         </button>
         <div id="accPanel" hidden>
-        <button id="nuevoEv" class="btn btn-p w-full mb-2">+ Nuevo evento</button>
-        <button id="resumenFP" class="btn btn-ghost w-full mb-2 text-sm font-bold" style="border:1.5px solid #0f5323;color:#0f5323" title="Resumen de guardias y supervisores controlados por día en los eventos de Fiestas Patrias (excluye los partidos de estadio)">Resumen Fiestas Patrias</button>
+        <button id="nuevoEv" class="btn btn-ghost w-full mb-2 text-sm font-semibold" style="border:1px solid #e5e7eb;color:#374151">+ Nuevo evento</button>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
         <button id="verArchivo" class="btn btn-ghost w-full mb-3 text-sm font-semibold flex items-center justify-between gap-2" style="border:1.5px solid #94a3b8;color:#475569" aria-expanded="false">
           <span id="verArchivoLbl" class="flex items-center gap-1.5">📁 Archivo</span>
@@ -2021,7 +2020,6 @@
   </div>`;
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
-      $("#resumenFP").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalResumenFiestasPatrias(); });
       // Desplegar / plegar las acciones (chevron → a la derecha cerrado, ↓ abierto). Se recuerda el estado.
       const pintarAcc = () => {
         const ab = !!ADMIN_STATE.accAbierto;
