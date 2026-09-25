@@ -1997,7 +1997,10 @@
         <button id="nuevoEv" class="btn btn-ghost w-full mb-2 text-sm font-semibold" style="border:1px solid #e5e7eb;color:#374151">+ Nuevo evento</button>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
         <button id="verArchivo" class="btn btn-ghost w-full mb-3 text-sm font-semibold flex items-center justify-between gap-2" style="border:1.5px solid #94a3b8;color:#475569" aria-expanded="false">
-          <span id="verArchivoLbl" class="flex items-center gap-1.5">📁 Archivo</span>
+          <span id="verArchivoLbl" class="flex items-center gap-1.5">
+            <svg id="arcFolder" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span id="verArchivoTxt">Archivo</span>
+          </span>
           <svg id="arcChev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>
         </button>
         </div>
@@ -2080,7 +2083,8 @@
       const arch = !!ADMIN_STATE.verArchivo;
       const nArch = (ADMIN_STATE.eventos || []).filter(eventoArchivado).length;
       const bA = $("#verArchivo"); if (bA) bA.setAttribute("aria-expanded", arch ? "true" : "false");
-      const bALbl = $("#verArchivoLbl"); if (bALbl) bALbl.textContent = arch ? "← Volver a eventos actuales" : `📁 Archivo${nArch ? ` (${nArch})` : ""}`;
+      const bATxt = $("#verArchivoTxt"); if (bATxt) bATxt.textContent = arch ? "← Volver a eventos actuales" : `Archivo${nArch ? ` (${nArch})` : ""}`;
+      const arcFolder = $("#arcFolder"); if (arcFolder) arcFolder.style.display = arch ? "none" : "";
       const arcChev = $("#arcChev"); if (arcChev) arcChev.style.transform = arch ? "rotate(90deg)" : "";
       // Al desplegar la carpeta, el propio botón (← Volver a eventos actuales) hace de cabecera:
       // se oculta el sub-encabezado "Archivados" y el contorno verde del panel se extiende para
