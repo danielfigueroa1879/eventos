@@ -853,13 +853,6 @@
     #accPanel.acc-pulse { animation: accPulse 1.25s ease-in-out 0s 19, accFade 1.25s ease-out 23.75s 1 forwards; }
     /* Chevron de la carpeta "📁 Archivo": ► cerrado, gira ▼ (90°) al desplegar los documentos. */
     #arcChev { transition: transform .2s ease; }
-    /* Contorno que envuelve los documentos archivados cuando la carpeta está desplegada. */
-    #listaWrap.arch-box { border: 1.5px solid #94a3b8; border-radius: 12px; padding: 8px; background: #f8fafc; }
-    /* Carpeta desplegada: el botón y el contorno se sueldan y bajan como UNA sola pieza.
-       El -2px alinea los bordes del contorno con los del botón (accPanel: margen -8px + padding 6px). */
-    #adminSide.arch-open #verArchivo { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-    #adminSide.arch-open #accPanel { margin-bottom: 0; padding-bottom: 0; }
-    #adminSide.arch-open #listaWrap.arch-box { margin: 0 -2px; border-top: none; border-top-left-radius: 0; border-top-right-radius: 0; }
     .tel-shake { animation: telShake .55s ease-in-out 2; }
     .tel-falta label { color: #dc2626 !important; }
     .tel-falta input { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.2) !important; }
@@ -2073,10 +2066,9 @@
       const bA = $("#verArchivo"); if (bA) bA.setAttribute("aria-expanded", arch ? "true" : "false");
       const bALbl = $("#verArchivoLbl"); if (bALbl) bALbl.textContent = arch ? "← Volver a eventos actuales" : `📁 Archivo${nArch ? ` (${nArch})` : ""}`;
       const arcChev = $("#arcChev"); if (arcChev) arcChev.style.transform = arch ? "rotate(90deg)" : "";
-      const wrap = $("#listaWrap"); if (wrap) wrap.classList.toggle("arch-box", arch);
-      const side = $("#adminSide"); if (side) side.classList.toggle("arch-open", arch);
       // Al desplegar la carpeta, el propio botón (← Volver a eventos actuales) hace de cabecera:
-      // se oculta el sub-encabezado "Archivados" para que los documentos empiecen dentro del mismo contorno.
+      // se oculta el sub-encabezado "Archivados" y los documentos se listan directamente debajo,
+      // sin un contorno propio (el contorno verde del panel Desplegar ya enmarca la zona).
       const evHeader = $("#evHeader"); if (evHeader) evHeader.hidden = arch;
       const tit = $("#evTitulo"); if (tit && !arch) tit.textContent = "Eventos";
       const lista = eventosVisibles();
