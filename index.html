@@ -848,34 +848,27 @@
       from { box-shadow: 0 0 0 0 rgba(22,163,74,.15); border-color: rgba(22,163,74,.75); }
       to   { box-shadow: 0 0 0 0 rgba(22,163,74,0); border-color: rgba(22,163,74,0); }
     }
-    #accPanel { border: 1px solid transparent; border-radius: 12px; padding: 6px; margin: 0 -8px 8px; }
+    /* #deployBox: marco que envuelve el botón Desplegar/Plegar y las acciones. */
+    #deployBox { border: 1px solid transparent; border-radius: 12px; padding: 6px; margin: 0 -8px 8px; }
+    #accPanel { margin: 0; padding: 0; }
     /* 19 latidos de 1,25 s (23,75 s) + 1,25 s de desvanecido = 25 s */
-    #accPanel.acc-pulse { animation: accPulse 1.25s ease-in-out 0s 19, accFade 1.25s ease-out 23.75s 1 forwards; }
+    .acc-pulse { animation: accPulse 1.25s ease-in-out 0s 19, accFade 1.25s ease-out 23.75s 1 forwards; }
     /* Chevron de la carpeta "📁 Archivo": ► cerrado, gira ▼ (90°) al desplegar los documentos. */
     #arcChev { transition: transform .2s ease; }
     /* Modo Archivo desplegado: el contorno VERDE del panel Desplegar se extiende hacia abajo
        y envuelve también los documentos archivados, como una sola pieza continua.
        (Requiere el panel abierto: si se pliega, el contorno no aplica.) */
-    /* El botón Desplegar/Plegar hace de tapa superior del contorno (borde verde, abierto abajo). */
-    #adminSide.arch-open #accToggle {
+    /* Modo Archivo desplegado: contorno verde fijo que envuelve el botón Desplegar,
+       las acciones y los documentos como una sola pieza continua. */
+    #adminSide.arch-open #deployBox {
+      animation: none;
       border-color: rgba(22,163,74,.9);
       border-bottom-color: transparent;
       border-bottom-left-radius: 0; border-bottom-right-radius: 0;
-      margin: 0 -8px 0;
+      margin-bottom: 0; padding-bottom: 0;
     }
-    /* Tramo central: acciones, abierto arriba y abajo (solo bordes laterales verdes). */
-    #adminSide.arch-open #accPanel:not([hidden]) {
-      animation: none;
-      border-color: rgba(22,163,74,.9);
-      border-top-color: transparent;
-      border-bottom-color: transparent;
-      border-radius: 0;
-      margin: 0 -8px 0;
-      padding-bottom: 0;
-    }
-    #adminSide.arch-open #accPanel:not([hidden]) #verArchivo { margin-bottom: 0; }
-    /* Base del contorno: los documentos, cerrando abajo con esquinas redondeadas. */
-    #adminSide.arch-open #accPanel:not([hidden]) + #listaWrap {
+    #adminSide.arch-open #deployBox #verArchivo { margin-bottom: 0; }
+    #adminSide.arch-open #deployBox + #listaWrap {
       border: 1px solid rgba(22,163,74,.9);
       border-top: none;
       border-radius: 0 0 12px 12px;
@@ -1999,7 +1992,8 @@
         <img src="images/aniversario1.webp" class="w-11 h-11 object-contain hidden md:block" alt="Centenario">
       </div>
       <div class="p-3" id="adminSide">
-        <!-- Acciones plegables (ahorra espacio): Nuevo evento, Resumen y Archivo -->
+        <!-- Acciones plegables (ahorra espacio): Nuevo evento y Archivo. #deployBox es el marco verde. -->
+        <div id="deployBox">
         <button id="accToggle" type="button" class="w-full flex items-center justify-between px-2 py-1.5 mb-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200" aria-expanded="false">
           <span id="accLbl">Desplegar</span>
           <svg id="accChev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>
@@ -2014,6 +2008,7 @@
           </span>
           <svg id="arcChev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>
         </button>
+        </div>
         </div>
         <div id="listaWrap">
         <div id="evHeader" class="flex items-center justify-between px-1 mb-1.5">
@@ -2043,13 +2038,13 @@
         $("#accToggle").setAttribute("aria-expanded", ab ? "true" : "false");
         const side = $("#adminSide"); if (side) side.classList.toggle("arch-open", ab && !!ADMIN_STATE.verArchivo);
       };
-      const accPanel = $("#accPanel");
-      accPanel.addEventListener("animationend", e => { if (e.animationName === "accFade") accPanel.classList.remove("acc-pulse"); });
+      const deployBox = $("#deployBox");
+      deployBox.addEventListener("animationend", e => { if (e.animationName === "accFade") deployBox.classList.remove("acc-pulse"); });
       $("#accToggle").addEventListener("click", () => {
         ADMIN_STATE.accAbierto = !ADMIN_STATE.accAbierto; pintarAcc();
-        // Al desplegar: contorno verde que palpita ~25 s y se desvanece.
-        accPanel.classList.remove("acc-pulse");
-        if (ADMIN_STATE.accAbierto) { void accPanel.offsetWidth; accPanel.classList.add("acc-pulse"); }
+        // Al desplegar: contorno verde (que envuelve el botón Desplegar y las acciones) palpita ~25 s y se desvanece.
+        deployBox.classList.remove("acc-pulse");
+        if (ADMIN_STATE.accAbierto && !ADMIN_STATE.verArchivo) { void deployBox.offsetWidth; deployBox.classList.add("acc-pulse"); }
       });
       pintarAcc();
       $("#verArchivo").addEventListener("click", () => {
