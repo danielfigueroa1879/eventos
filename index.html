@@ -2678,6 +2678,7 @@
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" class="fld h-9 py-1.5 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
           <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
+          <button id="verificarTodosBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-white rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="background:#0f5323;" title="Verificar todos los guardias uno por uno (asistido con Zosepcar)">✅ Verificar todos</button>
         </div>
       </div>
       ${turnosBar ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
@@ -2780,6 +2781,7 @@
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asistMostrada));
       const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
+      const bvt = $("#verificarTodosBtn"); if (bvt) bvt.addEventListener("click", () => { try { verificarTodosAsistido(ev, filas); } catch (_) {} });
       const btnCerrar = $("#cerrarPartido");
       if (btnCerrar) btnCerrar.addEventListener("click", () => {
         if (!asist.length) { toast("No hay guardias en este partido para archivar", false); return; }
@@ -5381,6 +5383,175 @@
       header.addEventListener("pointerup", endDrag);
       header.addEventListener("pointercancel", endDrag);
     }
+
+    // =========================================================================
+    //  VERIFICAR TODOS (asistido) — recorre los guardias uno por uno copiando
+    //  el RUT para consultarlo en Zosepcar y arma un resumen central con
+    //  Nombre · RUT · Vencimiento · Estado.
+    //  IMPORTANTE: el navegador NO permite que esta página lea ni escriba dentro
+    //  del iframe de Zosepcar (es otro sitio), así que NO consulta sola: solo
+    //  agiliza el flujo manual y guarda lo que el admin lee. No toca la base de
+    //  datos: es de solo lectura.
+    // =========================================================================
+    function verificarTodosAsistido(ev, filasIn) {
+      try {
+        // Lista de guardias (sin supervisores), únicos por RUT, en orden.
+        const seen = new Set();
+        const lista = [];
+        (filasIn || []).forEach(a => {
+          if (!a || a.es_supervisor) return;
+          const rut = (a.rut || "").trim();
+          if (!rut || seen.has(rut)) return;
+          seen.add(rut);
+          const g = a.guardia || {};
+          lista.push({ rut, nombre: ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—" });
+        });
+        if (!lista.length) { toast("No hay guardias en la lista para verificar", false); return; }
+
+        // Estado a partir del vencimiento leído en Zosepcar (reutiliza la lógica legal existente).
+        const estadoDesdeVenc = (vencStr, acreditado) => {
+          if (acreditado === false) return { label: "NO ACREDITADO", color: "rojo" };
+          const v = parseFecha(vencStr);
+          if (!v) return { label: "—", color: "gris" };
+          const r = calcularVigencia(addMonths(v, -MESES_VIGENCIA));
+          return { label: r.vigencia, color: r.color };
+        };
+        const pill = (c, txt) => {
+          const map = { verde: "background:#dcfce7;color:#166534", amarillo: "background:#fef9c3;color:#854d0e", rojo: "background:#fee2e2;color:#991b1b", gris: "background:#e2e8f0;color:#475569" };
+          return `<span style="${map[c] || map.gris};padding:2px 8px;border-radius:9999px;font-weight:800;font-size:11px;white-space:nowrap">${esc(txt)}</span>`;
+        };
+
+        const resultados = new Array(lista.length).fill(null); // cada item: {venc, acreditado} o null (pendiente)
+        let i = 0;
+        const abrirZ = () => { try { modalConsultarGuardia(); } catch (_) {} };
+
+        document.getElementById("vtBar")?.remove();
+        const bar = document.createElement("div");
+        bar.id = "vtBar";
+        bar.style.cssText = "position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(760px,98vw);z-index:71;background:#0f5323;color:#fff;border:3px solid #0a3b19;border-bottom:0;border-radius:16px 16px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.35);padding:12px 14px;font-family:inherit;";
+        document.body.appendChild(bar);
+
+        const guardarActual = () => {
+          const vencInp = bar.querySelector("#vt_venc");
+          if (!vencInp) return;
+          if (vencInp.value) resultados[i] = { venc: vencInp.value, acreditado: true };
+        };
+        const avanzar = () => { if (i + 1 < lista.length) { i++; step(); } else finalizar(); };
+
+        const pintar = () => {
+          const it = lista[i];
+          const done = resultados.filter(Boolean).length;
+          const prev = resultados[i] || {};
+          bar.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+              <div style="font-weight:800;font-size:13px">✅ Verificar todos · <span style="opacity:.9">${i + 1} de ${lista.length}</span> <span style="opacity:.7;font-weight:600">(${done} anotados)</span></div>
+              <button id="vt_cerrar" style="background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer">Terminar ✓</button>
+            </div>
+            <div style="background:#fff;color:#0f172a;border-radius:12px;padding:10px 12px">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px">
+                <div style="min-width:170px;flex:1">
+                  <div style="font-size:11px;color:#64748b;font-weight:700">GUARDIA</div>
+                  <div style="font-weight:800;font-size:15px;line-height:1.15">${esc(it.nombre)}</div>
+                  <div style="font-family:ui-monospace,monospace;font-weight:700;color:#0f5323">${esc(it.rut)}</div>
+                </div>
+                <button id="vt_copiar" style="background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">📋 Copiar RUT</button>
+                <button id="vt_zos" style="background:#e2e8f0;color:#0f172a;border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;white-space:nowrap">🔎 Zosepcar</button>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px;margin-top:10px">
+                <div>
+                  <div style="font-size:11px;color:#64748b;font-weight:700">VENCIMIENTO (lo lees en Zosepcar)</div>
+                  <input id="vt_venc" type="date" value="${prev.venc || ""}" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px"/>
+                </div>
+                <button id="vt_nocurso" style="background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">❌ No acreditado / sin curso</button>
+                <div id="vt_estado" style="margin-left:auto"></div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;margin-top:10px">
+              <button id="vt_prev" style="background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer${i === 0 ? ";opacity:.4;pointer-events:none" : ""}">‹ Anterior</button>
+              <button id="vt_next" style="background:#facc15;color:#3f2d00;border:0;border-radius:10px;padding:9px 18px;font-weight:900;cursor:pointer">${i + 1 === lista.length ? "Guardar y ver resumen ✓" : "Guardar y siguiente ›"}</button>
+            </div>
+          `;
+          const vencInp = bar.querySelector("#vt_venc");
+          const estadoBox = bar.querySelector("#vt_estado");
+          const refEstado = () => {
+            if (prev.acreditado === false) { estadoBox.innerHTML = pill("rojo", "NO ACREDITADO"); return; }
+            const e2 = estadoDesdeVenc(vencInp.value, true);
+            estadoBox.innerHTML = vencInp.value ? pill(e2.color, e2.label) : "";
+          };
+          refEstado();
+          vencInp.addEventListener("input", refEstado);
+          bar.querySelector("#vt_cerrar").onclick = finalizar;
+          bar.querySelector("#vt_copiar").onclick = async () => {
+            const ok = await copiarAlPortapapeles(it.rut);
+            try { toast(ok ? ("RUT copiado: " + it.rut) : "No se pudo copiar", ok); } catch (_) {}
+          };
+          bar.querySelector("#vt_zos").onclick = abrirZ;
+          bar.querySelector("#vt_nocurso").onclick = () => { resultados[i] = { venc: "", acreditado: false }; avanzar(); };
+          bar.querySelector("#vt_prev").onclick = () => { guardarActual(); if (i > 0) { i--; step(); } };
+          bar.querySelector("#vt_next").onclick = () => { guardarActual(); avanzar(); };
+        };
+
+        const step = async () => {
+          pintar();
+          try { await copiarAlPortapapeles(lista[i].rut); } catch (_) {} // dentro del gesto de clic
+        };
+
+        const finalizar = () => {
+          bar.remove();
+          try { document.getElementById("cgWindow")?.remove(); } catch (_) {}
+          mostrarResumen();
+        };
+
+        const mostrarResumen = () => {
+          const rows = lista.map((it, idx) => {
+            const r = resultados[idx];
+            let estado, venc;
+            if (!r) { estado = pill("gris", "PENDIENTE"); venc = "—"; }
+            else if (r.acreditado === false) { estado = pill("rojo", "NO ACREDITADO"); venc = "—"; }
+            else { const e2 = estadoDesdeVenc(r.venc, true); estado = pill(e2.color, e2.label); venc = fechaFmt(r.venc); }
+            return `<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 8px;color:#94a3b8">${idx + 1}</td><td style="padding:6px 8px;font-weight:600">${esc(it.nombre)}</td><td style="padding:6px 8px;font-family:ui-monospace,monospace">${esc(it.rut)}</td><td style="padding:6px 8px;white-space:nowrap">${esc(venc)}</td><td style="padding:6px 8px">${estado}</td></tr>`;
+          }).join("");
+          const html = `
+            <div style="text-align:center">
+              <h3 style="font-weight:800;font-size:18px;margin-bottom:2px">✅ Resultado de verificación</h3>
+              <p style="color:#64748b;font-size:13px;margin-bottom:12px">${esc(ev.partido || ev.nombre_evento || "")} · ${lista.length} guardia(s)</p>
+            </div>
+            <div style="overflow:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:12px">
+              <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead><tr style="background:#0f5323;color:#fff;text-align:left"><th style="padding:8px">#</th><th style="padding:8px">Nombre</th><th style="padding:8px">RUT</th><th style="padding:8px">Vencimiento</th><th style="padding:8px">Estado</th></tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px">
+              <button id="vt_copytxt" class="btn btn-p">📋 Copiar resultado</button>
+              <button id="vt_cerrarRes" class="btn btn-ghost">Cerrar</button>
+            </div>
+          `;
+          openModalWide(html);
+          const bctx = document.getElementById("vt_copytxt");
+          if (bctx) bctx.onclick = async () => {
+            const txt = lista.map((it, idx) => {
+              const r = resultados[idx];
+              let est = "PENDIENTE", venc = "—";
+              if (r && r.acreditado === false) est = "NO ACREDITADO";
+              else if (r) { est = estadoDesdeVenc(r.venc, true).label; venc = fechaFmt(r.venc); }
+              return `${idx + 1}. ${it.nombre} | ${it.rut} | Vence: ${venc} | ${est}`;
+            }).join("\n");
+            const ok = await copiarAlPortapapeles(txt);
+            try { toast(ok ? "Resultado copiado" : "No se pudo copiar", ok); } catch (_) {}
+          };
+          const bcr = document.getElementById("vt_cerrarRes");
+          if (bcr) bcr.onclick = () => { try { closeModal(); } catch (_) {} };
+        };
+
+        abrirZ();
+        step();
+      } catch (err) {
+        console.error("verificarTodosAsistido:", err);
+        try { toast("No se pudo iniciar la verificación", false); } catch (_) {}
+      }
+    }
+
     function modalCuentaOS10(ev, asist) {
       const isPart = esPartido(ev);
       const saved = ev.reporte_os10 || {};
