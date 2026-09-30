@@ -3268,8 +3268,8 @@
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
-    ${FOTO_INGRESO_ON ? `<td data-label="Foto" class="pr-2 text-center">${a.foto_url
-      ? `<button data-foto="${a.id}" class="inline-block rounded-md overflow-hidden ring-1 ring-slate-200 align-middle hover:ring-emerald-400 transition" style="width:34px;height:44px" title="Ver foto de ingreso"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" loading="lazy"></button>`
+    ${FOTO_INGRESO_ON ? `<td data-label="Foto" class="pr-2 text-center" style="width:1%">${a.foto_url
+      ? `<button data-foto="${a.id}" class="inline-block rounded overflow-hidden ring-1 ring-slate-200 align-middle hover:ring-emerald-400 transition" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso (ampliar)"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" style="display:block" loading="lazy"></button>`
       : `<span class="text-slate-300" title="Sin foto">—</span>`}</td>` : ""}
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
