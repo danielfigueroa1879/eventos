@@ -3371,9 +3371,12 @@
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
       ${a.foto_url
         ? (modo === "empresa"
-          // Empresa: se VE la foto pero NO se puede descargar/guardar (fondo CSS, sin <img>; sin menú contextual ni callout de iOS).
-          ? `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" oncontextmenu="return false" ondragstart="return false" style="background-image:url('${esc(a.foto_url)}');background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none"></span>`
-          // Admin: <img> normal (puede ampliarla y descargarla).
+          // Empresa: la foto SOLO se ve durante 1 hora desde el ingreso (control), con un VELO BLANCO
+          // encima, y NO se puede descargar/guardar (fondo CSS, sin <img>). Pasada 1 h, desaparece (avatar).
+          ? ((Date.now() - new Date(a.hora_ingreso || 0).getTime() < 3600000)
+            ? `<span class="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" oncontextmenu="return false" ondragstart="return false" style="background-image:url('${esc(a.foto_url)}');background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>`
+            : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
+          // Admin: <img> normal (puede ampliarla y descargarla, sin límite de tiempo).
           : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`)
         : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
       <span class="flex-1 min-w-0">
@@ -6974,6 +6977,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       };
       await paint();
       Data.onChange(paint);
+      // Re-pinta cada 2 min para que las fotos de ingreso se oculten solas al cumplir 1 hora
+      // (aunque la empresa deje la pantalla abierta sin novedades).
+      if (EMPRESA_STATE._tick) clearInterval(EMPRESA_STATE._tick);
+      EMPRESA_STATE._tick = setInterval(paint, 120000);
     }
 
     /* =========================================================================
