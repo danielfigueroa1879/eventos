@@ -1341,6 +1341,17 @@
           const as = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).order("hora_ingreso", { ascending: true }));
           const ruts = [...new Set(as.map(a => a.rut))];
           let gu = []; if (ruts.length) gu = ok(await sb.from("guardias_central").select("*").in("rut", ruts));
+          // Bucket PRIVADO: las fotos no tienen URL pública. Se genera un enlace FIRMADO temporal
+          // (2 h) para poder verlas solo desde el panel. La ruta es siempre <evento_id>/<asistencia_id>.webp
+          // (sirve también para las fotos antiguas subidas antes de hacer privado el bucket).
+          const conFoto = as.filter(a => a.foto_url);
+          if (conFoto.length) {
+            try {
+              const paths = conFoto.map(a => `${evId}/${a.id}.webp`);
+              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(paths, 7200);
+              if (Array.isArray(firmadas)) firmadas.forEach((f, i) => { if (f && f.signedUrl && !f.error) conFoto[i].foto_url = f.signedUrl; });
+            } catch (e) { console.warn("firmar fotos:", e && e.message); }
+          }
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
         },
         async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).order("hora_ingreso", { ascending: false }).limit(1)); return d[0] || null; },
@@ -1372,15 +1383,15 @@
         // Configuración global compartida (tabla "config"). Si la tabla no existe aún, devuelve null sin romper.
         async getConfig(clave) { try { const d = ok(await sb.from("config").select("valor").eq("clave", clave).limit(1)); return d && d[0] ? d[0].valor : null; } catch (e) { console.warn("getConfig:", e && e.message); return null; } },
         async setConfig(clave, valor) { ok(await sb.from("config").upsert({ clave, valor, updated_at: nowISO() })); },
-        // Sube la foto de verificación (WebP HD) al bucket "ingresos" y guarda su URL en la asistencia.
+        // Sube la foto de verificación (WebP HD) al bucket privado "ingresos".
         async subirFotoIngreso(evId, asisId, blob) {
           const path = `${evId}/${asisId}.webp`;
           const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true });
           if (up.error) throw up.error;
-          const { data } = sb.storage.from("ingresos").getPublicUrl(path);
-          const url = (data && data.publicUrl) || null;
-          if (url) ok(await sb.from("asistencias").update({ foto_url: url }).eq("id", asisId));
-          return url;
+          // Bucket PRIVADO: se guarda la RUTA (no una URL pública). El panel genera un enlace firmado
+          // temporal al mostrar la foto, así no queda ningún enlace abierto/permanente a la imagen.
+          ok(await sb.from("asistencias").update({ foto_url: path }).eq("id", asisId));
+          return path;
         },
       };
     })();
@@ -1880,7 +1891,7 @@
 
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
         ${fotoRequerida ? `<div class="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-          <p class="text-[11px] text-slate-500 leading-snug text-left">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. No se realiza reconocimiento facial. Los datos se transmiten y almacenan de forma <b>cifrada</b>.</p>
+          <p class="text-[11px] text-slate-500 leading-snug text-left">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. No se realiza reconocimiento facial. Los datos se transmiten y almacenan de forma <b>cifrada y con acceso restringido</b>.</p>
         </div>` : ""}
       </div>
 
