@@ -1510,7 +1510,8 @@
         openModal(`
         <div class="text-center">
           <h2 class="font-bold text-slate-800 text-base mb-1">📸 Foto de verificación</h2>
-          <p class="text-xs text-slate-500 mb-3">Centra tu rostro dentro del óvalo y toma la foto para finalizar tu ingreso.</p>
+          <p class="text-xs text-slate-500 mb-1">Centra tu rostro dentro del óvalo y toma la foto para finalizar tu ingreso.</p>
+          <p class="text-[10.5px] text-slate-400 mb-3 leading-snug">🔒 Solo para control e identificación de ingreso (Ley N° 21.719). No se usa reconocimiento facial.</p>
           <div id="cap_stage" class="relative mx-auto rounded-2xl overflow-hidden bg-slate-900 shadow-inner" style="width:100%;max-width:300px;aspect-ratio:3/4;">
             <video id="cap_video" playsinline autoplay muted class="absolute inset-0 w-full h-full object-cover" style="transform:scaleX(-1)"></video>
             <img id="cap_preview" class="absolute inset-0 w-full h-full object-cover" style="display:none" alt="Foto tomada">
@@ -1878,6 +1879,9 @@
         </div>
 
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
+        ${fotoRequerida ? `<div class="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+          <p class="text-[11px] text-slate-500 leading-snug text-left">🔒 <b>Aviso de datos (Ley N° 21.719):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. No se realiza reconocimiento facial. Puedes ejercer tus derechos de acceso, rectificación y supresión ante el administrador del evento.</p>
+        </div>` : ""}
       </div>
 
       <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-3 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" alt="" class="w-5 h-5 rounded-full">Ir a os10coquimbo.cl</a>
