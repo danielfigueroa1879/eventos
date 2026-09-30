@@ -1,4 +1,15 @@
 <!doctype html>
+<!--
+  ============================================================================
+   ⛔  SISTEMA PROTEGIDO — Control de Guardias O.S.10 Coquimbo
+  ----------------------------------------------------------------------------
+   Uso exclusivo de fiscalización O.S.10. Está PROHIBIDO modificar, copiar,
+   redistribuir o manipular este código o sus datos sin autorización.
+   El acceso y las acciones quedan registrados. La intervención no autorizada
+   puede constituir delito conforme a la Ley N° 21.459 (delitos informáticos)
+   y demás normativa vigente en Chile.
+  ============================================================================
+-->
 <html lang="es">
 
 <head>
@@ -41,6 +52,22 @@
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>try { if (localStorage.getItem('os10_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) { }</script>
+  <!-- Aviso disuasivo en la consola del desarrollador (no bloquea DevTools; deja constancia del uso prohibido). -->
+  <script>
+    (function () {
+      try {
+        var t1 = "%c⛔ SISTEMA PROTEGIDO — O.S.10 Coquimbo";
+        var s1 = "color:#fff;background:#b91c1c;font-size:20px;font-weight:bold;padding:8px 14px;border-radius:6px";
+        var t2 = "%cEste sistema es de uso exclusivo de fiscalización O.S.10.\nEstá PROHIBIDO modificar, copiar, redistribuir o manipular su código o sus datos.\nEl acceso y las acciones quedan registrados. La intervención no autorizada puede\nconstituir delito conforme a la Ley N° 21.459 (delitos informáticos) y demás normativa vigente.";
+        var s2 = "color:#b91c1c;font-size:13px;font-weight:600;line-height:1.5";
+        var mostrar = function () { try { console.log(t1, s1); console.log(t2, s2); } catch (e) {} };
+        mostrar();
+        // Si abren la consola más tarde, se vuelve a mostrar (una vez).
+        var repetido = false;
+        window.addEventListener("resize", function () { if (!repetido) { repetido = true; mostrar(); } });
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root {
       --brand: #0c4a1f;
