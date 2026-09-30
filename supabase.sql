@@ -224,14 +224,15 @@ end $$;
 -- quien registra su ingreso. La foto se guarda en:  ingresos/<evento_id>/<asistencia_id>.webp
 -- y su URL pública queda en asistencias.foto_url.
 --
--- Bucket PÚBLICO: cualquiera con la URL exacta puede ver la imagen (no es listable). Es el
--- mismo criterio de la nota de seguridad de INSTRUCCIONES.md (riesgo aceptable para el evento).
+-- Bucket PRIVADO: las imágenes NO tienen URL pública permanente. El panel genera un enlace
+-- FIRMADO temporal (2 h) para verlas. Así una foto no queda accesible por un link suelto.
+-- (Si el bucket ya existía como público, esta línea lo cambia a privado.)
 insert into storage.buckets (id, name, public)
-values ('ingresos', 'ingresos', true)
-on conflict (id) do update set public = true;
+values ('ingresos', 'ingresos', false)
+on conflict (id) do update set public = false;
 
 -- Políticas de acceso al bucket (la página usa la anon key):
---  - lectura pública de las imágenes del bucket
+--  - select: necesaria para GENERAR los enlaces firmados desde el panel (no expone URLs públicas)
 --  - subida (insert) y reemplazo (update) permitidos para el bucket 'ingresos'
 drop policy if exists "ingresos_lectura"   on storage.objects;
 drop policy if exists "ingresos_subida"    on storage.objects;
