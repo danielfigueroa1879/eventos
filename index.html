@@ -1375,7 +1375,7 @@
           if (conFoto.length) {
             try {
               const paths = conFoto.map(a => `${evId}/${a.id}.webp`);
-              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(paths, 7200);
+              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(paths, 10800);
               if (Array.isArray(firmadas)) firmadas.forEach((f, i) => { if (f && f.signedUrl && !f.error) conFoto[i].foto_url = f.signedUrl; });
             } catch (e) { console.warn("firmar fotos:", e && e.message); }
           }
@@ -3398,9 +3398,9 @@
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
       ${a.foto_url
         ? (modo === "empresa"
-          // Empresa: la foto SOLO se ve durante 1 hora desde el ingreso (control), con un VELO BLANCO
-          // encima, y NO se puede descargar/guardar (fondo CSS, sin <img>). Pasada 1 h, desaparece (avatar).
-          ? ((Date.now() - new Date(a.hora_ingreso || 0).getTime() < 3600000)
+          // Empresa: la foto SOLO se ve durante 2 horas desde el ingreso (control), con un VELO BLANCO
+          // encima, y NO se puede descargar/guardar (fondo CSS, sin <img>). Pasadas 2 h, desaparece (avatar).
+          ? ((Date.now() - new Date(a.hora_ingreso || 0).getTime() < 7200000)
             ? `<span class="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" oncontextmenu="return false" ondragstart="return false" style="background-image:url('${esc(a.foto_url)}');background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>`
             : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
           // Admin: <img> normal (puede ampliarla y descargarla, sin límite de tiempo).
