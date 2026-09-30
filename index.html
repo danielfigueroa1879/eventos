@@ -1339,6 +1339,8 @@
         async setConfig(clave, valor) { let c = {}; try { c = JSON.parse(localStorage.getItem("os10_config") || "{}"); } catch {} c[clave] = valor; localStorage.setItem("os10_config", JSON.stringify(c)); ping(); },
         // Foto de verificación (demo): se guarda como data URL WebP dentro de la asistencia.
         async subirFotoIngreso(evId, asisId, blob) { const url = await blobToDataURL(blob); const a = get(K.as); const r = a.find(x => x.id === asisId); if (r) { r.foto_url = url; set(K.as, a); ping(); } return url; },
+        // Retención de fotos (demo): borra las fotos con más de N días.
+        async purgarFotosAntiguas(dias) { const corte = Date.now() - (dias || 7) * 86400000; const a = get(K.as); let n = 0; a.forEach(x => { if (x.foto_url && new Date(x.hora_ingreso).getTime() < corte) { x.foto_url = null; n++; } }); if (n) { set(K.as, a); ping(); } return n; },
       };
     })();
 
@@ -1358,7 +1360,11 @@
         async listEventos() { return ordenarEventos(ok(await sb.from("eventos").select("*").order("created_at", { ascending: true }))); },
         async createEvento(e) { return ok(await sb.from("eventos").insert({ ...e, activo: true }).select().single()); },
         async updateEvento(id, patch) { ok(await sb.from("eventos").update(patch).eq("id", id)); },
-        async deleteEvento(id) { ok(await sb.from("eventos").delete().eq("id", id)); },
+        async deleteEvento(id) {
+          // Limpieza: borra la carpeta de fotos del evento en el bucket (evita dejar imágenes huérfanas).
+          try { const { data: files } = await sb.storage.from("ingresos").list(id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${id}/${f.name}`)); } catch (e) { console.warn("borrar fotos evento:", e && e.message); }
+          ok(await sb.from("eventos").delete().eq("id", id));
+        },
         async getEventoBySlug(slug) { const d = ok(await sb.from("eventos").select("*").eq("slug", slug).limit(1)); return d[0] || null; },
         async getGuardia(rut) { const d = ok(await sb.from("guardias_central").select("*").eq("rut", rut).limit(1)); return d[0] || null; },
         async listGuardias() { return ok(await sb.from("guardias_central").select("*")); },
@@ -1396,6 +1402,9 @@
             try { ok(await sb.from("partidos_historial_asist").insert(rows)); }
             catch (e) { const rowsSin = rows.map(({ puesto, ...r }) => r); ok(await sb.from("partidos_historial_asist").insert(rowsSin)); } // por si falta la columna 'puesto'
           }
+          // Limpieza: al cerrar y archivar el partido se borran las fotos de ingreso de ese evento
+          // (el historial no guarda fotos), para no acumular peso en el almacenamiento.
+          try { const { data: files } = await sb.storage.from("ingresos").list(ev.id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${ev.id}/${f.name}`)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); }
           ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
           return hp.id;
         },
@@ -1419,6 +1428,19 @@
           // temporal al mostrar la foto, así no queda ningún enlace abierto/permanente a la imagen.
           ok(await sb.from("asistencias").update({ foto_url: path }).eq("id", asisId));
           return path;
+        },
+        // RETENCIÓN: borra del bucket las fotos con más de N días (por defecto 7) y limpia su referencia.
+        // Se ejecuta desde el panel del admin (throttled). Mantiene liviano el almacenamiento.
+        async purgarFotosAntiguas(dias) {
+          const corte = new Date(Date.now() - (dias || 7) * 86400000).toISOString();
+          let viejas = [];
+          try { viejas = ok(await sb.from("asistencias").select("id,evento_id,hora_ingreso").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { console.warn("purga (select):", e && e.message); return 0; }
+          if (!viejas.length) return 0;
+          const paths = viejas.map(a => `${a.evento_id}/${a.id}.webp`);
+          for (let i = 0; i < paths.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(paths.slice(i, i + 100)); if (r.error) console.warn("purga (storage):", r.error.message); } catch (e) { console.warn("purga (storage):", e && e.message); } }
+          const ids = viejas.map(a => a.id);
+          for (let i = 0; i < ids.length; i += 100) { try { ok(await sb.from("asistencias").update({ foto_url: null }).in("id", ids.slice(i, i + 100))); } catch (e) { console.warn("purga (update):", e && e.message); } }
+          return viejas.length;
         },
       };
     })();
@@ -2331,6 +2353,14 @@
       ADMIN_STATE._tick = setInterval(() => { if (ADMIN_STATE.selected) renderMain(); }, 5 * 60 * 1000);
       // Cargar el estado del interruptor "Foto de ingreso" ANTES del primer render (columna + botón).
       ADMIN_STATE.fotoIngreso = await cargarFotoIngresoConfig();
+      // RETENCIÓN de fotos: al entrar al panel se borran las fotos con más de 7 días (máx. 1 vez cada 6 h por dispositivo).
+      try {
+        const ultimaPurga = +(localStorage.getItem("os10_purga_fotos") || 0);
+        if (Date.now() - ultimaPurga > 6 * 3600 * 1000) {
+          localStorage.setItem("os10_purga_fotos", String(Date.now()));
+          Data.purgarFotosAntiguas(7).then(n => { if (n) console.log("Fotos de ingreso borradas por antigüedad (>7 días):", n); }).catch(() => {});
+        }
+      } catch (_) {}
       await refreshAdmin(true);
     }
 
@@ -2988,10 +3018,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
+            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
