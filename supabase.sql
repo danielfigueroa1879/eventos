@@ -89,6 +89,10 @@ create table if not exists asistencias (
 -- por guardia en un evento (causaba el error "ya estabas ingresado" al volver en otro turno).
 alter table asistencias drop constraint if exists asistencias_evento_id_rut_key;
 
+-- FOTO DE VERIFICACIÓN: URL (en el bucket "ingresos") de la foto tomada por quien registró
+-- el ingreso. Se guarda solo la URL (liviana); la imagen va en Supabase Storage (ver más abajo).
+alter table asistencias add column if not exists foto_url text;
+
 create index if not exists idx_asist_evento     on asistencias(evento_id);
 create index if not exists idx_asist_rut        on asistencias(rut);
 create index if not exists idx_asist_evento_rut on asistencias(evento_id, rut);
@@ -144,6 +148,15 @@ alter table partidos_historial_asist add column if not exists puesto text;
 create index if not exists idx_hist_evento on partidos_historial(evento_id);
 create index if not exists idx_hista_hist  on partidos_historial_asist(historial_id);
 
+-- ---------- CONFIGURACIÓN GLOBAL (interruptores del panel) ----------
+-- Tabla clave/valor para ajustes compartidos entre todos los dispositivos.
+-- Hoy se usa para "foto_ingreso" ('1' = pedir foto al registrar, '0'/ausente = no).
+create table if not exists config (
+  clave      text primary key,
+  valor      text,
+  updated_at timestamptz default now()
+);
+
 -- ---------- SEGURIDAD (RLS) ----------
 -- El formulario del guardia y el panel usan la ANON KEY pública.
 -- Estas políticas permiten leer/registrar. (Ver nota de seguridad en INSTRUCCIONES.md)
@@ -153,6 +166,7 @@ alter table asistencias              enable row level security;
 alter table partidos_historial       enable row level security;
 alter table partidos_historial_asist enable row level security;
 alter table puestos                  enable row level security;
+alter table config                   enable row level security;
 
 drop policy if exists "acceso_eventos"       on eventos;
 drop policy if exists "acceso_guardias"      on guardias_central;
@@ -160,6 +174,7 @@ drop policy if exists "acceso_asistencias"   on asistencias;
 drop policy if exists "acceso_historial"     on partidos_historial;
 drop policy if exists "acceso_historial_as"  on partidos_historial_asist;
 drop policy if exists "acceso_puestos"       on puestos;
+drop policy if exists "acceso_config"        on config;
 
 create policy "acceso_eventos"       on eventos                  for all using (true) with check (true);
 create policy "acceso_guardias"      on guardias_central         for all using (true) with check (true);
@@ -167,6 +182,7 @@ create policy "acceso_asistencias"   on asistencias              for all using (
 create policy "acceso_historial"     on partidos_historial       for all using (true) with check (true);
 create policy "acceso_historial_as"  on partidos_historial_asist for all using (true) with check (true);
 create policy "acceso_puestos"       on puestos                  for all using (true) with check (true);
+create policy "acceso_config"        on config                   for all using (true) with check (true);
 
 -- ---------- TIEMPO REAL ----------
 -- Se agregan al realtime solo si no estaban ya (evita el error 42710
@@ -197,4 +213,30 @@ begin
                  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'puestos') then
     alter publication supabase_realtime add table puestos;
   end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'config') then
+    alter publication supabase_realtime add table config;
+  end if;
 end $$;
+
+-- ---------- FOTOS DE VERIFICACIÓN (Supabase Storage) ----------
+-- Bucket público "ingresos" donde se guardan las fotos (WebP HD, muy livianas) que toma
+-- quien registra su ingreso. La foto se guarda en:  ingresos/<evento_id>/<asistencia_id>.webp
+-- y su URL pública queda en asistencias.foto_url.
+--
+-- Bucket PÚBLICO: cualquiera con la URL exacta puede ver la imagen (no es listable). Es el
+-- mismo criterio de la nota de seguridad de INSTRUCCIONES.md (riesgo aceptable para el evento).
+insert into storage.buckets (id, name, public)
+values ('ingresos', 'ingresos', true)
+on conflict (id) do update set public = true;
+
+-- Políticas de acceso al bucket (la página usa la anon key):
+--  - lectura pública de las imágenes del bucket
+--  - subida (insert) y reemplazo (update) permitidos para el bucket 'ingresos'
+drop policy if exists "ingresos_lectura"   on storage.objects;
+drop policy if exists "ingresos_subida"    on storage.objects;
+drop policy if exists "ingresos_reemplazo" on storage.objects;
+
+create policy "ingresos_lectura"   on storage.objects for select using (bucket_id = 'ingresos');
+create policy "ingresos_subida"    on storage.objects for insert with check (bucket_id = 'ingresos');
+create policy "ingresos_reemplazo" on storage.objects for update using (bucket_id = 'ingresos') with check (bucket_id = 'ingresos');

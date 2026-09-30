@@ -922,7 +922,7 @@
     const FECHA_TOPE_PRORROGA = new Date(2027, 4, 28, 23, 59, 59); // 28-may-2027 (tope prórroga)
 
     const USING_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-    const APP_VERSION = "v3.2";
+    const APP_VERSION = "v3.3";
     // En modo Supabase, limpiar datos de demo viejos guardados en el navegador (evita confusiones/cachés).
     if (USING_SUPABASE) { try { ["os10_eventos", "os10_guardias", "os10_asistencias", "os10_seeded"].forEach(k => localStorage.removeItem(k)); } catch (e) { } }
 
@@ -1307,6 +1307,11 @@
         async updatePuesto(id, patch) { set(K.pu, get(K.pu).map(x => x.id === id ? { ...x, ...patch } : x)); ping(); },
         async deletePuesto(id) { set(K.pu, get(K.pu).filter(x => x.id !== id)); set(K.as, get(K.as).map(x => x.puesto_id === id ? { ...x, puesto_id: null } : x)); ping(); },
         async asignarPuesto(asistenciaId, puestoId) { set(K.as, get(K.as).map(x => x.id === asistenciaId ? { ...x, puesto_id: puestoId } : x)); ping(); },
+        // Configuración global (demo: en este dispositivo). Ej: clave "foto_ingreso" = "1"/"0".
+        async getConfig(clave) { try { const c = JSON.parse(localStorage.getItem("os10_config") || "{}"); return clave in c ? c[clave] : null; } catch { return null; } },
+        async setConfig(clave, valor) { let c = {}; try { c = JSON.parse(localStorage.getItem("os10_config") || "{}"); } catch {} c[clave] = valor; localStorage.setItem("os10_config", JSON.stringify(c)); ping(); },
+        // Foto de verificación (demo): se guarda como data URL WebP dentro de la asistencia.
+        async subirFotoIngreso(evId, asisId, blob) { const url = await blobToDataURL(blob); const a = get(K.as); const r = a.find(x => x.id === asisId); if (r) { r.foto_url = url; set(K.as, a); ping(); } return url; },
       };
     })();
 
@@ -1364,6 +1369,19 @@
         async updatePuesto(id, patch) { ok(await sb.from("puestos").update(patch).eq("id", id)); },
         async deletePuesto(id) { ok(await sb.from("puestos").delete().eq("id", id)); },
         async asignarPuesto(asistenciaId, puestoId) { ok(await sb.from("asistencias").update({ puesto_id: puestoId }).eq("id", asistenciaId)); },
+        // Configuración global compartida (tabla "config"). Si la tabla no existe aún, devuelve null sin romper.
+        async getConfig(clave) { try { const d = ok(await sb.from("config").select("valor").eq("clave", clave).limit(1)); return d && d[0] ? d[0].valor : null; } catch (e) { console.warn("getConfig:", e && e.message); return null; } },
+        async setConfig(clave, valor) { ok(await sb.from("config").upsert({ clave, valor, updated_at: nowISO() })); },
+        // Sube la foto de verificación (WebP HD) al bucket "ingresos" y guarda su URL en la asistencia.
+        async subirFotoIngreso(evId, asisId, blob) {
+          const path = `${evId}/${asisId}.webp`;
+          const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true });
+          if (up.error) throw up.error;
+          const { data } = sb.storage.from("ingresos").getPublicUrl(path);
+          const url = (data && data.publicUrl) || null;
+          if (url) ok(await sb.from("asistencias").update({ foto_url: url }).eq("id", asisId));
+          return url;
+        },
       };
     })();
 
@@ -1445,6 +1463,181 @@
     function openModalWide(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+
+    /* =========================================================================
+       FOTO DE VERIFICACIÓN (ingreso) — captura con guía ovalada + conversión a WebP HD
+       ---------------------------------------------------------------------------
+       - La foto NO se guarda en Full HD: se recorta a retrato 3:4 y se limita a HD
+         (alto máx. 1000 px) y se comprime a WebP (calidad 0.72). Pesa muy poco.
+       - Sirve para dejar registro de QUIÉN ingresó realmente los datos en el QR.
+       ========================================================================= */
+    function blobToDataURL(blob) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); }); }
+
+    // Dibuja la fuente (video o <img>) recortada a retrato 3:4, escalada a HD, y devuelve un Blob WebP.
+    function _fotoWebpDesde(source, sw, sh) {
+      return new Promise((resolve, reject) => {
+        try {
+          if (!sw || !sh) { reject(new Error("Sin imagen")); return; }
+          const ratio = 3 / 4;                 // ancho/alto del retrato final
+          let cropW = sw, cropH = sw / ratio;  // recorte centrado con proporción 3:4
+          if (cropH > sh) { cropH = sh; cropW = sh * ratio; }
+          const sx = (sw - cropW) / 2, sy = (sh - cropH) / 2;
+          const maxH = 1000;                   // límite HD (Full HD sería ~1440+): mantiene el archivo liviano
+          const outH = Math.min(maxH, cropH), outW = outH * ratio;
+          const c = document.createElement("canvas");
+          c.width = Math.round(outW); c.height = Math.round(outH);
+          const ctx = c.getContext("2d");
+          ctx.imageSmoothingQuality = "high";
+          // La cámara frontal se ve en espejo en pantalla, pero se guarda la imagen REAL (sin espejo).
+          ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, outW, outH);
+          const done = (blob) => { if (blob) resolve(blob); else reject(new Error("No se pudo convertir la foto")); };
+          if (c.toBlob) c.toBlob(done, "image/webp", 0.72);
+          else { const u = c.toDataURL("image/webp", 0.72); fetch(u).then(r => r.blob()).then(resolve).catch(reject); }
+        } catch (e) { reject(e); }
+      });
+    }
+
+    // Abre el modal de captura. Resuelve con el Blob WebP (usar foto) o null (cancelar).
+    function capturarFotoIngreso() {
+      return new Promise((resolve) => {
+        let stream = null, shotBlob = null, terminado = false;
+        const limpiar = () => { try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) {} stream = null; };
+        // Cerrar tocando el fondo oscuro = cancelar (además detiene la cámara y resuelve la promesa).
+        const onBackdrop = (e) => { if (e.target.id === "modal") cerrar(null); };
+        const cerrar = (blob) => { if (terminado) return; terminado = true; try { $("#modal").removeEventListener("click", onBackdrop); } catch (_) {} limpiar(); closeModal(); resolve(blob || null); };
+        $("#modal").addEventListener("click", onBackdrop);
+
+        openModal(`
+        <div class="text-center">
+          <h2 class="font-bold text-slate-800 text-base mb-1">📸 Foto de verificación</h2>
+          <p class="text-xs text-slate-500 mb-3">Centra tu rostro dentro del óvalo y toma la foto para finalizar tu ingreso.</p>
+          <div id="cap_stage" class="relative mx-auto rounded-2xl overflow-hidden bg-slate-900 shadow-inner" style="width:100%;max-width:300px;aspect-ratio:3/4;">
+            <video id="cap_video" playsinline autoplay muted class="absolute inset-0 w-full h-full object-cover" style="transform:scaleX(-1)"></video>
+            <img id="cap_preview" class="absolute inset-0 w-full h-full object-cover" style="display:none" alt="Foto tomada">
+            <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 300 400" aria-hidden="true">
+              <defs><mask id="cap_mask"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="178" rx="96" ry="126" fill="black"/></mask></defs>
+              <rect width="300" height="400" fill="rgba(15,23,42,0.55)" mask="url(#cap_mask)"/>
+              <ellipse cx="150" cy="178" rx="96" ry="126" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="7 7" opacity="0.92"/>
+            </svg>
+          </div>
+          <div id="cap_msg" class="text-[11px] text-slate-400 mt-2" style="min-height:16px"></div>
+          <div id="cap_actions" class="mt-3 flex gap-2">
+            <button id="cap_cancel" class="btn btn-ghost flex-1 text-sm">Cancelar</button>
+            <button id="cap_shot" class="btn btn-p flex-1 text-sm" disabled>📷 Tomar foto</button>
+          </div>
+        </div>`);
+
+        const video = $("#cap_video"), preview = $("#cap_preview"), msg = $("#cap_msg"), acts = $("#cap_actions");
+        const setMsg = (t, cls) => { if (msg) { msg.className = "text-[11px] mt-2 " + (cls || "text-slate-400"); msg.textContent = t || ""; msg.style.minHeight = "16px"; } };
+
+        // Vista de previsualización (foto ya tomada): Repetir / Usar foto.
+        const verPreview = (blob) => {
+          shotBlob = blob;
+          blobToDataURL(blob).then(u => { preview.src = u; preview.style.display = "block"; video.style.display = "none"; });
+          acts.innerHTML = `
+            <button id="cap_retry" class="btn btn-ghost flex-1 text-sm">↺ Repetir</button>
+            <button id="cap_use" class="btn btn-p flex-1 text-sm">✔ Usar foto</button>`;
+          setMsg("¿Se ve bien tu rostro? Puedes repetirla si quieres.", "text-slate-400");
+          $("#cap_retry").addEventListener("click", volverVivo);
+          $("#cap_use").addEventListener("click", () => cerrar(shotBlob));
+        };
+
+        // Vuelve a la cámara en vivo (o al selector de archivo si no hay cámara).
+        const volverVivo = () => {
+          preview.style.display = "none"; video.style.display = "block";
+          if (stream) {
+            acts.innerHTML = `
+              <button id="cap_cancel" class="btn btn-ghost flex-1 text-sm">Cancelar</button>
+              <button id="cap_shot" class="btn btn-p flex-1 text-sm">📷 Tomar foto</button>`;
+            $("#cap_cancel").addEventListener("click", () => cerrar(null));
+            $("#cap_shot").addEventListener("click", tomar);
+            setMsg("");
+          } else { usarArchivo(); }
+        };
+
+        const tomar = async () => {
+          if (!video.videoWidth) { setMsg("La cámara aún no está lista, espera un momento…", "text-amber-600"); return; }
+          const shot = $("#cap_shot"); if (shot) { shot.disabled = true; shot.textContent = "Procesando…"; }
+          try { const blob = await _fotoWebpDesde(video, video.videoWidth, video.videoHeight); verPreview(blob); }
+          catch (e) { console.error(e); setMsg("No se pudo tomar la foto, intenta de nuevo.", "text-red-600"); if (shot) { shot.disabled = false; shot.textContent = "📷 Tomar foto"; } }
+        };
+
+        // Alternativa cuando no hay cámara / permiso denegado: subir/seleccionar una foto (también se convierte a WebP HD).
+        const usarArchivo = () => {
+          const stage = $("#cap_stage");
+          if (stage) stage.innerHTML = `<div class="absolute inset-0 flex flex-col items-center justify-center text-center text-slate-300 p-4">
+            <div class="text-4xl mb-2">📷</div>
+            <div class="text-xs">No se pudo abrir la cámara.<br>Toca el botón para tomar o elegir una foto.</div></div>`;
+          setMsg("Se pedirá una foto para completar el ingreso.", "text-slate-400");
+          acts.innerHTML = `
+            <button id="cap_cancel" class="btn btn-ghost flex-1 text-sm">Cancelar</button>
+            <label id="cap_filelbl" class="btn btn-p flex-1 text-sm cursor-pointer flex items-center justify-center">📷 Tomar / elegir foto
+              <input id="cap_file" type="file" accept="image/*" capture="user" class="hidden">
+            </label>`;
+          $("#cap_cancel").addEventListener("click", () => cerrar(null));
+          $("#cap_file").addEventListener("change", async (ev) => {
+            const f = ev.target.files && ev.target.files[0]; if (!f) return;
+            setMsg("Procesando foto…", "text-slate-400");
+            try {
+              const img = new Image(); const url = URL.createObjectURL(f);
+              await new Promise((r, j) => { img.onload = r; img.onerror = j; img.src = url; });
+              const blob = await _fotoWebpDesde(img, img.naturalWidth, img.naturalHeight);
+              URL.revokeObjectURL(url);
+              // En modo archivo mostramos la previsualización directa con opción de repetir (reabrir selector).
+              const stage2 = $("#cap_stage");
+              if (stage2) stage2.innerHTML = `<img id="cap_preview" class="absolute inset-0 w-full h-full object-cover" alt="Foto tomada">
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 300 400" aria-hidden="true">
+                  <ellipse cx="150" cy="178" rx="96" ry="126" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="7 7" opacity="0.7"/></svg>`;
+              const pv = $("#cap_preview"); const du = await blobToDataURL(blob); if (pv) pv.src = du;
+              shotBlob = blob;
+              acts.innerHTML = `
+                <label class="btn btn-ghost flex-1 text-sm cursor-pointer flex items-center justify-center">↺ Repetir
+                  <input id="cap_file2" type="file" accept="image/*" capture="user" class="hidden"></label>
+                <button id="cap_use" class="btn btn-p flex-1 text-sm">✔ Usar foto</button>`;
+              setMsg("", "text-slate-400");
+              $("#cap_use").addEventListener("click", () => cerrar(shotBlob));
+              const f2 = $("#cap_file2"); if (f2) f2.addEventListener("change", (e2) => { const ff = e2.target.files && e2.target.files[0]; if (ff) { usarArchivo(); const inp = $("#cap_file"); if (inp) { const dt = new DataTransfer(); dt.items.add(ff); inp.files = dt.files; inp.dispatchEvent(new Event("change")); } } });
+            } catch (e) { console.error(e); setMsg("No se pudo procesar la foto, intenta con otra.", "text-red-600"); }
+          });
+        };
+
+        $("#cap_cancel").addEventListener("click", () => cerrar(null));
+        $("#cap_shot").addEventListener("click", tomar);
+
+        // Iniciar cámara frontal.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { usarArchivo(); return; }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false })
+          .then(s => {
+            if (terminado) { try { s.getTracks().forEach(t => t.stop()); } catch (_) {} return; }
+            stream = s; video.srcObject = s;
+            video.onloadedmetadata = () => { video.play().catch(() => {}); const shot = $("#cap_shot"); if (shot) shot.disabled = false; };
+          })
+          .catch(err => { console.warn("getUserMedia:", err); usarArchivo(); });
+      });
+    }
+    // Visor de la foto de ingreso (admin): vista ampliada, profesional y minimalista.
+    function verFotoIngresoModal(url, nombre, a) {
+      if (!url) return;
+      openModal(`
+      <div class="text-center">
+        <div class="flex items-center justify-between mb-3 -mt-1">
+          <h2 class="font-bold text-slate-800 text-sm tracking-wide">📸 FOTO DE INGRESO</h2>
+          <button id="vf_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
+        </div>
+        <div class="mx-auto rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-black/10 shadow" style="max-width:320px;aspect-ratio:3/4">
+          <img src="${esc(url)}" alt="Foto de ingreso" class="w-full h-full object-cover">
+        </div>
+        ${nombre ? `<div class="mt-3 font-semibold text-slate-800">${esc(nombre)}</div>` : ""}
+        ${a && a.hora_ingreso ? `<div class="text-xs text-slate-400 mt-0.5">Ingreso: ${esc(horaFmt(a.hora_ingreso))}</div>` : ""}
+        <div class="flex gap-2 mt-4">
+          <a href="${esc(url)}" download="ingreso.webp" target="_blank" rel="noopener" class="btn btn-ghost flex-1 text-sm">⬇ Descargar</a>
+          <button id="vf_close" class="btn btn-p flex-1 text-sm">Cerrar</button>
+        </div>
+      </div>`);
+      const x = $("#vf_x"), c = $("#vf_close");
+      if (x) x.addEventListener("click", closeModal);
+      if (c) c.addEventListener("click", closeModal);
+    }
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
     // Distintivo SPD: badge azul con letras blancas.
     function badgeSPD() { return `<span class="badge" style="background:#1b3a8f;color:#ffffff;font-weight:bold" title="Autorizado por SPD (Subsecretaría de Prevención del Delito)">SPD</span>`; }
@@ -1613,6 +1806,10 @@
       }
       // Candado de edición: si el evento está CERRADO, el guardia no puede modificar sus datos.
       const registroAbierto = ev.registro_abierto === true;
+      // ¿Se exige foto de verificación al finalizar el registro? (interruptor global del admin)
+      let fotoRequerida = false;
+      try { fotoRequerida = (await Data.getConfig("foto_ingreso")) === "1"; } catch (_) { fotoRequerida = false; }
+      let fotoBlob = null; // foto capturada (WebP HD) pendiente de subir tras crear la asistencia
       app.innerHTML = `
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
@@ -1813,6 +2010,9 @@
       function mostrarVigencia(f) { if (superSel && superSel.value === "supervisor") { vigBox.hidden = true; return; } if (!f) { vigBox.hidden = true; return; } const v = calcularVigencia(f); vigBox.hidden = false; vigBadge.innerHTML = badge(v) + (v.siges ? ` <span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""); }
       function actualizarBtn() {
         avisoTel();
+        // Texto del botón cuando los datos están listos: si se exige foto, se avisa en el propio botón.
+        const okTxtE = fotoRequerida ? "📸 Confirmar con foto" : "✔ Confirmar ingreso";
+        const okTxtN = fotoRequerida ? "📸 Registrar con foto" : "Registrar ingreso";
         // La fecha futura sí bloquea; un solo nombre/apellido solo avisa (no bloquea)
         if (fecha.value && fechaFutura(fecha.value)) { submit.disabled = true; submit.textContent = "Fecha de examen inválida"; return; }
         if (modo === "existe") {
@@ -1820,14 +2020,14 @@
           const ok = resto && tel.value.trim();
           // Si solo falta el teléfono (y se puede editar), el botón queda activo: al tocarlo avisa y sacude el recuadro.
           const soloTel = resto && !tel.value.trim() && registroAbierto;
-          submit.disabled = !(ok || soloTel); submit.textContent = ok ? "✔ Confirmar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
+          submit.disabled = !(ok || soloTel); submit.textContent = ok ? okTxtE : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
           return;
         }
         if (modo === "nuevo") {
           const resto = rutValido(rut.value) && nombres.value.trim() && apellidos.value.trim() && fecha.value;
           const ok = resto && tel.value.trim();
           // Si solo falta el teléfono, el botón queda activo: al tocarlo avisa y sacude el recuadro.
-          submit.disabled = !resto; submit.textContent = ok ? "Registrar ingreso" : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
+          submit.disabled = !resto; submit.textContent = ok ? okTxtN : (!tel.value.trim() ? "Ingrese su número de teléfono" : "Complete los datos");
         }
       }
 
@@ -1873,6 +2073,17 @@
           toast("Sin conexión a internet. Verifica tu señal e intenta nuevamente.", "danger", 4000);
           return;
         }
+        // FOTO DE VERIFICACIÓN: si está activada, se exige tomar la foto ANTES de registrar.
+        // Deja constancia de quién ingresó realmente los datos. Si cancela, no se registra.
+        if (fotoRequerida && !fotoBlob) {
+          const blob = await capturarFotoIngreso();
+          if (!blob) { toast("Necesitas tomar la foto para completar tu ingreso.", false, 3500); return; }
+          fotoBlob = blob;
+        }
+        await guardarIngreso();
+      });
+
+      async function guardarIngreso() {
         const rutV = formatRut(rut.value);
         const txtPrev = submit.textContent;
         submit.disabled = true; submit.textContent = "Guardando… no cierres esta ventana";
@@ -1901,6 +2112,13 @@
           // 2) Registrar la asistencia y CONFIRMAR que el servidor la escribió (devuelve la fila insertada).
           const asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superSel && superSel.value === "supervisor")), TIMEOUT_MS);
           if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
+          // 2b) Subir la foto de verificación (WebP HD) y adjuntarla a la asistencia recién creada.
+          //     Es "mejor esfuerzo": si fallara la subida NO se pierde el ingreso ya registrado.
+          if (fotoBlob) {
+            submit.textContent = "Guardando foto…";
+            try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fotoBlob), TIMEOUT_MS); if (u) asis.foto_url = u; fotoBlob = null; }
+            catch (e) { console.error("foto:", e); toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500); }
+          }
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
           mostrarIngresoExitoso(asis);
         } catch (err) {
@@ -1919,7 +2137,7 @@
           toast("No se pudo registrar tu ingreso. Verifica tu conexión e intenta nuevamente.", "danger", 4000);
           submit.disabled = false; submit.textContent = txtPrev || "✔ Confirmar ingreso";
         }
-      });
+      }
     }
 
     /* =========================================================================
@@ -1956,7 +2174,11 @@
     /* =========================================================================
        PANEL ADMIN
        ========================================================================= */
-    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true, verArchivo: false };
+    let ADMIN_STATE = { eventos: [], selected: null, search: "", turnoFiltro: "all", unsub: null, sidebarOpen: false, showStats: false, showQR: false, showResumen: true, verArchivo: false, fotoIngreso: false };
+
+    // Estado (caché) de la función "Foto de verificación al ingresar".
+    let FOTO_INGRESO_ON = false;
+    async function cargarFotoIngresoConfig() { try { FOTO_INGRESO_ON = (await Data.getConfig("foto_ingreso")) === "1"; } catch (_) { FOTO_INGRESO_ON = false; } return FOTO_INGRESO_ON; }
     // ARCHIVO de eventos: un evento archivado (activo === false) sale de la lista principal del panel
     // y pasa a la sección "📁 Archivo", donde se ve y se despliega igual que siempre. No se borra nada:
     // el link de la empresa sigue funcionando hasta que el evento se elimine.
@@ -2000,6 +2222,18 @@
         </button>
         <div id="accPanel" hidden>
         <button id="nuevoEv" class="btn btn-ghost w-full mb-2 text-sm font-semibold" style="border:1px solid #e5e7eb;color:#374151">+ Nuevo evento</button>
+        <div id="fotoIngresoBox" class="mb-2 rounded-lg border border-slate-200 px-2.5 py-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-[13px] font-semibold text-slate-700 flex items-center gap-1">📸 Foto de ingreso</div>
+              <div id="fotoIngresoHint" class="text-[10.5px] text-slate-400 leading-tight">Pide una foto al finalizar el registro.</div>
+            </div>
+            <button id="toggleFoto" type="button" role="switch" aria-checked="false" title="Activar/desactivar foto de ingreso"
+              class="relative inline-flex flex-shrink-0 h-6 w-11 items-center rounded-full transition-colors bg-slate-300">
+              <span id="toggleFotoKnob" class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform translate-x-0.5"></span>
+            </button>
+          </div>
+        </div>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
         <button id="verArchivo" class="btn btn-ghost w-full mb-3 text-sm font-semibold flex items-center justify-between gap-2" style="border:1.5px solid #94a3b8;color:#475569" aria-expanded="false">
           <span id="verArchivoLbl" class="flex items-center gap-1.5">
@@ -2029,6 +2263,34 @@
   </div>`;
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
+
+      // --- Interruptor global "Foto de ingreso" (activado/desactivado) ---
+      const pintarToggleFoto = () => {
+        const b = $("#toggleFoto"), k = $("#toggleFotoKnob"), h = $("#fotoIngresoHint");
+        if (!b || !k) return;
+        const on = !!ADMIN_STATE.fotoIngreso;
+        b.setAttribute("aria-checked", on ? "true" : "false");
+        b.classList.toggle("bg-emerald-500", on);
+        b.classList.toggle("bg-slate-300", !on);
+        k.classList.toggle("translate-x-[22px]", on);
+        k.classList.toggle("translate-x-0.5", !on);
+        if (h) { h.textContent = on ? "Activada: pide una foto al finalizar el registro." : "Desactivada. Actívala para pedir una foto al registrar."; h.className = "text-[10.5px] leading-tight " + (on ? "text-emerald-600" : "text-slate-400"); }
+      };
+      (async () => { ADMIN_STATE.fotoIngreso = await cargarFotoIngresoConfig(); pintarToggleFoto(); })();
+      const btnFoto = $("#toggleFoto");
+      if (btnFoto) btnFoto.addEventListener("click", async () => {
+        const nuevo = !ADMIN_STATE.fotoIngreso;
+        btnFoto.disabled = true;
+        try {
+          await Data.setConfig("foto_ingreso", nuevo ? "1" : "0");
+          ADMIN_STATE.fotoIngreso = nuevo; FOTO_INGRESO_ON = nuevo; pintarToggleFoto();
+          toast(nuevo ? "📸 Foto de ingreso ACTIVADA" : "Foto de ingreso desactivada", true);
+        } catch (e) {
+          console.error(e);
+          toast("No se pudo guardar. ¿Ejecutaste el SQL actualizado en Supabase (tabla config)?", "danger", 5000);
+        }
+        btnFoto.disabled = false;
+      });
       // Desplegar / plegar las acciones (chevron → a la derecha cerrado, ↓ abierto). Se recuerda el estado.
       const pintarAcc = () => {
         const ab = !!ADMIN_STATE.accAbierto;
@@ -2839,6 +3101,7 @@
       filtrarLista();
       main.querySelectorAll(".turnoChip").forEach(c => c.addEventListener("click", () => { ADMIN_STATE.turnoFiltro = c.dataset.turno; renderMain(); }));
       main.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev)));
+      main.querySelectorAll("[data-foto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); const a = asist.find(a => a.id === x.dataset.foto); if (a && a.foto_url) { const nom = ((a.guardia && a.guardia.nombres || "") + " " + (a.guardia && a.guardia.apellidos || "")).trim(); verFotoIngresoModal(a.foto_url, nom, a); } }));
       main.querySelectorAll("[data-edit]").forEach(x => x.addEventListener("click", () => modalEditarGuardia(asist.find(a => a.id === x.dataset.edit), ev)));
       main.querySelectorAll("[data-approve]").forEach(x => x.addEventListener("click", async () => {
         const a = asist.find(a => a.id === x.dataset.approve);
@@ -3018,7 +3281,7 @@
     <td data-label="Vigencia" class="pr-2">${badgeVigenciaCelda(v, ev, a, g)}</td>
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
-    <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
+    <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}${a.foto_url ? ` <button data-foto="${a.id}" class="align-middle text-slate-400 hover:text-slate-700" title="Ver foto de ingreso">📷</button>` : ""}</td>
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
       ${esSPD(g, a) && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
@@ -3205,6 +3468,12 @@
       <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1 ' + nameBox : ''}">${esc(nomFull)}</span></div>
       <div class="inline-block mt-1.5">${esSup ? "" : vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">${esSup ? "Autorización" : "Examen"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${esSPD(g, a) ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
+    ${(!empresa && a.foto_url) ? `<div class="flex justify-center mb-3">
+      <button id="dg_foto_btn" type="button" class="relative rounded-2xl overflow-hidden ring-1 ring-slate-200 shadow-sm bg-slate-100 active:opacity-80" style="width:104px;aspect-ratio:3/4" title="Ver foto de ingreso">
+        <img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" loading="lazy">
+        <span class="absolute bottom-0 inset-x-0 bg-black/45 text-white text-[9px] py-0.5 flex items-center justify-center gap-1">📸 Ver foto</span>
+      </button>
+    </div>` : ""}
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
       <div class="text-center text-red-800 font-extrabold text-xs mb-1">⚠ ${getInfracciones(g).length === 1 ? "OBSERVACIÓN" : getInfracciones(g).length + " OBSERVACIONES"}</div>
       ${getInfracciones(g).map(r => `<div class="text-center py-1 border-t border-red-200 first:border-0">
@@ -3254,6 +3523,9 @@
     <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
       $("#dg_x").addEventListener("click", closeModal);
       $("#dg_close").addEventListener("click", closeModal);
+      // Ver la foto de ingreso ampliada (solo vista admin).
+      const dgFoto = $("#dg_foto_btn");
+      if (dgFoto) dgFoto.addEventListener("click", () => verFotoIngresoModal(a.foto_url, nomFull, a));
       // Admin: cambiar el turno del guardia (ej: de Noche a Día) ajustando la hora de ingreso.
       if (!empresa && a.id && eventoUsaTurnos(ev)) {
         const selT = $("#dg_turno"), btnT = $("#dg_turno_ok");

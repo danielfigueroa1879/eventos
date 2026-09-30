@@ -48,6 +48,17 @@ Abre `index.html` con doble clic. Entra al panel con el PIN **1234**. Trae 2 eve
 
 ---
 
+## 📸 Foto de verificación al ingresar (nuevo)
+Permite exigir una **foto** a quien registra su ingreso por el QR, para dejar constancia de quién ingresó realmente los datos. La foto se toma con una **guía ovalada** para el rostro (se ve profesional), se convierte a **WebP en HD** (no Full HD) para que pese muy poco, y queda adjunta al registro.
+
+**Activar/desactivar:** en el panel de administrador, abre las acciones ("Desplegar") y usa el interruptor **📸 Foto de ingreso**. Es un ajuste global (aplica a todos los eventos y a todos los dispositivos).
+
+**Ver las fotos (admin):** en el listado aparece un ícono 📷 junto a la hora de ingreso, y en el **Detalle del guardia** se muestra la miniatura; al tocarla se ve ampliada con opción de descargar.
+
+**Requisito de instalación (una sola vez):** vuelve a ejecutar el archivo `supabase.sql` en **Supabase → SQL Editor** (es seguro re-ejecutarlo). Eso agrega la columna `asistencias.foto_url`, la tabla `config` y crea el bucket de Storage **`ingresos`** con sus permisos. Sin este paso, el interruptor no se podrá guardar y las fotos no se subirán.
+
+> Nota: el bucket `ingresos` es **público** (quien tenga la URL exacta de una foto puede verla, pero no listar el bucket). Es el mismo criterio de la nota de seguridad de más abajo.
+
 ## 🎨 Personalizar
 - **Colores:** en `index.html`, variable CSS `--brand` (verde institucional).
 - **Reglas legales:** las constantes `MESES_VIGENCIA`, `ENTRADA_VIGENCIA_LEY` y `FECHA_TOPE_PRORROGA` ya están correctas (Ley 21.659 / prórroga Ley 21.825 hasta 28-may-2027). No las cambies salvo instrucción de OS10.
