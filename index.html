@@ -3369,7 +3369,13 @@
           : vigenciaPill(v));
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-1 pl-1.5 pr-0 py-2 text-left"${rowStyle}>
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
-      <span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5${(a.foto_url && modo !== "empresa") ? ' ring-emerald-400' : ''}" aria-hidden="true">${(a.foto_url && modo !== "empresa") ? `<img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover">` : avatarSVG(avSexo, a.rut)}</span>
+      ${a.foto_url
+        ? (modo === "empresa"
+          // Empresa: se VE la foto pero NO se puede descargar/guardar (fondo CSS, sin <img>; sin menú contextual ni callout de iOS).
+          ? `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" oncontextmenu="return false" ondragstart="return false" style="background-image:url('${esc(a.foto_url)}');background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none"></span>`
+          // Admin: <img> normal (puede ampliarla y descargarla).
+          : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`)
+        : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
       <span class="flex-1 min-w-0">
         <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
