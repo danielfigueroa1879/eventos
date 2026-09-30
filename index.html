@@ -1861,8 +1861,6 @@
         <div class="text-[11px] uppercase tracking-widest opacity-90 font-semibold">Seguridad Privada · O.S.10 Coquimbo</div>
         <h1 class="text-xl font-bold mt-1">${esc(ev.nombre_evento)}</h1>
         <div class="text-sm opacity-90 mb-2">Empresa: ${esc(ev.empresa)}</div>
-        <img src="images/copihue.webp" alt="Copihue Izquierdo" class="absolute bottom-1 left-2 sm:left-3 w-[clamp(50px,15vw,80px)] object-contain drop-shadow -scale-x-100 opacity-95">
-        <img src="images/copihue.webp" alt="Copihue Derecho" class="absolute bottom-1 right-2 sm:right-3 w-[clamp(50px,15vw,80px)] object-contain drop-shadow opacity-95">
       </div>
 
       <div class="card p-5 mt-4 space-y-4">
@@ -1918,7 +1916,7 @@
 
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
         ${fotoRequerida ? `<div class="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-          <p class="text-[11px] text-slate-500 leading-snug text-left">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. No se realiza reconocimiento facial. Los datos se transmiten y almacenan de forma <b>cifrada y con acceso restringido</b>.</p>
+          <p class="text-[11px] text-slate-500 leading-snug" style="text-align:justify">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. No se realiza reconocimiento facial. Los datos se procesan de forma <b>cifrada</b>.</p>
         </div>` : ""}
       </div>
 
