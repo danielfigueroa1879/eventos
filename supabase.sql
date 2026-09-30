@@ -237,7 +237,11 @@ on conflict (id) do update set public = false;
 drop policy if exists "ingresos_lectura"   on storage.objects;
 drop policy if exists "ingresos_subida"    on storage.objects;
 drop policy if exists "ingresos_reemplazo" on storage.objects;
+drop policy if exists "ingresos_borrado"   on storage.objects;
 
 create policy "ingresos_lectura"   on storage.objects for select using (bucket_id = 'ingresos');
 create policy "ingresos_subida"    on storage.objects for insert with check (bucket_id = 'ingresos');
 create policy "ingresos_reemplazo" on storage.objects for update using (bucket_id = 'ingresos') with check (bucket_id = 'ingresos');
+-- Borrado: permite que el panel elimine las fotos vencidas (retención de 7 días) y las de
+-- eventos borrados/partidos cerrados, para no acumular peso en el almacenamiento.
+create policy "ingresos_borrado"   on storage.objects for delete using (bucket_id = 'ingresos');
