@@ -2222,18 +2222,6 @@
         </button>
         <div id="accPanel" hidden>
         <button id="nuevoEv" class="btn btn-ghost w-full mb-2 text-sm font-semibold" style="border:1px solid #e5e7eb;color:#374151">+ Nuevo evento</button>
-        <div id="fotoIngresoBox" class="mb-2 rounded-lg border border-slate-200 px-2.5 py-2">
-          <div class="flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <div class="text-[13px] font-semibold text-slate-700 flex items-center gap-1">📸 Foto de ingreso</div>
-              <div id="fotoIngresoHint" class="text-[10.5px] text-slate-400 leading-tight">Pide una foto al finalizar el registro.</div>
-            </div>
-            <button id="toggleFoto" type="button" role="switch" aria-checked="false" title="Activar/desactivar foto de ingreso"
-              class="relative inline-flex flex-shrink-0 h-6 w-11 items-center rounded-full transition-colors bg-slate-300">
-              <span id="toggleFotoKnob" class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform translate-x-0.5"></span>
-            </button>
-          </div>
-        </div>
         <button id="importar" class="btn btn-ghost w-full mb-3 text-sm hidden">📥 Importar guardias (CSV)</button>
         <button id="verArchivo" class="btn btn-ghost w-full mb-3 text-sm font-semibold flex items-center justify-between gap-2" style="border:1.5px solid #94a3b8;color:#475569" aria-expanded="false">
           <span id="verArchivoLbl" class="flex items-center gap-1.5">
@@ -2263,34 +2251,6 @@
   </div>`;
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
-
-      // --- Interruptor global "Foto de ingreso" (activado/desactivado) ---
-      const pintarToggleFoto = () => {
-        const b = $("#toggleFoto"), k = $("#toggleFotoKnob"), h = $("#fotoIngresoHint");
-        if (!b || !k) return;
-        const on = !!ADMIN_STATE.fotoIngreso;
-        b.setAttribute("aria-checked", on ? "true" : "false");
-        b.classList.toggle("bg-emerald-500", on);
-        b.classList.toggle("bg-slate-300", !on);
-        k.classList.toggle("translate-x-[22px]", on);
-        k.classList.toggle("translate-x-0.5", !on);
-        if (h) { h.textContent = on ? "Activada: pide una foto al finalizar el registro." : "Desactivada. Actívala para pedir una foto al registrar."; h.className = "text-[10.5px] leading-tight " + (on ? "text-emerald-600" : "text-slate-400"); }
-      };
-      (async () => { ADMIN_STATE.fotoIngreso = await cargarFotoIngresoConfig(); pintarToggleFoto(); })();
-      const btnFoto = $("#toggleFoto");
-      if (btnFoto) btnFoto.addEventListener("click", async () => {
-        const nuevo = !ADMIN_STATE.fotoIngreso;
-        btnFoto.disabled = true;
-        try {
-          await Data.setConfig("foto_ingreso", nuevo ? "1" : "0");
-          ADMIN_STATE.fotoIngreso = nuevo; FOTO_INGRESO_ON = nuevo; pintarToggleFoto();
-          toast(nuevo ? "📸 Foto de ingreso ACTIVADA" : "Foto de ingreso desactivada", true);
-        } catch (e) {
-          console.error(e);
-          toast("No se pudo guardar. ¿Ejecutaste el SQL actualizado en Supabase (tabla config)?", "danger", 5000);
-        }
-        btnFoto.disabled = false;
-      });
       // Desplegar / plegar las acciones (chevron → a la derecha cerrado, ↓ abierto). Se recuerda el estado.
       const pintarAcc = () => {
         const ab = !!ADMIN_STATE.accAbierto;
@@ -2329,6 +2289,8 @@
       // Re-render periódico para que los turnos finalizados hace +2 h dejen de mostrarse solos.
       if (ADMIN_STATE._tick) clearInterval(ADMIN_STATE._tick);
       ADMIN_STATE._tick = setInterval(() => { if (ADMIN_STATE.selected) renderMain(); }, 5 * 60 * 1000);
+      // Cargar el estado del interruptor "Foto de ingreso" ANTES del primer render (columna + botón).
+      ADMIN_STATE.fotoIngreso = await cargarFotoIngresoConfig();
       await refreshAdmin(true);
     }
 
@@ -2907,6 +2869,14 @@
         ${qrBotonesHTML(ev, { conLink: true })}
       </div>
       <div class="flex gap-2 mt-3 flex-wrap justify-center">
+        <button id="toggleFotoQR" type="button" role="switch" aria-checked="${ADMIN_STATE.fotoIngreso ? 'true' : 'false'}" title="Activar/desactivar la foto de verificación al registrar el ingreso"
+          class="btn text-sm px-4 py-2.5 font-bold shadow-md rounded-xl inline-flex items-center gap-2 border transition-colors ${ADMIN_STATE.fotoIngreso ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300'}">
+          📸 Foto de ingreso
+          <span class="relative inline-flex h-5 w-9 items-center rounded-full flex-shrink-0 ${ADMIN_STATE.fotoIngreso ? 'bg-white/30' : 'bg-slate-300'}">
+            <span class="inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${ADMIN_STATE.fotoIngreso ? 'translate-x-[18px]' : 'translate-x-0.5'}"></span>
+          </span>
+          <span class="text-xs font-semibold">${ADMIN_STATE.fotoIngreso ? 'Activada' : 'Desactivada'}</span>
+        </button>
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
         <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel (.xlsx) o PDF (hoja oficio horizontal)">⬇ Descargar eventos</button>
         <button id="expInfractores" class="btn text-sm px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold shadow-md rounded-xl" title="Descargar en Excel el registro de todos los guardias infractores / detenidos">🚩 Infractores</button>
@@ -2954,10 +2924,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -3087,6 +3057,22 @@
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
+      // Interruptor global "Foto de ingreso" (dentro del menú del QR). Aplica a todos los eventos y dispositivos.
+      const btnFotoQR = $("#toggleFotoQR");
+      if (btnFotoQR) btnFotoQR.addEventListener("click", async () => {
+        const nuevo = !ADMIN_STATE.fotoIngreso;
+        btnFotoQR.disabled = true;
+        try {
+          await Data.setConfig("foto_ingreso", nuevo ? "1" : "0");
+          ADMIN_STATE.fotoIngreso = nuevo; FOTO_INGRESO_ON = nuevo;
+          toast(nuevo ? "📸 Foto de ingreso ACTIVADA" : "Foto de ingreso desactivada", true);
+          renderMain();
+        } catch (e) {
+          console.error(e);
+          toast("No se pudo guardar. ¿Ejecutaste el SQL actualizado en Supabase (tabla config)?", "danger", 5000);
+          btnFotoQR.disabled = false;
+        }
+      });
       $("#archEv").addEventListener("click", async () => {
         const archivar = !eventoArchivado(ev);
         try {
@@ -3281,7 +3267,10 @@
     <td data-label="Vigencia" class="pr-2">${badgeVigenciaCelda(v, ev, a, g)}</td>
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
-    <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}${a.foto_url ? ` <button data-foto="${a.id}" class="align-middle text-slate-400 hover:text-slate-700" title="Ver foto de ingreso">📷</button>` : ""}</td>
+    <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
+    ${FOTO_INGRESO_ON ? `<td data-label="Foto" class="pr-2 text-center">${a.foto_url
+      ? `<button data-foto="${a.id}" class="inline-block rounded-md overflow-hidden ring-1 ring-slate-200 align-middle hover:ring-emerald-400 transition" style="width:34px;height:44px" title="Ver foto de ingreso"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" loading="lazy"></button>`
+      : `<span class="text-slate-300" title="Sin foto">—</span>`}</td>` : ""}
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
       ${esSPD(g, a) && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
@@ -3365,7 +3354,7 @@
           : vigenciaPill(v));
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-1 pl-1.5 pr-0 py-2 text-left"${rowStyle}>
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
-      <span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>
+      <span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5${a.foto_url ? ' ring-emerald-400' : ''}" aria-hidden="true">${a.foto_url ? `<img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover">` : avatarSVG(avSexo, a.rut)}</span>
       <span class="flex-1 min-w-0">
         <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
