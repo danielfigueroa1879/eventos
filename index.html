@@ -1736,13 +1736,13 @@
        pantalla; (2) incrustada en el archivo que descarga el admin (canvas). */
     function _marcaTextoFoto(a, nombre) {
       var rut = (a && a.rut) ? String(a.rut) : "";
-      var base = "O.S.10 COQUIMBO";
+      var base = "FOTO RESTRINGIDA";
       return (base + (rut ? " · " + rut : "")).trim();
     }
     // data: URL de un SVG en mosaico (diagonal, semitransparente) para superponer en pantalla.
     // Se asigna por JS a element.style.backgroundImage, así se evitan conflictos de comillas en el HTML.
     function marcaAguaDataUrl(texto) {
-      var t = String(texto || "O.S.10 COQUIMBO").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      var t = String(texto || "FOTO RESTRINGIDA").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='190'>" +
         "<text x='8' y='150' transform='rotate(-32 150 95)' fill='rgba(255,255,255,0.34)' " +
         "font-family='Arial, sans-serif' font-size='17' font-weight='bold'>" + t + "</text></svg>";
@@ -1760,6 +1760,19 @@
         for (var x = -w; x < w * 1.6; x += stepX) { ctx.fillText(texto, x, y); }
       }
       ctx.restore();
+      // Banda al pie con el aviso (se incrusta también en el archivo descargado).
+      try {
+        var bh = Math.max(26, Math.round(h * 0.075));
+        ctx.save();
+        ctx.fillStyle = "rgba(153,27,27,0.82)";
+        ctx.fillRect(0, h - bh, w, bh);
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "bold " + Math.max(9, Math.round(w * 0.028)) + "px Arial, sans-serif";
+        ctx.fillText("FOTO RESTRINGIDA · IP registrada · prohibida su difusión", w / 2, h - bh / 2);
+        ctx.restore();
+      } catch (e) { }
     }
     // Descarga la foto con la marca incrustada. Si el canvas se "contamina" (CORS) o algo falla,
     // devuelve false para que el llamador descargue el original sin marca (la descarga nunca se rompe).
@@ -1817,7 +1830,7 @@
           <button id="vf_dl" class="btn btn-ghost flex-1 text-sm">⬇ Descargar</button>
           <button id="vf_close" class="btn btn-p flex-1 text-sm">Cerrar</button>
         </div>
-        <div class="text-[10px] text-slate-400 mt-2">Foto de uso exclusivo de fiscalización O.S.10. La descarga lleva marca de agua.</div>
+        <div class="mt-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[11px] font-semibold px-3 py-2 leading-snug">⚠ FOTO RESTRINGIDA — Se ha capturado la IP de quien abre esta foto. Prohibida su captura o difusión.</div>
       </div>`);
       const x = $("#vf_x"), c = $("#vf_close"), dl = $("#vf_dl"), wm = $("#vf_wm");
       if (wm) wm.style.backgroundImage = 'url("' + marcaAguaDataUrl(marca) + '")';
