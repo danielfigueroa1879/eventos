@@ -1437,7 +1437,7 @@
           const ruts = [...new Set(as.map(a => a.rut))];
           let gu = []; if (ruts.length) gu = ok(await sb.from("guardias_central").select("*").in("rut", ruts));
           // Bucket PRIVADO: las fotos no tienen URL pública. Se genera un enlace FIRMADO temporal
-          // y CORTO (15 min) solo para las miniaturas del panel. Así, si alguien copia una de esas
+          // y CORTO (5 min) solo para las miniaturas del panel. Así, si alguien copia una de esas
           // URLs desde DevTools, deja de funcionar muy pronto. La ruta es siempre
           // <evento_id>/<asistencia_id>.webp (sirve también para fotos antiguas del bucket).
           // Para VER/DESCARGAR una foto ampliada, el admin pide un enlace NUEVO al hacer clic
@@ -1446,7 +1446,7 @@
           if (conFoto.length) {
             try {
               const paths = conFoto.map(a => `${evId}/${a.id}.webp`);
-              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(paths, 900);
+              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(paths, 300);
               if (Array.isArray(firmadas)) firmadas.forEach((f, i) => { if (f && f.signedUrl && !f.error) conFoto[i].foto_url = f.signedUrl; });
             } catch (e) { console.warn("firmar fotos:", e && e.message); }
           }
