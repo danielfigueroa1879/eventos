@@ -98,6 +98,26 @@
       } catch (e) {}
     })();
   </script>
+  <!-- Trampa anti-inspección: cuando las DevTools están ABIERTAS, el navegador se detiene en la
+       instrucción `debugger` una y otra vez. Eso congela la revisión y hace que el árbol del
+       inspector se "repliegue"/interrumpa constantemente, estorbando a quien husmea el código.
+       Si las DevTools están CERRADAS (uso normal), `debugger` se ignora y no afecta en nada.
+       NOTA honesta: es solo DISUASIVO. Un técnico lo salta en segundos ("Deactivate breakpoints").
+       La protección real de los datos está en Supabase (RLS), no aquí. -->
+  <script>
+    (function () {
+      try {
+        var activo = true;
+        setInterval(function () {
+          if (!activo) return;
+          (function () { debugger; })();   // no-op si DevTools está cerrado; pausa si está abierto
+        }, 120);
+        // Por si el administrador NECESITA inspeccionar su propio sistema sin estorbo:
+        // en la consola puede escribir  window.__os10DevOff()  para desactivar la trampa.
+        window.__os10DevOff = function () { activo = false; return "Trampa anti-inspección desactivada."; };
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root {
       --brand: #0c4a1f;
