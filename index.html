@@ -89,6 +89,12 @@
             (e.metaKey && e.altKey && k === "u");                 // ⌘+Opt+U (Mac)
           if (bloquear) { e.preventDefault(); e.stopPropagation(); return false; }
         }, { capture: true });
+
+        // 3) Arrastrar imágenes (dragstart) deshabilitado en toda la página:
+        //    evita soltarlas en otra pestaña o en el escritorio para guardarlas.
+        document.addEventListener("dragstart", function (e) {
+          if (e.target && e.target.tagName === "IMG") { e.preventDefault(); return false; }
+        }, { capture: true });
       } catch (e) {}
     })();
   </script>
@@ -96,6 +102,18 @@
     :root {
       --brand: #0c4a1f;
       --brand2: #13612b;
+    }
+
+    /* Disuasivo para guardar imágenes: sin menú de "guardar como" al mantener
+       pulsado (móvil), sin selección y sin arrastre. No impide descargarlas
+       desde la pestaña Red/Network de DevTools (eso no es posible en el navegador). */
+    img {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      user-drag: none;
+      pointer-events: auto;
     }
 
     html {
