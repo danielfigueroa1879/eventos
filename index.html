@@ -68,6 +68,30 @@
       } catch (e) {}
     })();
   </script>
+  <!-- Bloqueo disuasivo de las herramientas de desarrollador.
+       Nota: ningún sitio web puede impedir al 100% abrir DevTools (el navegador
+       siempre ofrece esa opción al usuario); esto dificulta y desalienta su uso
+       bloqueando los atajos habituales, el menú contextual y "ver código fuente". -->
+  <script>
+    (function () {
+      try {
+        // 1) Menú contextual (clic derecho) deshabilitado en toda la página.
+        document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, { capture: true });
+
+        // 2) Atajos de teclado que abren DevTools o el código fuente.
+        document.addEventListener("keydown", function (e) {
+          var k = (e.key || "").toLowerCase();
+          var bloquear =
+            e.key === "F12" ||                                   // F12 → DevTools
+            (e.ctrlKey && e.shiftKey && (k === "i" || k === "j" || k === "c")) || // Ctrl+Shift+I/J/C
+            (e.metaKey && e.altKey && (k === "i" || k === "j" || k === "c")) ||   // ⌘+Opt+I/J/C (Mac)
+            (e.ctrlKey && k === "u") ||                           // Ctrl+U → ver fuente
+            (e.metaKey && e.altKey && k === "u");                 // ⌘+Opt+U (Mac)
+          if (bloquear) { e.preventDefault(); e.stopPropagation(); return false; }
+        }, { capture: true });
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root {
       --brand: #0c4a1f;
