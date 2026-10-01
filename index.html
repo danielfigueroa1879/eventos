@@ -1729,6 +1729,66 @@
           .catch(err => { console.warn("getUserMedia:", err); usarArchivo(); });
       });
     }
+    /* ---- MARCA DE AGUA sobre la foto de ingreso ----
+       No impide capturar la pantalla (ninguna web puede), pero deja toda copia
+       IDENTIFICADA (O.S.10 + RUT + fecha), lo que disuade y permite rastrear filtraciones.
+       Se aplica de dos maneras: (1) superpuesta en pantalla, para fotos/capturas de
+       pantalla; (2) incrustada en el archivo que descarga el admin (canvas). */
+    function _marcaTextoFoto(a, nombre) {
+      var rut = (a && a.rut) ? String(a.rut) : "";
+      var base = "O.S.10 COQUIMBO";
+      return (base + (rut ? " · " + rut : "")).trim();
+    }
+    // data: URL de un SVG en mosaico (diagonal, semitransparente) para superponer en pantalla.
+    // Se asigna por JS a element.style.backgroundImage, así se evitan conflictos de comillas en el HTML.
+    function marcaAguaDataUrl(texto) {
+      var t = String(texto || "O.S.10 COQUIMBO").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='190'>" +
+        "<text x='8' y='150' transform='rotate(-32 150 95)' fill='rgba(255,255,255,0.34)' " +
+        "font-family='Arial, sans-serif' font-size='17' font-weight='bold'>" + t + "</text></svg>";
+      return "data:image/svg+xml," + encodeURIComponent(svg);
+    }
+    // Dibuja la marca de agua en mosaico sobre un canvas (para la descarga).
+    function _dibujarMarcaCanvas(ctx, w, h, texto) {
+      ctx.save();
+      ctx.font = "bold " + Math.max(12, Math.round(w * 0.045)) + "px Arial, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.34)";
+      ctx.textBaseline = "middle";
+      ctx.rotate(-32 * Math.PI / 180);
+      var stepX = Math.round(w * 0.55), stepY = Math.round(w * 0.30);
+      for (var y = -h; y < h * 1.6; y += stepY) {
+        for (var x = -w; x < w * 1.6; x += stepX) { ctx.fillText(texto, x, y); }
+      }
+      ctx.restore();
+    }
+    // Descarga la foto con la marca incrustada. Si el canvas se "contamina" (CORS) o algo falla,
+    // devuelve false para que el llamador descargue el original sin marca (la descarga nunca se rompe).
+    function descargarFotoConMarca(url, texto, nombreArchivo) {
+      return new Promise(function (resolve) {
+        var img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = function () {
+          try {
+            var cv = document.createElement("canvas");
+            cv.width = img.naturalWidth || 750; cv.height = img.naturalHeight || 1000;
+            var ctx = cv.getContext("2d");
+            ctx.drawImage(img, 0, 0, cv.width, cv.height);
+            _dibujarMarcaCanvas(ctx, cv.width, cv.height, texto);
+            cv.toBlob(function (blob) {
+              if (!blob) { resolve(false); return; }
+              var href = URL.createObjectURL(blob);
+              var a = document.createElement("a");
+              a.href = href; a.download = nombreArchivo || "ingreso-os10.webp";
+              document.body.appendChild(a); a.click(); a.remove();
+              setTimeout(function () { URL.revokeObjectURL(href); }, 5000);
+              resolve(true);
+            }, "image/webp", 0.92);
+          } catch (e) { resolve(false); }
+        };
+        img.onerror = function () { resolve(false); };
+        img.src = url;
+      });
+    }
     // Visor de la foto de ingreso (admin): vista ampliada, profesional y minimalista.
     async function verFotoIngresoModal(url, nombre, a) {
       // El admin pide un enlace FIRMADO NUEVO justo al abrir (así ver/descargar nunca
@@ -1740,25 +1800,39 @@
         }
       } catch (e) { }
       if (!url) return;
+      const marca = _marcaTextoFoto(a, nombre);
       openModal(`
       <div class="text-center">
         <div class="flex items-center justify-between mb-3 -mt-1">
           <h2 class="font-bold text-slate-800 text-sm tracking-wide">📸 FOTO DE INGRESO</h2>
           <button id="vf_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
-        <div class="mx-auto rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-black/10 shadow" style="max-width:320px;aspect-ratio:3/4">
-          <img src="${esc(url)}" alt="Foto de ingreso" class="w-full h-full object-cover">
+        <div class="relative mx-auto rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-black/10 shadow" style="max-width:320px;aspect-ratio:3/4">
+          <img src="${esc(url)}" alt="Foto de ingreso" class="w-full h-full object-cover" oncontextmenu="return false" ondragstart="return false">
+          <div id="vf_wm" aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;z-index:2;background-repeat:repeat"></div>
         </div>
         ${nombre ? `<div class="mt-3 font-semibold text-slate-800">${esc(nombre)}</div>` : ""}
         ${a && a.hora_ingreso ? `<div class="text-xs text-slate-400 mt-0.5">Ingreso: ${esc(horaFmt(a.hora_ingreso))}</div>` : ""}
         <div class="flex gap-2 mt-4">
-          <a href="${esc(url)}" download="ingreso.webp" target="_blank" rel="noopener" class="btn btn-ghost flex-1 text-sm">⬇ Descargar</a>
+          <button id="vf_dl" class="btn btn-ghost flex-1 text-sm">⬇ Descargar</button>
           <button id="vf_close" class="btn btn-p flex-1 text-sm">Cerrar</button>
         </div>
+        <div class="text-[10px] text-slate-400 mt-2">Foto de uso exclusivo de fiscalización O.S.10. La descarga lleva marca de agua.</div>
       </div>`);
-      const x = $("#vf_x"), c = $("#vf_close");
+      const x = $("#vf_x"), c = $("#vf_close"), dl = $("#vf_dl"), wm = $("#vf_wm");
+      if (wm) wm.style.backgroundImage = 'url("' + marcaAguaDataUrl(marca) + '")';
       if (x) x.addEventListener("click", closeModal);
       if (c) c.addEventListener("click", closeModal);
+      if (dl) dl.addEventListener("click", async () => {
+        const prev = dl.textContent; dl.disabled = true; dl.textContent = "Preparando…";
+        let listo = false;
+        try { listo = await descargarFotoConMarca(url, marca, "ingreso-os10.webp"); } catch (e) { listo = false; }
+        if (!listo) {
+          // Respaldo: si no se pudo marcar (p. ej. CORS), descarga el original para no bloquear al admin.
+          try { const a2 = document.createElement("a"); a2.href = url; a2.download = "ingreso.webp"; a2.target = "_blank"; a2.rel = "noopener"; document.body.appendChild(a2); a2.click(); a2.remove(); } catch (e) { }
+        }
+        dl.disabled = false; dl.textContent = prev;
+      });
     }
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
     // Distintivo SPD: badge azul con letras blancas.
