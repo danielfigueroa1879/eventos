@@ -1794,8 +1794,9 @@
         ctx.restore();
       } catch (e) { }
     }
-    // Descarga la foto con la marca incrustada. Si el canvas se "contamina" (CORS) o algo falla,
-    // devuelve false para que el llamador descargue el original sin marca (la descarga nunca se rompe).
+    // Descarga la foto SIEMPRE esmerilada (vidrio) + con la marca incrustada. Nunca entrega una copia
+    // nítida: la imagen se difumina en el canvas antes de exportar. Si el canvas se "contamina" (CORS)
+    // o algo falla, devuelve false y el llamador avisa (no descarga el original nítido).
     function descargarFotoConMarca(url, texto, nombreArchivo) {
       return new Promise(function (resolve) {
         var img = new Image();
@@ -1805,7 +1806,12 @@
             var cv = document.createElement("canvas");
             cv.width = img.naturalWidth || 750; cv.height = img.naturalHeight || 1000;
             var ctx = cv.getContext("2d");
-            ctx.drawImage(img, 0, 0, cv.width, cv.height);
+            // Vidrio esmerilado: se dibuja la imagen desenfocada. Se sobredibuja un margen
+            // para que el desenfoque no deje bordes transparentes.
+            var b = Math.max(6, Math.round(cv.width * 0.025)), m = b * 2;
+            ctx.filter = "blur(" + b + "px)";
+            ctx.drawImage(img, -m, -m, cv.width + 2 * m, cv.height + 2 * m);
+            ctx.filter = "none";
             _dibujarMarcaCanvas(ctx, cv.width, cv.height, texto);
             cv.toBlob(function (blob) {
               if (!blob) { resolve(false); return; }
@@ -1841,29 +1847,58 @@
           <button id="vf_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
         <div class="relative mx-auto rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-black/10 shadow" style="max-width:320px;aspect-ratio:3/4">
-          <img src="${esc(url)}" alt="Foto de ingreso" class="w-full h-full object-cover" oncontextmenu="return false" ondragstart="return false">
+          <img id="vf_img" src="${esc(url)}" alt="Foto de ingreso" class="w-full h-full object-cover" style="transition:filter .4s ease, transform .4s ease" oncontextmenu="return false" ondragstart="return false">
+          <div id="vf_frost" style="position:absolute;inset:0;z-index:1;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,0.10);pointer-events:none">
+            <span style="background:rgba(15,23,42,0.62);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px">🧊 Vidrio esmerilado</span>
+          </div>
           <div id="vf_wm" aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;z-index:2;background-repeat:repeat"></div>
         </div>
         ${nombre ? `<div class="mt-3 font-semibold text-slate-800">${esc(nombre)}</div>` : ""}
         ${a && a.hora_ingreso ? `<div class="text-xs text-slate-400 mt-0.5">Ingreso: ${esc(horaFmt(a.hora_ingreso))}</div>` : ""}
-        <div class="flex gap-2 mt-4">
+        <div id="vf_time" class="text-[11px] text-slate-500 mt-2">Se difumina en 30 s</div>
+        <div class="flex gap-2 mt-3">
+          <button id="vf_reveal" class="btn btn-ghost flex-1 text-sm" style="display:none">👁 Ver 30 s</button>
           <button id="vf_dl" class="btn btn-ghost flex-1 text-sm">⬇ Descargar</button>
           <button id="vf_close" class="btn btn-p flex-1 text-sm">Cerrar</button>
         </div>
-        <div class="mt-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[11px] font-semibold px-3 py-2 leading-snug">⚠ FOTO RESTRINGIDA — Se ha capturado la IP de quien abre esta foto. Prohibida su captura o difusión.</div>
+        <div class="mt-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[11px] font-semibold px-3 py-2 leading-snug">⚠ FOTO RESTRINGIDA — Se ha capturado la IP de quien abre esta foto. La descarga siempre sale esmerilada. Prohibida su captura o difusión.</div>
       </div>`);
       const x = $("#vf_x"), c = $("#vf_close"), dl = $("#vf_dl"), wm = $("#vf_wm");
+      const vImg = $("#vf_img"), vFrost = $("#vf_frost"), vTime = $("#vf_time"), vRev = $("#vf_reveal");
       if (wm) wm.style.backgroundImage = 'url("' + marcaAguaDataUrl(marca) + '")';
-      if (x) x.addEventListener("click", closeModal);
-      if (c) c.addEventListener("click", closeModal);
+
+      // --- Vidrio esmerilado automático: nítida 30 s, luego se difumina. Botón "Ver 30 s" para re-ver. ---
+      let _vfSecs = 30, _vfTo = null, _vfIv = null;
+      const _vfLimpiar = () => { if (_vfTo) clearTimeout(_vfTo); if (_vfIv) clearInterval(_vfIv); _vfTo = _vfIv = null; };
+      const _vfEsmerilar = () => {
+        _vfLimpiar();
+        if (vImg) { vImg.style.filter = "blur(11px)"; vImg.style.transform = "scale(1.08)"; }
+        if (vFrost) vFrost.style.display = "flex";
+        if (vTime) vTime.textContent = "🧊 Vidrio esmerilado — toca “Ver 30 s” para revelar";
+        if (vRev) vRev.style.display = "";
+      };
+      const _vfRevelar = () => {
+        _vfLimpiar();
+        if (vImg) { vImg.style.filter = "none"; vImg.style.transform = "none"; }
+        if (vFrost) vFrost.style.display = "none";
+        if (vRev) vRev.style.display = "none";
+        _vfSecs = 30;
+        if (vTime) vTime.textContent = "Se difumina en 30 s";
+        _vfIv = setInterval(() => { _vfSecs--; if (vTime && _vfSecs >= 0) vTime.textContent = "Se difumina en " + _vfSecs + " s"; }, 1000);
+        _vfTo = setTimeout(_vfEsmerilar, 30000);
+      };
+      const _cerrar = () => { _vfLimpiar(); closeModal(); };
+      _vfRevelar();
+
+      if (vRev) vRev.addEventListener("click", _vfRevelar);
+      if (x) x.addEventListener("click", _cerrar);
+      if (c) c.addEventListener("click", _cerrar);
       if (dl) dl.addEventListener("click", async () => {
         const prev = dl.textContent; dl.disabled = true; dl.textContent = "Preparando…";
         let listo = false;
         try { listo = await descargarFotoConMarca(url, marca, "ingreso-os10.webp"); } catch (e) { listo = false; }
-        if (!listo) {
-          // Respaldo: si no se pudo marcar (p. ej. CORS), descarga el original para no bloquear al admin.
-          try { const a2 = document.createElement("a"); a2.href = url; a2.download = "ingreso.webp"; a2.target = "_blank"; a2.rel = "noopener"; document.body.appendChild(a2); a2.click(); a2.remove(); } catch (e) { }
-        }
+        // No se entrega copia nítida: si falla el esmerilado (p. ej. CORS), se avisa y no se descarga.
+        if (!listo) { try { toast("No se pudo generar la descarga esmerilada. Intenta de nuevo.", false); } catch (e) { } }
         dl.disabled = false; dl.textContent = prev;
       });
     }
