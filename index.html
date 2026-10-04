@@ -6029,8 +6029,8 @@
                   <input id="vt_venc" type="date" value="${(prev.venc !== undefined ? prev.venc : (it.vencISO || ""))}" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px"/>
                 </div>
                 <div>
-                  <div style="font-size:11px;color:#64748b;font-weight:700">o pega la fecha</div>
-                  <input id="vt_pegar" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" autocomplete="off" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px;width:120px"/>
+                  <div style="font-size:11px;color:#64748b;font-weight:700">escribe la fecha (solo números)</div>
+                  <input id="vt_pegar" type="text" inputmode="numeric" placeholder="ej: 08052028" autocomplete="off" maxlength="10" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px;width:130px"/>
                 </div>
                 <button id="vt_nocurso" style="background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">❌ No acreditado / sin curso</button>
                 <div id="vt_estado" style="margin-left:auto"></div>
@@ -6056,16 +6056,25 @@
           // "pegar": el admin pega/escribe la fecha de Zosepcar (dd/mm/aaaa) y se traslada al campo fecha.
           const pegarInp = bar.querySelector("#vt_pegar");
           if (pegarInp) {
-            const aplicarPegado = () => {
-              const d = parseFecha((pegarInp.value || "").trim());
-              if (d instanceof Date && !isNaN(d)) {
-                const p2 = n => String(n).padStart(2, "0");
-                vencInp.value = d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate());
-                refEstado();
+            // El admin escribe SOLO números (ej: 08052028) y los separadores "/" se ponen solos.
+            // Al completar 8 dígitos (dd mm aaaa) se traslada al campo de vencimiento.
+            const sincronizar = () => {
+              const p2 = n => String(n).padStart(2, "0");
+              const dig = (pegarInp.value || "").replace(/\D/g, "").slice(0, 8);
+              let out = dig;
+              if (dig.length > 4) out = dig.slice(0, 2) + "/" + dig.slice(2, 4) + "/" + dig.slice(4);
+              else if (dig.length > 2) out = dig.slice(0, 2) + "/" + dig.slice(2);
+              pegarInp.value = out;
+              if (dig.length === 8) {
+                const dd = +dig.slice(0, 2), mm = +dig.slice(2, 4), yy = +dig.slice(4);
+                const d = new Date(yy, mm - 1, dd);
+                if (!isNaN(d) && d.getDate() === dd && d.getMonth() === mm - 1 && yy > 1900) {
+                  vencInp.value = yy + "-" + p2(mm) + "-" + p2(dd);
+                  refEstado();
+                }
               }
             };
-            pegarInp.addEventListener("input", aplicarPegado);
-            pegarInp.addEventListener("paste", () => setTimeout(aplicarPegado, 0));
+            pegarInp.addEventListener("input", sincronizar);
           }
           bar.querySelector("#vt_cerrar").onclick = finalizar;
           bar.querySelector("#vt_copiar").onclick = async () => {
