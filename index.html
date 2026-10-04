@@ -5929,8 +5929,9 @@
     //  Nombre · RUT · Vencimiento · Estado.
     //  IMPORTANTE: el navegador NO permite que esta página lea ni escriba dentro
     //  del iframe de Zosepcar (es otro sitio), así que NO consulta sola: solo
-    //  agiliza el flujo manual y guarda lo que el admin lee. No toca la base de
-    //  datos: es de solo lectura.
+    //  agiliza el flujo manual y guarda lo que el admin lee. Si el admin cambia el
+    //  vencimiento, se actualiza la FECHA DE EXAMEN del guardia en la base
+    //  (examen = vencimiento − 36 meses); si no lo cambia, no escribe nada.
     // =========================================================================
     function verificarTodosAsistido(ev, filasIn) {
       try {
@@ -5949,7 +5950,7 @@
           const p2 = n => String(n).padStart(2, "0");
           const vencISO = (vD instanceof Date && !isNaN(vD)) ? (vD.getFullYear() + "-" + p2(vD.getMonth() + 1) + "-" + p2(vD.getDate())) : "";
           const vencFmt = vencISO ? fechaVenceFmt(vD) : "";
-          lista.push({ rut, nombre: ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—", vencISO, vencFmt });
+          lista.push({ rut, nombre: ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—", vencISO, vencFmt, g });
         });
         if (!lista.length) { toast("No hay guardias en la lista para verificar", false); return; }
 
@@ -5976,10 +5977,29 @@
         bar.style.cssText = "position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(760px,98vw);z-index:71;background:#0f5323;color:#fff;border:3px solid #0a3b19;border-bottom:0;border-radius:16px 16px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.35);padding:12px 14px;font-family:inherit;";
         document.body.appendChild(bar);
 
+        // Guarda en la base de datos SOLO si el vencimiento cambió respecto al que ya tenía el sistema.
+        // IMPORTANTE: el registro guarda la FECHA DE EXAMEN, no el vencimiento.
+        //   vencimiento = examen + 36 meses  →  examen = vencimiento − 36 meses.
+        const guardarVencSiCambio = async (it, vencValue) => {
+          if (!it || !vencValue || vencValue === it.vencISO) return;
+          const d = parseFecha(vencValue);
+          if (!(d instanceof Date) || isNaN(d)) return;
+          const examen = addMonths(d, -MESES_VIGENCIA);
+          const p2 = n => String(n).padStart(2, "0");
+          const examenISO = examen.getFullYear() + "-" + p2(examen.getMonth() + 1) + "-" + p2(examen.getDate());
+          try {
+            await Data.upsertGuardia({ ...(it.g || {}), rut: it.rut, fecha_ultimo_examen: examenISO });
+            it.vencISO = vencValue; it.vencFmt = fechaVenceFmt(d);
+            if (it.g) it.g.fecha_ultimo_examen = examenISO;
+            try { toast("Vencimiento actualizado para " + it.rut, true); } catch (_) {}
+          } catch (e) { try { toast("No se pudo guardar el vencimiento: " + (e.message || e), false); } catch (_) {} }
+        };
+
         const guardarActual = () => {
           const vencInp = bar.querySelector("#vt_venc");
           if (!vencInp) return;
           if (vencInp.value) resultados[i] = { venc: vencInp.value, acreditado: true };
+          guardarVencSiCambio(lista[i], vencInp.value); // guarda en BD si cambió (convierte a fecha de examen)
         };
         const avanzar = () => { if (i + 1 < lista.length) { i++; step(); } else finalizar(); };
 
