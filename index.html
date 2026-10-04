@@ -5943,7 +5943,13 @@
           if (!rut || seen.has(rut)) return;
           seen.add(rut);
           const g = a.guardia || {};
-          lista.push({ rut, nombre: ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—" });
+          // Vencimiento que YA tiene el sistema (se calcula del último examen guardado).
+          const vRes = calcularVigencia(g.fecha_ultimo_examen || "");
+          const vD = vRes && vRes.vence;
+          const p2 = n => String(n).padStart(2, "0");
+          const vencISO = (vD instanceof Date && !isNaN(vD)) ? (vD.getFullYear() + "-" + p2(vD.getMonth() + 1) + "-" + p2(vD.getDate())) : "";
+          const vencFmt = vencISO ? fechaVenceFmt(vD) : "";
+          lista.push({ rut, nombre: ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—", vencISO, vencFmt });
         });
         if (!lista.length) { toast("No hay guardias en la lista para verificar", false); return; }
 
@@ -5996,10 +6002,15 @@
                 <button id="vt_copiar" style="background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">📋 Copiar RUT</button>
                 <button id="vt_zos" style="background:#e2e8f0;color:#0f172a;border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;white-space:nowrap">🔎 Zosepcar</button>
               </div>
-              <div style="display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px;margin-top:10px">
+              <div style="font-size:11px;color:#475569;margin-top:10px;background:#f1f5f9;border-radius:8px;padding:6px 10px">📅 En el sistema: <b style="color:#0f172a">${it.vencFmt || "— (sin dato)"}</b>${it.vencISO ? ` · <button id="vt_usarSis" style="background:#0f5323;color:#fff;border:0;border-radius:8px;padding:3px 8px;font-weight:700;cursor:pointer;font-size:11px">usar esta</button>` : ""}</div>
+              <div style="display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px;margin-top:8px">
                 <div>
-                  <div style="font-size:11px;color:#64748b;font-weight:700">VENCIMIENTO (lo lees en Zosepcar)</div>
-                  <input id="vt_venc" type="date" value="${prev.venc || ""}" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px"/>
+                  <div style="font-size:11px;color:#64748b;font-weight:700">VENCIMIENTO (Zosepcar)</div>
+                  <input id="vt_venc" type="date" value="${(prev.venc !== undefined ? prev.venc : (it.vencISO || ""))}" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px"/>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#64748b;font-weight:700">o pega la fecha</div>
+                  <input id="vt_pegar" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" autocomplete="off" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px;width:120px"/>
                 </div>
                 <button id="vt_nocurso" style="background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">❌ No acreditado / sin curso</button>
                 <div id="vt_estado" style="margin-left:auto"></div>
@@ -6019,6 +6030,23 @@
           };
           refEstado();
           vencInp.addEventListener("input", refEstado);
+          // "usar esta": copia el vencimiento que ya tiene el sistema al campo editable.
+          const btnUsar = bar.querySelector("#vt_usarSis");
+          if (btnUsar) btnUsar.onclick = () => { vencInp.value = it.vencISO || ""; refEstado(); };
+          // "pegar": el admin pega/escribe la fecha de Zosepcar (dd/mm/aaaa) y se traslada al campo fecha.
+          const pegarInp = bar.querySelector("#vt_pegar");
+          if (pegarInp) {
+            const aplicarPegado = () => {
+              const d = parseFecha((pegarInp.value || "").trim());
+              if (d instanceof Date && !isNaN(d)) {
+                const p2 = n => String(n).padStart(2, "0");
+                vencInp.value = d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate());
+                refEstado();
+              }
+            };
+            pegarInp.addEventListener("input", aplicarPegado);
+            pegarInp.addEventListener("paste", () => setTimeout(aplicarPegado, 0));
+          }
           bar.querySelector("#vt_cerrar").onclick = finalizar;
           bar.querySelector("#vt_copiar").onclick = async () => {
             const ok = await copiarAlPortapapeles(it.rut);
