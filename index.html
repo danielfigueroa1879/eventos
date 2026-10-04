@@ -5962,9 +5962,10 @@
           const r = calcularVigencia(addMonths(v, -MESES_VIGENCIA));
           return { label: r.vigencia, color: r.color };
         };
-        const pill = (c, txt) => {
+        const pill = (c, txt, big) => {
           const map = { verde: "background:#dcfce7;color:#166534", amarillo: "background:#fef9c3;color:#854d0e", rojo: "background:#fee2e2;color:#991b1b", gris: "background:#e2e8f0;color:#475569" };
-          return `<span style="${map[c] || map.gris};padding:2px 8px;border-radius:9999px;font-weight:800;font-size:11px;white-space:nowrap">${esc(txt)}</span>`;
+          const sz = big ? "padding:6px 16px;font-size:16px" : "padding:2px 8px;font-size:11px";
+          return `<span style="${map[c] || map.gris};${sz};border-radius:9999px;font-weight:800;white-space:nowrap">${esc(txt)}</span>`;
         };
 
         const resultados = new Array(lista.length).fill(null); // cada item: {venc, acreditado} o null (pendiente)
@@ -6021,6 +6022,7 @@
                 </div>
                 <button id="vt_copiar" style="background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">📋 Copiar RUT</button>
                 <button id="vt_zos" style="background:#e2e8f0;color:#0f172a;border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;white-space:nowrap">🔎 Zosepcar</button>
+                <div id="vt_estado"></div>
               </div>
               <div style="font-size:11px;color:#475569;margin-top:10px;background:#f1f5f9;border-radius:8px;padding:6px 10px">📅 En el sistema: <b style="color:#0f172a">${it.vencFmt || "— (sin dato)"}</b>${it.vencISO ? ` · <button id="vt_usarSis" style="background:#0f5323;color:#fff;border:0;border-radius:8px;padding:3px 8px;font-weight:700;cursor:pointer;font-size:11px">usar esta</button>` : ""}</div>
               <div style="display:flex;gap:8px;margin-top:8px">
@@ -6034,8 +6036,7 @@
                 </div>
               </div>
               <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:10px">
-                <button id="vt_nocurso" style="background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">❌ No acreditado / sin curso</button>
-                <div id="vt_estado" style="margin-left:auto"></div>
+                <button id="vt_nocurso" style="background:#fee2e2;color:#991b1b;border:0;border-radius:9px;padding:5px 10px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap">✖ No acreditado</button>
               </div>
             </div>
             <div style="display:flex;justify-content:space-between;gap:8px;margin-top:10px">
@@ -6046,9 +6047,9 @@
           const vencInp = bar.querySelector("#vt_venc");
           const estadoBox = bar.querySelector("#vt_estado");
           const refEstado = () => {
-            if (prev.acreditado === false) { estadoBox.innerHTML = pill("rojo", "NO ACREDITADO"); return; }
+            if (prev.acreditado === false) { estadoBox.innerHTML = pill("rojo", "NO ACREDITADO", true); return; }
             const e2 = estadoDesdeVenc(vencInp.value, true);
-            estadoBox.innerHTML = vencInp.value ? pill(e2.color, e2.label) : "";
+            estadoBox.innerHTML = vencInp.value ? pill(e2.color, e2.label, true) : "";
           };
           refEstado();
           vencInp.addEventListener("input", refEstado);
@@ -6092,6 +6093,17 @@
         const step = async () => {
           pintar();
           try { await copiarAlPortapapeles(lista[i].rut); } catch (_) {} // dentro del gesto de clic
+          // Si la ventana de Zosepcar está abierta, la reinicia para consultar el nuevo RUT
+          // (recarga el sitio y vuelve a la vista del casillero RUT). El RUT ya quedó copiado.
+          try {
+            const w = document.getElementById("cgWindow");
+            if (w) {
+              const ifr = w.querySelector("#cg_iframe");
+              if (ifr) ifr.src = "https://zosepcar.cl/consulta_componentes/";
+              const bRut = w.querySelector("#cg_btn_rut");
+              if (bRut) bRut.click();
+            }
+          } catch (_) {}
         };
 
         const finalizar = () => {
