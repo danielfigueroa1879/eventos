@@ -6023,15 +6023,17 @@
                 <button id="vt_zos" style="background:#e2e8f0;color:#0f172a;border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;white-space:nowrap">🔎 Zosepcar</button>
               </div>
               <div style="font-size:11px;color:#475569;margin-top:10px;background:#f1f5f9;border-radius:8px;padding:6px 10px">📅 En el sistema: <b style="color:#0f172a">${it.vencFmt || "— (sin dato)"}</b>${it.vencISO ? ` · <button id="vt_usarSis" style="background:#0f5323;color:#fff;border:0;border-radius:8px;padding:3px 8px;font-weight:700;cursor:pointer;font-size:11px">usar esta</button>` : ""}</div>
-              <div style="display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px;margin-top:8px">
-                <div>
-                  <div style="font-size:11px;color:#64748b;font-weight:700">VENCIMIENTO (Zosepcar)</div>
-                  <input id="vt_venc" type="date" value="${(prev.venc !== undefined ? prev.venc : (it.vencISO || ""))}" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px"/>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:11px;color:#64748b;font-weight:700">VENCIMIENTO</div>
+                  <input id="vt_venc" type="date" value="${(prev.venc !== undefined ? prev.venc : (it.vencISO || ""))}" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px;width:100%;box-sizing:border-box"/>
                 </div>
-                <div>
-                  <div style="font-size:11px;color:#64748b;font-weight:700">escribe la fecha (solo números)</div>
-                  <input id="vt_pegar" type="text" inputmode="numeric" placeholder="ej: 08052028" autocomplete="off" maxlength="10" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px;width:130px"/>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:11px;color:#64748b;font-weight:700">o escribe (números)</div>
+                  <input id="vt_pegar" type="text" inputmode="numeric" placeholder="08052028" autocomplete="off" maxlength="10" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px;width:100%;box-sizing:border-box"/>
                 </div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:10px">
                 <button id="vt_nocurso" style="background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;white-space:nowrap">❌ No acreditado / sin curso</button>
                 <div id="vt_estado" style="margin-left:auto"></div>
               </div>
