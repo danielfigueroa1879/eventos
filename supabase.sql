@@ -42,6 +42,9 @@ alter table eventos add column if not exists fecha_hasta date;
 -- Ubicación del evento:
 alter table eventos add column if not exists direccion text;
 alter table eventos add column if not exists comuna    text;
+-- Dotación por turno además de los guardias (cantidad_esperada):
+-- { "supervisores": 2, "otros": [ { "cargo": "Jefe de seguridad", "cantidad": 1 } ] }
+alter table eventos add column if not exists dotacion jsonb default '{}'::jsonb;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9
