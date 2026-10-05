@@ -1073,6 +1073,11 @@
          del primer turno. La asistencia se separa automáticamente por turno
          según la hora de ingreso.
        ========================================================================= */
+    // FOTOS DE INGRESO: se archivan FOTO_RETENCION_DIAS días (también las de partidos archivados)
+    // y SOLO el administrador las recibe. Las demás vistas (empresa, distribución pública)
+    // nunca reciben la foto ni su enlace: listAsistencias la quita si VER_FOTOS es false.
+    const FOTO_RETENCION_DIAS = 90;
+    let VER_FOTOS = false;              // true solo dentro del panel del administrador (renderAdmin)
     const TURNO_HORAS_DEFAULT = 12;      // turno de 12 horas (día/noche)
     const TURNO_INICIO_DEFAULT = "08:00"; // inicio del primer turno
     // Margen tras el fin de un turno antes de considerarlo FINALIZADO (historial/archivo).
@@ -1386,7 +1391,7 @@
         async listAsistencias(evId) {
           const as = get(K.as).filter(x => x.evento_id === evId);
           const gu = get(K.gu);
-          return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
+          return as.map(a => ({ ...a, foto_url: VER_FOTOS ? a.foto_url : null, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
         },
         async yaRegistrado(evId, rut) { return get(K.as).filter(x => x.evento_id === evId && x.rut === rut).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? 1 : -1))[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
@@ -1399,13 +1404,13 @@
           const hp = get(K.hp); hp.push({ id: hid, evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length, cerrado_at: nowISO() }); set(K.hp, hp);
           const hpa = get(K.hpa);
           const puMap = {}; get(K.pu).forEach(p => { if (p.evento_id === ev.id) puMap[p.id] = p.nombre; });
-          asist.forEach(a => { const g = a.guardia || {}; hpa.push({ id: uid(), historial_id: hid, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null }); });
+          asist.forEach(a => { const g = a.guardia || {}; hpa.push({ id: uid(), historial_id: hid, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: (get(K.as).find(x => x.id === a.id) || {}).foto_url || null }); });
           set(K.hpa, hpa);
           set(K.as, get(K.as).filter(x => x.evento_id !== ev.id));
           ping(); return hid;
         },
         async listHistorial(evId) { return get(K.hp).filter(x => x.evento_id === evId).sort((a, b) => (a.cerrado_at < b.cerrado_at ? 1 : -1)); },
-        async listHistorialAsist(hid) { return get(K.hpa).filter(x => x.historial_id === hid).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1)); },
+        async listHistorialAsist(hid) { return get(K.hpa).filter(x => x.historial_id === hid).map(x => ({ ...x, foto_url: VER_FOTOS ? x.foto_url : null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1)); },
         async deleteHistorial(hid) { set(K.hp, get(K.hp).filter(x => x.id !== hid)); set(K.hpa, get(K.hpa).filter(x => x.historial_id !== hid)); ping(); },
         async listPuestos(evId) { return get(K.pu).filter(x => x.evento_id === evId).sort((a, b) => (a.orden || 0) - (b.orden || 0)); },
         async createPuesto(p) { const rec = { ...p, id: uid(), created_at: nowISO() }; const a = get(K.pu); a.push(rec); set(K.pu, a); ping(); return rec; },
@@ -1417,8 +1422,8 @@
         async setConfig(clave, valor) { let c = {}; try { c = JSON.parse(localStorage.getItem("os10_config") || "{}"); } catch {} c[clave] = valor; localStorage.setItem("os10_config", JSON.stringify(c)); ping(); },
         // Foto de verificación (demo): se guarda como data URL WebP dentro de la asistencia.
         async subirFotoIngreso(evId, asisId, blob) { const url = await blobToDataURL(blob); const a = get(K.as); const r = a.find(x => x.id === asisId); if (r) { r.foto_url = url; set(K.as, a); ping(); } return url; },
-        // Retención de fotos (demo): borra las fotos con más de N días.
-        async purgarFotosAntiguas(dias) { const corte = Date.now() - (dias || 7) * 86400000; const a = get(K.as); let n = 0; a.forEach(x => { if (x.foto_url && new Date(x.hora_ingreso).getTime() < corte) { x.foto_url = null; n++; } }); if (n) { set(K.as, a); ping(); } return n; },
+        // Retención de fotos (demo): borra las fotos con más de N días (asistencias e historial).
+        async purgarFotosAntiguas(dias) { const corte = Date.now() - (dias || FOTO_RETENCION_DIAS) * 86400000; let n = 0; [K.as, K.hpa].forEach(k => { const a = get(k); let m = 0; a.forEach(x => { if (x.foto_url && new Date(x.hora_ingreso).getTime() < corte) { x.foto_url = null; m++; } }); if (m) { set(k, a); n += m; } }); if (n) ping(); return n; },
       };
     })();
 
@@ -1458,6 +1463,8 @@
           // <evento_id>/<asistencia_id>.webp (sirve también para fotos antiguas del bucket).
           // Para VER/DESCARGAR una foto ampliada, el admin pide un enlace NUEVO al hacer clic
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
+          // Fuera del panel admin la foto no se entrega (ni se firma su enlace).
+          if (!VER_FOTOS) as.forEach(a => { a.foto_url = null; });
           const conFoto = as.filter(a => a.foto_url);
           if (conFoto.length) {
             try {
@@ -1486,20 +1493,46 @@
           const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
           // Mapa puesto_id -> nombre para guardar la facción de cada guardia.
           const puMap = {}; try { (ok(await sb.from("puestos").select("id,nombre").eq("evento_id", ev.id)) || []).forEach(p => { puMap[p.id] = p.nombre; }); } catch (_) {}
-          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null }; });
+          // La foto de ingreso se ARCHIVA con el partido: se guarda la ruta del bucket
+          // (<evento_id>/<asistencia_id>.webp) y el archivo se conserva FOTO_RETENCION_DIAS días.
+          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: calcularVigencia(g.fecha_ultimo_examen).vigencia, hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: a.foto_url ? `${ev.id}/${a.id}.webp` : null }; });
+          let fotosArchivadas = !rows.length;
           if (rows.length) {
-            try { ok(await sb.from("partidos_historial_asist").insert(rows)); }
-            catch (e) { const rowsSin = rows.map(({ puesto, ...r }) => r); ok(await sb.from("partidos_historial_asist").insert(rowsSin)); } // por si falta la columna 'puesto'
+            try { ok(await sb.from("partidos_historial_asist").insert(rows)); fotosArchivadas = true; }
+            catch (e) {
+              try { const rowsSinFoto = rows.map(({ foto_url, ...r }) => r); ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto)); } // por si falta la columna 'foto_url'
+              catch (e2) { const rowsSin = rows.map(({ foto_url, puesto, ...r }) => r); ok(await sb.from("partidos_historial_asist").insert(rowsSin)); } // por si falta también 'puesto'
+            }
           }
-          // Limpieza: al cerrar y archivar el partido se borran las fotos de ingreso de ese evento
-          // (el historial no guarda fotos), para no acumular peso en el almacenamiento.
-          try { const { data: files } = await sb.storage.from("ingresos").list(ev.id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${ev.id}/${f.name}`)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); }
+          // Si la base aún no tiene la columna foto_url en el historial, las fotos no se pueden
+          // archivar: se borran como antes para no dejar imágenes huérfanas en el bucket.
+          if (!fotosArchivadas) { try { const { data: files } = await sb.storage.from("ingresos").list(ev.id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${ev.id}/${f.name}`)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } }
           ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
           return hp.id;
         },
         async listHistorial(evId) { return ok(await sb.from("partidos_historial").select("*").eq("evento_id", evId).order("cerrado_at", { ascending: false })); },
-        async listHistorialAsist(hid) { return ok(await sb.from("partidos_historial_asist").select("*").eq("historial_id", hid).order("hora_ingreso", { ascending: true })); },
-        async deleteHistorial(hid) { ok(await sb.from("partidos_historial").delete().eq("id", hid)); },
+        async listHistorialAsist(hid) {
+          const rows = ok(await sb.from("partidos_historial_asist").select("*").eq("historial_id", hid).order("hora_ingreso", { ascending: true }));
+          // Fotos archivadas: solo el admin las ve, con enlace firmado corto (bucket privado).
+          rows.forEach(r => { r.foto_path = r.foto_url || null; r.foto_url = null; });
+          const conFoto = VER_FOTOS ? rows.filter(r => r.foto_path) : [];
+          if (conFoto.length) {
+            try {
+              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(conFoto.map(r => r.foto_path), 300);
+              if (Array.isArray(firmadas)) firmadas.forEach((f, i) => { if (f && f.signedUrl && !f.error) conFoto[i].foto_url = f.signedUrl; });
+            } catch (e) { console.warn("firmar fotos historial:", e && e.message); }
+          }
+          return rows;
+        },
+        async deleteHistorial(hid) {
+          // Borra también las fotos archivadas de ese partido.
+          try {
+            const fr = ok(await sb.from("partidos_historial_asist").select("foto_url").eq("historial_id", hid).not("foto_url", "is", null));
+            const paths = fr.map(r => r.foto_url).filter(Boolean);
+            for (let i = 0; i < paths.length; i += 100) await sb.storage.from("ingresos").remove(paths.slice(i, i + 100));
+          } catch (e) { console.warn("borrar fotos historial:", e && e.message); }
+          ok(await sb.from("partidos_historial").delete().eq("id", hid));
+        },
         async listPuestos(evId) { return ok(await sb.from("puestos").select("*").eq("evento_id", evId).order("orden", { ascending: true })); },
         async createPuesto(p) { return ok(await sb.from("puestos").insert(p).select().single()); },
         async updatePuesto(id, patch) { ok(await sb.from("puestos").update(patch).eq("id", id)); },
@@ -1518,18 +1551,21 @@
           ok(await sb.from("asistencias").update({ foto_url: path }).eq("id", asisId));
           return path;
         },
-        // RETENCIÓN: borra del bucket las fotos con más de N días (por defecto 7) y limpia su referencia.
+        // RETENCIÓN: borra del bucket las fotos con más de N días (por defecto FOTO_RETENCION_DIAS)
+        // y limpia su referencia, tanto en asistencias como en el historial de partidos archivados.
         // Se ejecuta desde el panel del admin (throttled). Mantiene liviano el almacenamiento.
         async purgarFotosAntiguas(dias) {
-          const corte = new Date(Date.now() - (dias || 7) * 86400000).toISOString();
+          const corte = new Date(Date.now() - (dias || FOTO_RETENCION_DIAS) * 86400000).toISOString();
+          const borrarPaths = async (paths) => { for (let i = 0; i < paths.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(paths.slice(i, i + 100)); if (r.error) console.warn("purga (storage):", r.error.message); } catch (e) { console.warn("purga (storage):", e && e.message); } } };
+          const limpiar = async (tabla, ids) => { for (let i = 0; i < ids.length; i += 100) { try { ok(await sb.from(tabla).update({ foto_url: null }).in("id", ids.slice(i, i + 100))); } catch (e) { console.warn("purga (update):", e && e.message); } } };
+          let n = 0;
           let viejas = [];
-          try { viejas = ok(await sb.from("asistencias").select("id,evento_id,hora_ingreso").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { console.warn("purga (select):", e && e.message); return 0; }
-          if (!viejas.length) return 0;
-          const paths = viejas.map(a => `${a.evento_id}/${a.id}.webp`);
-          for (let i = 0; i < paths.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(paths.slice(i, i + 100)); if (r.error) console.warn("purga (storage):", r.error.message); } catch (e) { console.warn("purga (storage):", e && e.message); } }
-          const ids = viejas.map(a => a.id);
-          for (let i = 0; i < ids.length; i += 100) { try { ok(await sb.from("asistencias").update({ foto_url: null }).in("id", ids.slice(i, i + 100))); } catch (e) { console.warn("purga (update):", e && e.message); } }
-          return viejas.length;
+          try { viejas = ok(await sb.from("asistencias").select("id,evento_id,hora_ingreso").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { console.warn("purga (select):", e && e.message); }
+          if (viejas.length) { await borrarPaths(viejas.map(a => `${a.evento_id}/${a.id}.webp`)); await limpiar("asistencias", viejas.map(a => a.id)); n += viejas.length; }
+          let viejasH = [];
+          try { viejasH = ok(await sb.from("partidos_historial_asist").select("id,foto_url").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { /* columna foto_url aún no creada */ }
+          if (viejasH.length) { await borrarPaths(viejasH.map(r => r.foto_url)); await limpiar("partidos_historial_asist", viejasH.map(r => r.id)); n += viejasH.length; }
+          return n;
         },
       };
     })();
@@ -2466,6 +2502,7 @@
     let EMPRESA_STATE = { showQR: true, showResumen: true };
 
     async function renderAdmin() {
+      VER_FOTOS = true;   // solo el administrador recibe y ve las fotos de ingreso
       document.body.classList.add("vista-admin"); // fondo sólido #e6f2fe en celular (solo admin)
       app.innerHTML = `
   <div class="min-h-screen flex flex-col md:flex-row">
@@ -2568,12 +2605,12 @@
       ADMIN_STATE._tick = setInterval(() => { if (ADMIN_STATE.selected) renderMain(); }, 5 * 60 * 1000);
       // Cargar el estado del interruptor "Foto de ingreso" ANTES del primer render (columna + botón).
       ADMIN_STATE.fotoIngreso = await cargarFotoIngresoConfig();
-      // RETENCIÓN de fotos: al entrar al panel se borran las fotos con más de 7 días (máx. 1 vez cada 6 h por dispositivo).
+      // RETENCIÓN de fotos: al entrar al panel se borran las fotos con más de FOTO_RETENCION_DIAS días (máx. 1 vez cada 6 h por dispositivo).
       try {
         const ultimaPurga = +(localStorage.getItem("os10_purga_fotos") || 0);
         if (Date.now() - ultimaPurga > 6 * 3600 * 1000) {
           localStorage.setItem("os10_purga_fotos", String(Date.now()));
-          Data.purgarFotosAntiguas(7).then(n => { if (n) console.log("Fotos de ingreso borradas por antigüedad (>7 días):", n); }).catch(() => {});
+          Data.purgarFotosAntiguas(FOTO_RETENCION_DIAS).then(n => { if (n) console.log(`Fotos de ingreso borradas por antigüedad (>${FOTO_RETENCION_DIAS} días):`, n); }).catch(() => {});
         }
       } catch (_) {}
       await refreshAdmin(true);
@@ -3649,15 +3686,9 @@
           : vigenciaPill(v));
       return `<button data-detail="${a.id}" data-search="${esc((a.rut + " " + nomFull).toLowerCase())}" class="filaMov w-full flex items-center gap-1 pl-1.5 pr-0 py-2 text-left"${rowStyle}>
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
-      ${a.foto_url
-        ? (modo === "empresa"
-          // Empresa: la foto SOLO se ve durante 2 horas desde el ingreso (control), con un VELO BLANCO
-          // encima, y NO se puede descargar/guardar (fondo CSS, sin <img>). Pasadas 2 h, desaparece (avatar).
-          ? ((Date.now() - new Date(a.hora_ingreso || 0).getTime() < 7200000)
-            ? `<span class="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" oncontextmenu="return false" ondragstart="return false" style="background-image:url('${esc(a.foto_url)}');background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>`
-            : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
-          // Admin: <img> normal (puede ampliarla y descargarla, sin límite de tiempo).
-          : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`)
+      ${(a.foto_url && modo !== "empresa")
+        // Solo el admin ve la foto de ingreso (la vista empresa ni siquiera la recibe: ver VER_FOTOS).
+        ? `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`
         : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
       <span class="flex-1 min-w-0">
         <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
@@ -3695,7 +3726,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${nomClsE}">${(a.foto_url && (Date.now() - new Date(a.hora_ingreso || 0).getTime() < 7200000)) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none" oncontextmenu="return false" ondragstart="return false" title="Foto de ingreso (visible 2 h)"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}${dobleT}</td>
+        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${nomClsE}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}${dobleT}</td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -4971,7 +5002,7 @@
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(r, ev, dtSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${i}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
       }).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
       openModal(`<div class="flex items-center justify-between mb-1">
           <h2 class="font-bold text-slate-800">${esc(h.partido || ev.nombre_evento)}</h2>
@@ -4988,9 +5019,23 @@
         </div>
         <div class="mt-2"><button id="hg_back" class="btn btn-ghost w-full">← Volver al historial</button></div>`);
       $("#hg_x").addEventListener("click", closeModal);
+      enlazarFotosHistorial($("#modalBox"), ev, rows);
       $("#hg_back").addEventListener("click", () => modalHistorialPartidos(ev));
       $("#hg_xls").addEventListener("click", () => descargarExcel(histEvPseudo(ev, h), histRowsToAsist(rows)));
       $("#hg_pdf").addEventListener("click", () => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)));
+    }
+
+    // Foto archivada de un partido (solo admin): al tocar la miniatura se abre ampliada,
+    // pidiendo un enlace firmado nuevo a partir de su ruta <evento_id>/<asistencia_id>.webp.
+    function enlazarFotosHistorial(cont, ev, rows) {
+      if (!cont) return;
+      cont.querySelectorAll("[data-hfoto]").forEach(b => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const r = rows[+b.dataset.hfoto]; if (!r || !r.foto_url) return;
+        const m = String(r.foto_path || "").match(/^([^/]+)\/([^/]+)\.webp$/);
+        const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim();
+        verFotoIngresoModal(r.foto_url, nom, { ...r, evento_id: m ? m[1] : null, id: m ? m[2] : null });
+      }));
     }
 
     // HTML del detalle de un partido archivado (tabla de guardias). Reutilizable.
@@ -5001,7 +5046,7 @@
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(r, ev, dtSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${i}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
       }).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800 truncate">${esc(h.partido || ev.nombre_evento)}</h2>
@@ -5054,6 +5099,7 @@
         let rows = [];
         try { rows = await Data.listHistorialAsist(h.id); } catch (e) { det.innerHTML = `<p class="text-red-600 text-sm">Error: ${esc(e.message || String(e))}</p>`; return; }
         det.innerHTML = historialPartidoDetalleHTML(ev, h, rows);
+        enlazarFotosHistorial(det, ev, rows);
         const evP = histEvPseudo(ev, h), asistH = histRowsToAsist(rows);
         const bx = $("#hpv_xls", det); if (bx) bx.addEventListener("click", () => descargarExcel(evP, asistH));
         const bp = $("#hpv_pdf", det); if (bp) bp.addEventListener("click", () => descargarPDF(evP, asistH));

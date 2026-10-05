@@ -148,6 +148,9 @@ create table if not exists partidos_historial_asist (
 );
 -- Migración para bases ya existentes: guarda la facción (puesto) en el historial de partidos.
 alter table partidos_historial_asist add column if not exists puesto text;
+-- Foto de ingreso ARCHIVADA con el partido: ruta en el bucket "ingresos" (<evento_id>/<asistencia_id>.webp).
+-- Solo el administrador la ve; se borra sola a los 90 días (igual que las de asistencias).
+alter table partidos_historial_asist add column if not exists foto_url text;
 create index if not exists idx_hist_evento on partidos_historial(evento_id);
 create index if not exists idx_hista_hist  on partidos_historial_asist(historial_id);
 
