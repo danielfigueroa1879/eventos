@@ -2621,8 +2621,8 @@
         const resumen = abierto ? `<div class="evResumen rounded-b-lg px-3 py-2 -mt-px mb-1 text-[11px] space-y-1">
         <div class="flex justify-between gap-2"><span class="evResLbl">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
-        <div class="flex justify-between gap-2"><span class="evResLbl">👮 Guardias</span><span class="font-semibold text-right"><span data-reg="${e.id}">…</span> / ${esc(e.cantidad_esperada || "—")}</span></div>
-        ${(() => { const d = dotacionEv(e); return (d.supervisores ? `<div class="flex justify-between gap-2"><span class="evResLbl">🤵 Superv. / turno</span><span class="font-semibold text-right">${d.supervisores}</span></div>` : "") + d.otros.map(o => `<div class="flex justify-between gap-2"><span class="evResLbl">⭐ ${esc(o.cargo)}</span><span class="font-semibold text-right">${esc(o.cantidad || 1)}</span></div>`).join(""); })()}
+        <div class="flex justify-between gap-2"><span class="evResLbl whitespace-nowrap">👮 Guard. · 🤵 Sup.</span><span class="font-semibold text-right whitespace-nowrap"><span data-reg="${e.id}">…</span>/${esc(e.cantidad_esperada || "—")} · <span data-regsup="${e.id}">…</span>/${dotacionEv(e).supervisores || "—"}</span></div>
+        ${(() => { const d = dotacionEv(e); return d.otros.map(o => `<div class="flex justify-between gap-2"><span class="evResLbl">⭐ ${esc(o.cargo)}</span><span class="font-semibold text-right">${esc(o.cantidad || 1)}</span></div>`).join(""); })()}
         <div class="flex justify-between gap-2"><span class="evResLbl">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
@@ -2679,6 +2679,7 @@
         const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length} / ${e.cantidad_esperada || "—"} guardias`;
         if (e.id === ADMIN_STATE.expandido) {
           const elR = $(`[data-reg="${e.id}"]`); if (elR) elR.textContent = g.length;
+          const elRS = $(`[data-regsup="${e.id}"]`); if (elRS) elRS.textContent = sup.length;
           // Llegados en el turno vigente ahora
           const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
           const enTurno = tnNow ? g.filter(a => { const t = calcularTurno(a.hora_ingreso, e); return t && t.clave === tnNow.clave; }).length : g.length;
@@ -3104,7 +3105,15 @@
         </div>
         <div class="text-slate-500 text-sm truncate">Empresa: <span class="font-medium">${esc(ev.empresa)}</span>${ev.fecha_evento ? ` · ${esc(fechaFmt(ev.fecha_evento))}${ev.fecha_hasta && ev.fecha_hasta !== ev.fecha_evento ? " al " + esc(fechaFmt(ev.fecha_hasta)) : ""}` : ""}</div>
         ${ev.direccion || ev.comuna ? `<div class="text-xs text-slate-500 truncate">📍 ${esc([ev.direccion, ev.comuna].filter(Boolean).join(", "))}</div>` : ""}
-        ${ev.resol_numero || ev.resol_fecha ? `<div class="text-xs text-slate-500 truncate">📄 Resol. DD.FF. ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</div>` : ""}
+        ${(() => {
+          const d = dotacionEv(ev), sep = `<span class="text-slate-300">·</span>`;
+          const partes = [];
+          if (ev.resol_numero || ev.resol_fecha) partes.push(`<span class="whitespace-nowrap">📄 Resol.<span class="hidden sm:inline"> DD.FF.</span> ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</span>`);
+          partes.push(`<span class="whitespace-nowrap" title="Guardias registrados / esperados por turno">👮 <b class="text-slate-700">${asistGuardias.length}/${total || "—"}</b></span>`);
+          if (d.supervisores || asistSupervisores.length) partes.push(`<span class="whitespace-nowrap" title="Supervisores registrados / esperados por turno">🤵 <b class="text-slate-700">${asistSupervisores.length}/${d.supervisores || "—"}</b></span>`);
+          d.otros.forEach(o => partes.push(`<span class="whitespace-nowrap truncate min-w-0" title="${esc(o.cargo)} por turno">⭐ <b class="text-slate-700">${esc(o.cantidad || 1)}</b> ${esc(o.cargo)}</span>`));
+          return `<div class="text-xs text-slate-500 flex items-center gap-x-1.5 min-w-0 overflow-hidden">${partes.join(sep)}</div>`;
+        })()}
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
       <div class="flex gap-1.5 flex-shrink-0 items-center">
