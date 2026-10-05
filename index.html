@@ -2658,7 +2658,7 @@
         const resumen = abierto ? `<div class="evResumen rounded-b-lg px-3 py-2 -mt-px mb-1 text-[11px] space-y-1">
         <div class="flex justify-between gap-2"><span class="evResLbl">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
-        <div class="flex justify-between gap-2"><span class="evResLbl whitespace-nowrap">${guardiaIcon()} Guard. · 🤵 Sup.</span><span class="font-semibold text-right whitespace-nowrap"><span data-reg="${e.id}">…</span>/${esc(e.cantidad_esperada || "—")} · <span data-regsup="${e.id}">…</span>/${dotacionEv(e).supervisores || "—"}</span></div>
+        <div class="flex justify-between gap-2"><span class="evResLbl whitespace-nowrap">${guardiaIcon()} GG.SS. · 🤵 SUP.</span><span class="font-semibold text-right whitespace-nowrap"><span data-reg="${e.id}">…</span>/${esc(e.cantidad_esperada || "—")} · <span data-regsup="${e.id}">…</span>/${dotacionEv(e).supervisores || "—"}</span></div>
         ${(() => { const d = dotacionEv(e); return d.otros.map(o => `<div class="flex justify-between gap-2"><span class="evResLbl">⭐ ${esc(o.cargo)}</span><span class="font-semibold text-right">${esc(o.cantidad || 1)}</span></div>`).join(""); })()}
         <div class="flex justify-between gap-2"><span class="evResLbl">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
@@ -2713,7 +2713,7 @@
         let as = [];
         try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
         const g = as.filter(a => !a.es_supervisor), sup = as.filter(a => a.es_supervisor);
-        const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length} / ${e.cantidad_esperada || "—"} guardias`;
+        const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length}/${e.cantidad_esperada || "—"} GG.SS. · ${sup.length}/${dotacionEv(e).supervisores || "—"} SUP.`;
         if (e.id === ADMIN_STATE.expandido) {
           const elR = $(`[data-reg="${e.id}"]`); if (elR) elR.textContent = g.length;
           const elRS = $(`[data-regsup="${e.id}"]`); if (elRS) elRS.textContent = sup.length;
@@ -3146,8 +3146,8 @@
           const d = dotacionEv(ev), sep = `<span class="text-slate-300">·</span>`;
           const partes = [];
           if (ev.resol_numero || ev.resol_fecha) partes.push(`<span class="whitespace-nowrap">📄 Resol.<span class="hidden sm:inline"> DD.FF.</span> ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</span>`);
-          partes.push(`<span class="whitespace-nowrap" title="Guardias registrados / esperados por turno">Guardias ${guardiaIcon()} <b class="text-slate-700">${asistGuardias.length}/${total || "—"}</b></span>`);
-          partes.push(`<span class="whitespace-nowrap" title="Supervisores registrados / esperados por turno">Supervisores 🤵 <b class="text-slate-700">${asistSupervisores.length}/${d.supervisores || "—"}</b></span>`);
+          partes.push(`<span class="whitespace-nowrap" title="Guardias registrados / esperados por turno"><span class="sm:hidden">GG.SS.</span><span class="hidden sm:inline">Guardias</span> ${guardiaIcon()} <b class="text-slate-700">${asistGuardias.length}/${total || "—"}</b></span>`);
+          partes.push(`<span class="whitespace-nowrap" title="Supervisores registrados / esperados por turno"><span class="sm:hidden">SUP.</span><span class="hidden sm:inline">Supervisores</span> 🤵 <b class="text-slate-700">${asistSupervisores.length}/${d.supervisores || "—"}</b></span>`);
           d.otros.forEach(o => partes.push(`<span class="whitespace-nowrap" title="${esc(o.cargo)} por turno">⭐ <b class="text-slate-700">${esc(o.cantidad || 1)}</b> ${esc(o.cargo)}</span>`));
           return `<div class="text-xs text-slate-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">${partes.join(sep)}</div>`;
         })()}
