@@ -440,6 +440,22 @@
       border-radius: .5rem
     }
 
+    /* Formulario compacto de Nuevo/Editar evento */
+    .mfrm .mfLbl { display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 1px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+    .mfrm .fld-sm { padding: .38rem .55rem; min-width: 0 }
+    .mfrm .mfBox { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: .75rem; padding: .45rem .55rem .5rem; display: flex; flex-direction: column; gap: .35rem }
+    .mfrm .mfBoxT { font-size: 12px; font-weight: 700; color: #334155 }
+    .mfrm .mfFoot { position: sticky; bottom: 0; background: #fff; padding: .6rem 0 .75rem; margin-top: .4rem; border-top: 1px solid #f1f5f9 }
+    .mfrm input[type=date], .mfrm input[type=time] { min-height: 2.1rem }
+    @media (max-width: 640px) {
+      /* 16px evita el zoom automático de iOS al tocar un campo */
+      .mfrm .fld-sm { font-size: 16px; padding: .32rem .5rem }
+      .mfrm select.fld-sm { padding-right: 1.4rem }
+    }
+    html[data-theme="dark"] .mfrm .mfBox { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12) }
+    html[data-theme="dark"] .mfrm .mfLbl, html[data-theme="dark"] .mfrm .mfBoxT { color: #cbd5e1 }
+    html[data-theme="dark"] .mfrm .mfFoot { background: #262a30; border-top-color: rgba(255,255,255,.08) }
+
     .fld:focus {
       border-color: var(--brand2);
       box-shadow: 0 0 0 3px rgba(34, 197, 94, .15)
@@ -1591,7 +1607,7 @@
       const c = err && (err.code || ""); const m = ((err && (err.message || err.details)) || "").toLowerCase();
       return c === "23505" || m.includes("duplicate") || m.includes("unique") || m.includes("ya registrad");
     }
-    function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; const mo = $("#modal"); mo.style.alignItems = ""; mo.style.display = "flex"; }
+    function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; const mo = $("#modal"); mo.style.alignItems = ""; mo.style.padding = ""; mo.style.display = "flex"; }
     // Modal ancho (para tablas tipo escritorio); en celular ocupa todo el ancho disponible.
     function openModalWide(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     function closeModal() { $("#modal").style.display = "none"; }
@@ -2606,6 +2622,7 @@
         <div class="flex justify-between gap-2"><span class="evResLbl">📄 Resol. DD.FF.</span><span class="font-semibold text-right">${esc(e.resol_numero || "—")}${e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">👮 Guardias</span><span class="font-semibold text-right"><span data-reg="${e.id}">…</span> / ${esc(e.cantidad_esperada || "—")}</span></div>
+        ${(() => { const d = dotacionEv(e); return (d.supervisores ? `<div class="flex justify-between gap-2"><span class="evResLbl">🤵 Superv. / turno</span><span class="font-semibold text-right">${d.supervisores}</span></div>` : "") + d.otros.map(o => `<div class="flex justify-between gap-2"><span class="evResLbl">⭐ ${esc(o.cargo)}</span><span class="font-semibold text-right">${esc(o.cantidad || 1)}</span></div>`).join(""); })()}
         <div class="flex justify-between gap-2"><span class="evResLbl">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
@@ -6672,95 +6689,124 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
     }
 
     /* ---- Modales evento ---- */
+    // Dotación del evento (por turno): supervisores + otros cargos escritos a mano
+    // (ej: Jefe de seguridad). Se guarda en eventos.dotacion (jsonb).
+    function dotacionEv(ev) {
+      const d = (ev && ev.dotacion && typeof ev.dotacion === "object") ? ev.dotacion : {};
+      const otros = Array.isArray(d.otros) ? d.otros.filter(o => o && String(o.cargo || "").trim()) : [];
+      return { supervisores: parseInt(d.supervisores) || 0, otros };
+    }
     function modalNuevoEvento(ev) {
       if (ev instanceof Event) ev = undefined;           // proteger: nunca tratar un click como edición
       const edit = !!ev && !!ev.id;                       // solo es edición si trae un evento con id real
+      const dot = dotacionEv(edit ? ev : null);
+      const L = (t) => `<label class="mfLbl">${t}</label>`;
       openModal(`
-    <h2 class="font-bold text-base text-slate-800 mb-2">${edit ? "Editar evento" : "Nuevo evento"}</h2>
-    <div class="space-y-2">
-      <div>
-        <label class="text-xs font-semibold text-slate-600">Tipo</label>
-        <select id="m_tipo" class="fld fld-sm">
-          <option value="evento">Evento</option>
-          <option value="partido">Partido</option>
-        </select>
+    <div class="mfrm">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="font-bold text-base text-slate-800">${edit ? "Editar evento" : "Nuevo evento"}</h2>
+      <button id="m_x" type="button" class="text-slate-400 hover:text-slate-700 text-xl leading-none px-1" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="space-y-1.5">
+      <div class="grid grid-cols-2 gap-1.5">
+        <div>${L("Tipo")}
+          <select id="m_tipo" class="fld fld-sm">
+            <option value="evento">Evento</option>
+            <option value="partido">Partido</option>
+          </select>
+        </div>
+        <div>${L("Empresa")}<input id="m_emp" class="fld fld-sm" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
       </div>
-      <div id="m_nom_wrap"><label class="text-xs font-semibold text-slate-600">Nombre del evento</label><input id="m_nom" class="fld fld-sm" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
-      <div id="m_partido_wrap" hidden><label class="text-xs font-semibold text-slate-600">Partido (equipos)</label><input id="m_partido" class="fld fld-sm" placeholder="La Serena vs Huachipato" value="${edit ? esc(ev.partido || "") : ""}"/></div>
-      <div><label class="text-xs font-semibold text-slate-600">Empresa de seguridad</label><input id="m_emp" class="fld fld-sm" placeholder="MAGATY" value="${edit ? esc(ev.empresa) : ""}"/></div>
-      <div class="grid grid-cols-2 gap-2">
-        <div><label class="text-xs font-semibold text-slate-600">Dirección</label><input id="m_dir" class="fld fld-sm" placeholder="Av. Amunátegui 1234" value="${edit ? esc(ev.direccion || "") : ""}"/></div>
-        <div><label class="text-xs font-semibold text-slate-600">Comuna</label><input id="m_comuna" class="fld fld-sm" placeholder="La Serena" value="${edit ? esc(ev.comuna || "") : ""}"/></div>
+      <div id="m_nom_wrap">${L("Nombre del evento")}<input id="m_nom" class="fld fld-sm" placeholder="Pampilla La Serena" value="${edit ? esc(ev.nombre_evento) : ""}"/></div>
+      <div id="m_partido_wrap" hidden>${L("Partido (equipos)")}<input id="m_partido" class="fld fld-sm" placeholder="La Serena vs Huachipato" value="${edit ? esc(ev.partido || "") : ""}"/></div>
+      <div class="grid grid-cols-[3fr_2fr] gap-1.5">
+        <div>${L("Dirección")}<input id="m_dir" class="fld fld-sm" placeholder="Av. Amunátegui 1234" value="${edit ? esc(ev.direccion || "") : ""}"/></div>
+        <div>${L("Comuna")}<input id="m_comuna" class="fld fld-sm" placeholder="La Serena" value="${edit ? esc(ev.comuna || "") : ""}"/></div>
       </div>
-      <div><label class="text-xs font-semibold text-slate-600">Cantidad de guardias esperada</label><input id="m_cant" type="number" min="0" class="fld fld-sm" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
-      <div class="grid grid-cols-2 gap-2">
-        <div><label class="text-xs font-semibold text-slate-600">Desde ${edit ? "" : "(opcional)"}</label><input id="m_fecha" type="date" class="fld fld-sm" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
-        <div><label class="text-xs font-semibold text-slate-600">Hasta ${edit ? "" : "(opcional)"}</label><input id="m_fecha_hasta" type="date" class="fld fld-sm" value="${edit ? esc(ev.fecha_hasta || "") : ""}"/></div>
+      <div class="mfBox">
+        <div class="mfBoxT">👥 Dotación por turno</div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <div>${L("Guardias")}<input id="m_cant" type="number" min="0" inputmode="numeric" class="fld fld-sm" placeholder="100" value="${edit ? esc(ev.cantidad_esperada) : ""}"/></div>
+          <div>${L("Supervisores")}<input id="m_sup" type="number" min="0" inputmode="numeric" class="fld fld-sm" placeholder="0" value="${dot.supervisores || ""}"/></div>
+        </div>
+        <div id="m_otros" class="space-y-1.5"></div>
+        <button id="m_otro_add" type="button" class="text-xs font-semibold text-green-700 hover:text-green-800 py-0.5">+ Agregar cargo (ej: Jefe de seguridad)</button>
+        <datalist id="m_cargos_dl">
+          <option value="Jefe de seguridad"><option value="Encargado de seguridad"><option value="Coordinador de seguridad">
+          <option value="Jefe de turno"><option value="Guardia canino"><option value="Paramédico"><option value="Operador de cámaras (CCTV)">
+        </datalist>
       </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div><label class="text-xs font-semibold text-slate-600">N° de Resol. DD.FF.</label><input id="m_resol_num" class="fld fld-sm" placeholder="Ej: 1234" value="${edit ? esc(ev.resol_numero || "") : ""}"/></div>
-        <div><label class="text-xs font-semibold text-slate-600">Fecha de la resolución</label><input id="m_resol_fecha" type="date" class="fld fld-sm" value="${edit ? esc(ev.resol_fecha || "") : ""}"/></div>
+      <div class="grid grid-cols-2 gap-1.5">
+        <div>${L("Desde" + (edit ? "" : " <span class='font-normal text-slate-400'>(opc.)</span>"))}<input id="m_fecha" type="date" class="fld fld-sm" value="${edit ? esc(ev.fecha_evento || "") : ""}"/></div>
+        <div>${L("Hasta" + (edit ? "" : " <span class='font-normal text-slate-400'>(opc.)</span>"))}<input id="m_fecha_hasta" type="date" class="fld fld-sm" value="${edit ? esc(ev.fecha_hasta || "") : ""}"/></div>
       </div>
-      <div id="m_turnos_mode_wrap">
-        <label class="text-xs font-semibold text-slate-600">¿Usar turnos?</label>
-        <select id="m_turnos_mode" class="fld fld-sm">
-          <option value="con">Con turnos</option>
-          <option value="sin">Sin turnos (evento corto)</option>
-        </select>
+      <div class="grid grid-cols-2 gap-1.5">
+        <div>${L("N° Resol. DD.FF.")}<input id="m_resol_num" class="fld fld-sm" placeholder="Ej: 1234" value="${edit ? esc(ev.resol_numero || "") : ""}"/></div>
+        <div>${L("Fecha resolución")}<input id="m_resol_fecha" type="date" class="fld fld-sm" value="${edit ? esc(ev.resol_fecha || "") : ""}"/></div>
       </div>
-      <div id="m_turnos_block" class="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2">
-        <div class="text-xs font-semibold text-slate-700">🕑 Configuración de turnos</div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="text-[11px] font-semibold text-slate-600">Duración del turno</label>
-            <select id="m_turno" class="fld fld-sm">
-              <option value="12">Turno de 12 horas (día/noche)</option>
-              <option value="8">Turno de 8 horas</option>
-              <option value="6">Turno de 6 horas</option>
-              <option value="24">Turno de 24 horas</option>
-              <option value="custom">Personalizado…</option>
+      <div id="m_turnos_row" class="mfBox">
+        <div class="mfBoxT">🕑 Turnos</div>
+        <div class="grid grid-cols-3 gap-1.5">
+          <div id="m_turnos_mode_wrap">${L("¿Usa turnos?")}
+            <select id="m_turnos_mode" class="fld fld-sm">
+              <option value="con">Sí</option>
+              <option value="sin">No</option>
             </select>
           </div>
-          <div>
-            <label class="text-[11px] font-semibold text-slate-600">Inicio del 1er turno</label>
-            <input id="m_tini" type="time" class="fld fld-sm" value="${edit ? esc(ev.turno_inicio || TURNO_INICIO_DEFAULT) : TURNO_INICIO_DEFAULT}"/>
+          <div class="m_tcfg">${L("Duración")}
+            <select id="m_turno" class="fld fld-sm">
+              <option value="12">12 h</option>
+              <option value="8">8 h</option>
+              <option value="6">6 h</option>
+              <option value="24">24 h</option>
+              <option value="custom">Otra…</option>
+            </select>
           </div>
+          <div class="m_tcfg">${L("Inicio 1er")}<input id="m_tini" type="time" class="fld fld-sm" value="${edit ? esc(ev.turno_inicio || TURNO_INICIO_DEFAULT) : TURNO_INICIO_DEFAULT}"/></div>
         </div>
-        <div id="m_turno_custom_wrap" hidden>
-          <label class="text-[11px] font-semibold text-slate-600">Horas por turno (personalizado)</label>
-          <input id="m_turno_custom" type="number" min="1" max="24" step="1" class="fld fld-sm" placeholder="Ej: 10"/>
-        </div>
-        <p class="text-[11px] text-slate-400">La asistencia se separa automáticamente por turno según la hora de ingreso.</p>
+        <div id="m_turno_custom_wrap" hidden>${L("Horas por turno")}<input id="m_turno_custom" type="number" min="1" max="24" step="1" inputmode="numeric" class="fld fld-sm" placeholder="Ej: 10"/></div>
       </div>
-      <label class="flex items-start gap-2 text-sm text-slate-700 select-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 cursor-pointer">
-        <input type="checkbox" id="m_qr_rot" class="w-4 h-4 flex-shrink-0 mt-0.5">
-        <span>🔒 <b>QR rotativo por turno</b> (código presencial)<br><span class="text-[11px] text-slate-400 font-normal">El código QR cambia en cada turno (1 hora antes de su inicio) y solo sirve escaneándolo en el lugar. Recomendado en eventos con turnos.</span></span>
+      <label class="flex items-center gap-2 text-xs text-slate-700 select-none cursor-pointer px-1" title="El código QR cambia en cada turno (1 hora antes de su inicio) y solo sirve escaneándolo en el lugar.">
+        <input type="checkbox" id="m_qr_rot" class="w-4 h-4 flex-shrink-0">
+        <span>🔒 <b>QR rotativo por turno</b> <span class="text-slate-400">(código presencial)</span></span>
       </label>
     </div>
-    <div class="flex gap-2 mt-3">
+    <div class="mfFoot flex gap-2">
       <button id="m_cancel" class="btn btn-ghost flex-1">Cancelar</button>
       <button id="m_save" class="btn btn-p flex-1">${edit ? "Guardar" : "Crear evento"}</button>
+    </div>
     </div>`);
-      { const _mb = $("#modalBox"); if (_mb) _mb.classList.replace("p-5", "p-4"); const _mo = $("#modal"); if (_mo) _mo.style.alignItems = "flex-start"; }
+      { const _mb = $("#modalBox"); if (_mb) { _mb.classList.remove("p-5"); _mb.classList.add("p-3", "sm:p-4", "pb-0", "sm:pb-0"); } const _mo = $("#modal"); if (_mo) { _mo.style.alignItems = "flex-start"; if (window.innerWidth < 640) _mo.style.padding = "8px"; } }
       // QR rotativo: por defecto activo si el evento usa turnos (o según lo ya guardado al editar).
       $("#m_qr_rot").checked = edit ? qrRotativo(ev) : true;
+
+      // Otros cargos de la dotación (texto libre + cantidad por turno)
+      const otrosBox = $("#m_otros");
+      const addOtro = (cargo = "", cantidad = "") => {
+        const row = document.createElement("div");
+        row.className = "m_otro grid grid-cols-[1fr_4.2rem_2rem] gap-1.5 items-center";
+        row.innerHTML = `<input class="m_otro_cargo fld fld-sm" list="m_cargos_dl" placeholder="Escribe el cargo" value="${esc(cargo)}"/>
+          <input class="m_otro_cant fld fld-sm text-center" type="number" min="0" inputmode="numeric" placeholder="1" value="${esc(cantidad)}"/>
+          <button type="button" class="m_otro_del text-slate-400 hover:text-red-600 text-lg leading-none" title="Quitar">✕</button>`;
+        row.querySelector(".m_otro_del").addEventListener("click", () => row.remove());
+        otrosBox.appendChild(row);
+        return row;
+      };
+      dot.otros.forEach(o => addOtro(o.cargo, o.cantidad || ""));
+      $("#m_otro_add").addEventListener("click", () => addOtro().querySelector(".m_otro_cargo").focus());
+
       // Selector de duración de turno: mostrar campo personalizado cuando corresponde
       const selTurno = $("#m_turno"), customWrap = $("#m_turno_custom_wrap"), customInput = $("#m_turno_custom");
       const presets = ["12", "8", "6", "24"];
       if (edit && ev.turno_horas != null) {
         const h = String(parseFloat(ev.turno_horas) || TURNO_HORAS_DEFAULT);
         if (presets.includes(h)) { selTurno.value = h; }
-        else { selTurno.value = "custom"; customWrap.hidden = false; customInput.value = h; }
+        else { selTurno.value = "custom"; customInput.value = h; }
       }
-      selTurno.addEventListener("change", () => {
-        const isCustom = selTurno.value === "custom";
-        customWrap.hidden = !isCustom;
-        if (isCustom && !customInput.value) customInput.focus();
-      });
 
       // Tipo (Evento/Partido) y modo de turnos (Con/Sin)
       const selTipo = $("#m_tipo"), nomWrap = $("#m_nom_wrap"), partidoWrap = $("#m_partido_wrap"),
-        turnosModeWrap = $("#m_turnos_mode_wrap"), selTurnosMode = $("#m_turnos_mode"), turnosBlock = $("#m_turnos_block");
+        selTurnosMode = $("#m_turnos_mode"), turnosRow = $("#m_turnos_row");
       if (edit) {
         selTipo.value = esPartido(ev) ? "partido" : "evento";
         selTurnosMode.value = (ev.usa_turnos === false) ? "sin" : "con";
@@ -6769,15 +6815,22 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const esPart = selTipo.value === "partido";
         partidoWrap.hidden = !esPart;
         nomWrap.hidden = esPart;                    // en partido el nombre es el "equipos"
-        turnosModeWrap.hidden = esPart;             // los partidos no llevan turnos
-        // El bloque de configuración de turnos solo si es evento CON turnos
-        turnosBlock.hidden = esPart || selTurnosMode.value === "sin";
+        turnosRow.hidden = esPart;                  // los partidos no llevan turnos
+        // La configuración de turnos solo si es evento CON turnos
+        const conT = !esPart && selTurnosMode.value === "con";
+        document.querySelectorAll("#modalBox .m_tcfg").forEach(el => { el.style.visibility = conT ? "" : "hidden"; });
+        customWrap.hidden = !conT || selTurno.value !== "custom";
       };
       selTipo.addEventListener("change", aplicarTipo);
       selTurnosMode.addEventListener("change", aplicarTipo);
+      selTurno.addEventListener("change", () => {
+        aplicarTipo();
+        if (selTurno.value === "custom" && !customInput.value) customInput.focus();
+      });
       aplicarTipo();
 
       $("#m_cancel").addEventListener("click", closeModal);
+      $("#m_x").addEventListener("click", closeModal);
       $("#m_save").addEventListener("click", async () => {
         const esPart = selTipo.value === "partido";
         const partidoTxt = ($("#m_partido")?.value || "").trim();
@@ -6794,6 +6847,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const turnoInicio = ($("#m_tini").value || TURNO_INICIO_DEFAULT);
         const fechaHasta = $("#m_fecha_hasta").value || null;
         if (fecha && fechaHasta && fechaHasta < fecha) { toast("La fecha 'Hasta' no puede ser anterior a 'Desde'", false); return; }
+        const otros = [...otrosBox.querySelectorAll(".m_otro")].map(r => ({
+          cargo: (r.querySelector(".m_otro_cargo").value || "").trim(),
+          cantidad: parseInt(r.querySelector(".m_otro_cant").value) || 1
+        })).filter(o => o.cargo);
         const campos = {
           nombre_evento: nombre, empresa, cantidad_esperada: cant, fecha_evento: fecha, fecha_hasta: fechaHasta,
           direccion: ($("#m_dir").value || "").trim() || null,
@@ -6802,11 +6859,22 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           resol_fecha: $("#m_resol_fecha").value || null,
           tipo: esPart ? "partido" : "evento", partido: esPart ? partidoTxt : null,
           usa_turnos: usaTurnos, turno_horas: turnoHoras, turno_inicio: turnoInicio,
-          qr_rotativo: $("#m_qr_rot").checked
+          qr_rotativo: $("#m_qr_rot").checked,
+          dotacion: { supervisores: parseInt($("#m_sup").value) || 0, otros }
+        };
+        const guardar = async (c) => {
+          if (edit) { await Data.updateEvento(ev.id, c); }
+          else { const nuevo = await Data.createEvento({ ...c, slug: makeSlug(nombre, empresa) }); ADMIN_STATE.selected = nuevo.id; ADMIN_STATE.verArchivo = false; }
         };
         try {
-          if (edit) { await Data.updateEvento(ev.id, campos); }
-          else { const nuevo = await Data.createEvento({ ...campos, slug: makeSlug(nombre, empresa) }); ADMIN_STATE.selected = nuevo.id; ADMIN_STATE.verArchivo = false; }
+          try { await guardar(campos); }
+          catch (err) {
+            // Base sin la columna "dotacion" (falta correr supabase.sql): guardar el resto igual.
+            if (!/dotacion/i.test(String(err && (err.message || err)))) throw err;
+            const { dotacion, ...resto } = campos;
+            await guardar(resto);
+            toast("Evento guardado, pero sin supervisores/cargos: falta agregar la columna 'dotacion' en Supabase (ver supabase.sql).", false, 6000);
+          }
           closeModal(); refreshAdmin();
         } catch (err) { toast("Error: " + (err.message || err), false); }
       });
