@@ -3624,10 +3624,10 @@
     function _avatarFallbackSVG() {
       return "<svg viewBox='0 0 40 40' width='100%' height='100%' preserveAspectRatio='xMidYMid slice' aria-hidden='true' style='display:block'><rect width='40' height='40' fill='#d6dfe9'/><path d='M6.5 40c0-8.2 6-12.2 13.5-12.2S33.5 31.8 33.5 40Z' fill='#9aa7b6'/><circle cx='20' cy='17' r='7.3' fill='#c3cdd8'/></svg>";
     }
-    // Ícono de GUARDIA de seguridad (reemplaza al emoji 👮 de policía): camisa negra con
-    // placa dorada y gorra negra. Cambiar GUARDIA_ICONO para otra variante:
+    // Ícono de GUARDIA de seguridad (reemplaza al emoji 👮 de policía): chaqueta roja con
+    // placa dorada (chaqueta roja, sin gorra). Cambiar GUARDIA_ICONO para otra variante:
     //   ropa: "camisa" (negra) | "chaqueta" (roja) ·  gorra: true (negra) | false (sin gorra)
-    const GUARDIA_ICONO = { ropa: "camisa", gorra: true };
+    const GUARDIA_ICONO = { ropa: "chaqueta", gorra: false };
     function guardiaIcon(size) {
       const ropa = GUARDIA_ICONO.ropa === "chaqueta" ? "#c8102e" : "#111827";
       const cuello = GUARDIA_ICONO.ropa === "chaqueta" ? "#7f0a1d" : "#4b5563";
