@@ -3148,8 +3148,8 @@
           if (ev.resol_numero || ev.resol_fecha) partes.push(`<span class="whitespace-nowrap">📄 Resol.<span class="hidden sm:inline"> DD.FF.</span> ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</span>`);
           partes.push(`<span class="whitespace-nowrap" title="Guardias registrados / esperados por turno">Guardias ${guardiaIcon()} <b class="text-slate-700">${asistGuardias.length}/${total || "—"}</b></span>`);
           partes.push(`<span class="whitespace-nowrap" title="Supervisores registrados / esperados por turno">Supervisores 🤵 <b class="text-slate-700">${asistSupervisores.length}/${d.supervisores || "—"}</b></span>`);
-          d.otros.forEach(o => partes.push(`<span class="whitespace-nowrap truncate min-w-0" title="${esc(o.cargo)} por turno">⭐ <b class="text-slate-700">${esc(o.cantidad || 1)}</b> ${esc(o.cargo)}</span>`));
-          return `<div class="text-xs text-slate-500 flex items-center gap-x-1.5 min-w-0 overflow-hidden">${partes.join(sep)}</div>`;
+          d.otros.forEach(o => partes.push(`<span class="whitespace-nowrap" title="${esc(o.cargo)} por turno">⭐ <b class="text-slate-700">${esc(o.cantidad || 1)}</b> ${esc(o.cargo)}</span>`));
+          return `<div class="text-xs text-slate-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">${partes.join(sep)}</div>`;
         })()}
         <div class="text-xs font-medium mt-0.5">${eventoInfoHTML(ev)}</div>
       </div>
