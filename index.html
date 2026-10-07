@@ -4774,7 +4774,7 @@
         <table class="sup"><thead><tr>${thSup}</tr></thead><tbody>${trSup}</tbody></table>` : "";
       return `<html><head><meta charset="utf-8"><title>${esc(tituloListado(ev))}</title>
       <style>
-        @page{size:A4 landscape;margin:12mm}
+        @page{size:8.5in 13in landscape;margin:12mm}
         *{font-family:Arial,Helvetica,sans-serif}
         html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
         body{padding:24px;color:#111}
@@ -4809,9 +4809,9 @@
       const asistS = asist.filter(a => a.es_supervisor);
       const cols = listadoColumnas(ev), rows = detalleRows(ev, asistG);
       const colsSup = listadoColumnasSup(ev), rowsSup = detalleRows(ev, asistS);
-      // Siempre horizontal: con hoja vertical las columnas se montan unas sobre otras.
+      // Siempre oficio horizontal: con hoja vertical las columnas se montan unas sobre otras.
       const landscape = true;
-      const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+      const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: [612, 936] }); // hoja oficio
       if (typeof doc.autoTable !== "function") return null;
       const W = doc.internal.pageSize.getWidth();
       doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(15, 83, 35);
