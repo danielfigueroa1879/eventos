@@ -405,6 +405,12 @@
       color: #075985;
     }
 
+    /* Resumen: guardias con SPD aprobado (mismo azul del distintivo SPD) */
+    .b-spd {
+      background: #1b3a8f;
+      color: #ffffff;
+    }
+
     .row-dup {
       background: #fef2f2 !important;
       outline: 2px solid #fca5a5;
@@ -3220,12 +3226,13 @@
       </button>
       <div id="resumenPanel" class="p-3 border-t border-slate-100" ${ADMIN_STATE.showResumen ? "" : "hidden"}>
         ${usaT && nTurnosHist ? `<p class="text-[11px] text-slate-400 mb-2">Resumen del turno vigente. Los turnos anteriores están en 📁 Historial de turnos.</p>` : ""}
-        <div class="grid grid-cols-3 md:grid-cols-5 gap-2 text-center">
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-2 text-center">
           ${chip("Guardias Total", filas.length, "azul")}
           ${chip("Guardias vigentes", nV, "verde")}
           ${chip("Guardias prórroga", nP, "amarillo")}
           ${chip("Sin curso", nS, "rojo")}
           ${chip("Supervisores", nSup, "celeste")}
+          ${chip("SPD", contarSpdAprobados(ev, filas), "spd")}
         </div>
       </div>
     </div>
@@ -3496,6 +3503,10 @@
       main.querySelectorAll("[data-del]").forEach(x => x.addEventListener("click", () => { const a = asist.find(a => a.id === x.dataset.del); confirmar(`¿Quitar a ${esc(a.guardia?.nombres || a.rut)} de este evento?`, async () => { await Data.deleteAsistencia(a.id); closeModal(); refreshAdmin(); }); }));
       // Tocar la facción (columna Distribución / línea móvil) abre el mapa en ese puesto.
       main.querySelectorAll("[data-goto-puesto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); abrirDistribucion(ev, { focusPuestoId: x.dataset.gotoPuesto }); }));
+    }
+    // Guardias con SPD APROBADO (resolución SPD verificada) dentro de una lista de asistencias.
+    function contarSpdAprobados(ev, lista) {
+      return (lista || []).filter(a => !a.es_supervisor && esSPD(a.guardia || {}, a) && spdVerificado(ev, a, a.guardia || {})).length;
     }
     function chip(label, n, color) { return `<div class="rounded-lg py-1.5 b-${color}"><div class="text-lg font-bold leading-tight">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
     // Filtra en vivo el listado de guardias (móvil y escritorio) sin re-renderizar
@@ -7434,12 +7445,13 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <div id="empResumenPanel" class="px-4 pb-3 border-t border-slate-100" ${EMPRESA_STATE.showResumen ? "" : "hidden"}>
           <div class="w-full bg-slate-100 rounded-full h-3 mt-3"><div class="brand-bg h-3 rounded-full" style="width:${pct}%"></div></div>
           ${usaT && nTurnosHist ? `<p class="text-[11px] text-slate-400 mt-2">Resumen del turno vigente. Los turnos anteriores están en 📁 Historial (dentro del QR).</p>` : ""}
-          <div class="grid grid-cols-3 md:grid-cols-5 gap-2 mt-4 text-center">
+          <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mt-4 text-center">
             ${chip("Guardias Total", filasG.length, "azul")}
             ${chip("Guardias vigentes", cont("VIGENTE"), "verde")}
             ${chip("Guardias prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo")}
             ${chip("Sin curso", cont("SIN_CURSO"), "rojo")}
             ${chip("Supervisores", nSupE, "celeste")}
+            ${chip("SPD", contarSpdAprobados(ev, filasG), "spd")}
           </div>
         </div>
       </div>
