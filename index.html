@@ -265,6 +265,53 @@
       }
     }
 
+    /* Celulares pequeños: contadores H/M y botones de la barra del listado más compactos,
+       para que H y M queden SIEMPRE en la misma fila (vista admin y empresa). */
+    @media (max-width:420px) {
+      .hmChip {
+        padding: 2px 5px !important;
+        font-size: 11px !important
+      }
+
+      .barMovil .btn,
+      .barMovil .themeBtn {
+        padding-left: .45rem !important;
+        padding-right: .45rem !important;
+        font-size: 11px !important
+      }
+    }
+
+    @media (max-width:360px) {
+      .hmChip {
+        padding: 2px 4px !important;
+        font-size: 10.5px !important
+      }
+
+      .barMovil .btn,
+      .barMovil .themeBtn {
+        padding-left: .3rem !important;
+        padding-right: .3rem !important;
+        font-size: 10.5px !important
+      }
+
+      .barMovil .btn svg {
+        width: 16px;
+        height: 16px
+      }
+
+      .barMovil>div:last-child {
+        gap: 3px !important
+      }
+
+      /* Consultar guardia / Verificar todos: caben lado a lado */
+      #consultarGuardiaBtn,
+      #verificarTodosBtn {
+        font-size: 12px !important;
+        padding-left: .5rem !important;
+        padding-right: .5rem !important
+      }
+    }
+
     /* Tabla responsiva -> tarjetas en móvil */
     @media (max-width:700px) {
 
@@ -3225,10 +3272,10 @@
 
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 py-2 border-b border-slate-100">
-        <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
-          <div class="font-semibold text-slate-700 text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
-            <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${nH} <span class="text-slate-400 font-normal">H</span></span>
-            <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${nM} <span class="text-slate-400 font-normal">M</span></span>
+        <div class="barMovil flex items-center justify-between gap-1.5 w-full sm:w-auto">
+          <div class="font-semibold text-slate-700 text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 flex-nowrap flex-shrink-0">
+            <span class="hmChip bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${nH} <span class="text-slate-400 font-normal">H</span></span>
+            <span class="hmChip bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${nM} <span class="text-slate-400 font-normal">M</span></span>
             ${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? `<span class="text-indigo-600 font-normal text-xs ml-0.5">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 md:hidden">
@@ -7401,9 +7448,9 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <div class="px-3 py-2 border-b border-slate-100">
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <span class="font-semibold text-slate-700">Guardias <span class="text-slate-400 font-normal">(${filasG.length})</span></span>
-            <span class="flex items-center gap-1.5">
-              <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${contarHM(filasG).h} <span class="text-slate-400 font-normal">H</span></span>
-              <span class="bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${contarHM(filasG).m} <span class="text-slate-400 font-normal">M</span></span>
+            <span class="barMovil flex items-center gap-1 sm:gap-1.5 flex-nowrap">
+              <span class="hmChip bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Hombres">👨 ${contarHM(filasG).h} <span class="text-slate-400 font-normal">H</span></span>
+              <span class="hmChip bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap" title="Mujeres">👩 ${contarHM(filasG).m} <span class="text-slate-400 font-normal">M</span></span>
               ${themeBtnHTML("themeBtnEmp")}
             </span>
           </div>
