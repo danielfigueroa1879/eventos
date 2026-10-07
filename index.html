@@ -3127,6 +3127,8 @@
       // Candado de edición del evento: ABIERTO (verde) = los guardias pueden corregir sus datos;
       // CERRADO (gris) = nadie puede modificar los datos al registrar su ingreso.
       const registroAbierto = ev.registro_abierto === true;
+      // Celular: el buscador se abre con la lupa (queda abierto si ya hay una búsqueda escrita).
+      const buscaMovilAbierto = !!ADMIN_STATE.buscaMovil || !!(ADMIN_STATE.search || "").trim();
       const lockBtnHTML = (id, cls) => `<button id="${id}" class="btn btn-ghost ${cls} h-9 !py-0 px-2.5 sm:px-3 text-xs font-extrabold items-center justify-center gap-1 whitespace-nowrap${registroAbierto ? " text-green-700" : ""}" title="${registroAbierto ? "Edición ABIERTA — los guardias pueden corregir sus datos. Toca para CERRAR." : "Edición CERRADA — los guardias no pueden modificar sus datos. Toca para ABRIR."}">${registroAbierto ? "Abierto" : "Cerrado"}</button>`;
 
       main.innerHTML = `
@@ -3230,13 +3232,14 @@
             ${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? `<span class="text-indigo-600 font-normal text-xs ml-0.5">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 md:hidden">
+            <button id="lupaMovil" class="btn btn-ghost h-9 !py-0 !px-2.5 flex items-center justify-center sm:hidden${buscaMovilAbierto ? " text-green-700" : ""}" title="Buscar guardia por RUT o nombre" aria-label="Buscar guardia" aria-expanded="${buscaMovilAbierto}"${buscaMovilAbierto ? ' style="border-color:#15803d;background:#f0fdf4"' : ""}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></button>
             ${lockBtnHTML("lockMovilBtn", "flex")}
             <button id="cuentaMovil" class="btn btn-ghost h-9 !py-0 px-2.5 sm:px-3 text-xs font-extrabold flex items-center justify-center gap-1 whitespace-nowrap" title="Informe Cuenta O.S.10">Cuenta</button>
             <button id="compartirMovil" class="btn btn-ghost h-9 !py-0 !px-2.5 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
           </div>
         </div>
-        <div class="flex items-center gap-2 w-full sm:w-auto justify-end min-w-0">
-          <input id="buscar" class="fld h-9 py-1.5 text-sm flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-xs" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto justify-end min-w-0">
+          <input id="buscar" type="search" class="fld h-9 py-1.5 text-sm min-w-0 basis-full sm:basis-auto sm:flex-none sm:w-auto sm:max-w-xs${buscaMovilAbierto ? "" : " hidden sm:block"}" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
           <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
           <button id="verificarTodosBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-white rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="background:#0f5323;" title="Verificar todos los guardias uno por uno (asistido con Zosepcar)">✅ Verificar todos</button>
         </div>
@@ -3412,6 +3415,18 @@
       });
       $("#delEv").addEventListener("click", () => { confirmarConClave(`¿Eliminar el evento "${ev.nombre_evento}" y todos sus registros? Esta acción no se puede deshacer.`, async () => { try { await Data.deleteEvento(ev.id); ADMIN_STATE.selected = null; closeModal(); refreshAdmin(true); toast("Evento eliminado."); } catch (e) { toast("No se pudo eliminar: " + (e.message || e), "danger", 4000); } }); });
       const b = $("#buscar"); if (b) b.addEventListener("input", () => { ADMIN_STATE.search = b.value; filtrarLista(); });
+      // Lupa (celular): muestra/oculta el buscador. Al cerrarlo se limpia el filtro.
+      const lupaM = $("#lupaMovil");
+      if (lupaM && b) lupaM.addEventListener("click", () => {
+        const abrir = b.classList.contains("hidden");
+        ADMIN_STATE.buscaMovil = abrir;
+        b.classList.toggle("hidden", !abrir);
+        lupaM.classList.toggle("text-green-700", abrir);
+        lupaM.style.borderColor = abrir ? "#15803d" : ""; lupaM.style.background = abrir ? "#f0fdf4" : "";
+        lupaM.setAttribute("aria-expanded", String(abrir));
+        if (abrir) b.focus();
+        else { b.value = ""; ADMIN_STATE.search = ""; filtrarLista(); }
+      });
       filtrarLista();
       main.querySelectorAll(".turnoChip").forEach(c => c.addEventListener("click", () => { ADMIN_STATE.turnoFiltro = c.dataset.turno; renderMain(); }));
       main.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev)));
