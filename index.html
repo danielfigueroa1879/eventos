@@ -1813,8 +1813,7 @@
     /* ---- MARCA DE AGUA sobre la foto de ingreso ----
        No impide capturar la pantalla (ninguna web puede), pero deja toda copia
        IDENTIFICADA (O.S.10 + RUT + fecha), lo que disuade y permite rastrear filtraciones.
-       Se aplica de dos maneras: (1) superpuesta en pantalla, para fotos/capturas de
-       pantalla; (2) incrustada en el archivo que descarga el admin (canvas). */
+       Se superpone en pantalla, para fotos/capturas de pantalla (la foto no se puede descargar). */
     function _marcaTextoFoto(a, nombre) {
       var rut = (a && a.rut) ? String(a.rut) : "";
       var base = "FOTO RESTRINGIDA";
@@ -1829,63 +1828,9 @@
         "font-family='Arial, sans-serif' font-size='17' font-weight='bold'>" + t + "</text></svg>";
       return "data:image/svg+xml," + encodeURIComponent(svg);
     }
-    // Dibuja la marca de agua en mosaico sobre un canvas (para la descarga).
-    function _dibujarMarcaCanvas(ctx, w, h, texto) {
-      ctx.save();
-      ctx.font = "bold " + Math.max(12, Math.round(w * 0.045)) + "px Arial, sans-serif";
-      ctx.fillStyle = "rgba(255,255,255,0.34)";
-      ctx.textBaseline = "middle";
-      ctx.rotate(-32 * Math.PI / 180);
-      var stepX = Math.round(w * 0.55), stepY = Math.round(w * 0.30);
-      for (var y = -h; y < h * 1.6; y += stepY) {
-        for (var x = -w; x < w * 1.6; x += stepX) { ctx.fillText(texto, x, y); }
-      }
-      ctx.restore();
-      // Banda al pie con el aviso (se incrusta también en el archivo descargado).
-      try {
-        var bh = Math.max(26, Math.round(h * 0.075));
-        ctx.save();
-        ctx.fillStyle = "rgba(153,27,27,0.82)";
-        ctx.fillRect(0, h - bh, w, bh);
-        ctx.fillStyle = "#ffffff";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = "bold " + Math.max(9, Math.round(w * 0.028)) + "px Arial, sans-serif";
-        ctx.fillText("FOTO RESTRINGIDA · IP registrada · prohibida su difusión", w / 2, h - bh / 2);
-        ctx.restore();
-      } catch (e) { }
-    }
-    // Descarga la foto NÍTIDA (el admin sí puede) con la marca de agua incrustada. Si el canvas se
-    // "contamina" (CORS) o algo falla, devuelve false para que el llamador descargue el original.
-    function descargarFotoConMarca(url, texto, nombreArchivo) {
-      return new Promise(function (resolve) {
-        var img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = function () {
-          try {
-            var cv = document.createElement("canvas");
-            cv.width = img.naturalWidth || 750; cv.height = img.naturalHeight || 1000;
-            var ctx = cv.getContext("2d");
-            ctx.drawImage(img, 0, 0, cv.width, cv.height);
-            _dibujarMarcaCanvas(ctx, cv.width, cv.height, texto);
-            cv.toBlob(function (blob) {
-              if (!blob) { resolve(false); return; }
-              var href = URL.createObjectURL(blob);
-              var a = document.createElement("a");
-              a.href = href; a.download = nombreArchivo || "ingreso-os10.webp";
-              document.body.appendChild(a); a.click(); a.remove();
-              setTimeout(function () { URL.revokeObjectURL(href); }, 5000);
-              resolve(true);
-            }, "image/webp", 0.92);
-          } catch (e) { resolve(false); }
-        };
-        img.onerror = function () { resolve(false); };
-        img.src = url;
-      });
-    }
-    // Visor de la foto de ingreso (admin): vista ampliada, profesional y minimalista.
+    // Visor de la foto de ingreso (admin): vista ampliada, solo para ver (sin botón de descarga).
     async function verFotoIngresoModal(url, nombre, a) {
-      // El admin pide un enlace FIRMADO NUEVO justo al abrir (así ver/descargar nunca
+      // El admin pide un enlace FIRMADO NUEVO justo al abrir (así verla nunca
       // falla por caducidad). Si no se puede, usa el enlace que ya traía la miniatura.
       try {
         if (a && a.evento_id && a.id && Data.signFoto) {
@@ -1914,11 +1859,10 @@
         <div id="vf_time" class="text-[11px] text-slate-500 mt-2">Se difumina en 30 s</div>
         <div class="flex gap-2 mt-3">
           <button id="vf_reveal" class="btn btn-ghost flex-1 text-sm" style="display:none">👁 Ver 30 s</button>
-          <button id="vf_dl" class="btn btn-ghost flex-1 text-sm">⬇ Descargar</button>
           <button id="vf_close" class="btn btn-p flex-1 text-sm">Cerrar</button>
         </div>
       </div>`);
-      const x = $("#vf_x"), c = $("#vf_close"), dl = $("#vf_dl"), wm = $("#vf_wm");
+      const x = $("#vf_x"), c = $("#vf_close"), wm = $("#vf_wm");
       const vImg = $("#vf_img"), vFrost = $("#vf_frost"), vTime = $("#vf_time"), vRev = $("#vf_reveal");
       if (wm) wm.style.backgroundImage = 'url("' + marcaAguaDataUrl(marca) + '")';
 
@@ -1948,16 +1892,6 @@
       if (vRev) vRev.addEventListener("click", _vfRevelar);
       if (x) x.addEventListener("click", _cerrar);
       if (c) c.addEventListener("click", _cerrar);
-      if (dl) dl.addEventListener("click", async () => {
-        const prev = dl.textContent; dl.disabled = true; dl.textContent = "Preparando…";
-        let listo = false;
-        try { listo = await descargarFotoConMarca(url, marca, "ingreso-os10.webp"); } catch (e) { listo = false; }
-        if (!listo) {
-          // Respaldo: si no se pudo marcar (p. ej. CORS), descarga el original para no bloquear al admin.
-          try { const a2 = document.createElement("a"); a2.href = url; a2.download = "ingreso.webp"; a2.target = "_blank"; a2.rel = "noopener"; document.body.appendChild(a2); a2.click(); a2.remove(); } catch (e) { }
-        }
-        dl.disabled = false; dl.textContent = prev;
-      });
     }
     function badge(v) { return `<span class="badge badge-vig b-${v.color}">${esc(v.vigencia)}</span>`; }
     // Distintivo SPD: badge azul con letras blancas.
