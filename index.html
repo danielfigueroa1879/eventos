@@ -4070,6 +4070,7 @@
       bandaSup: { font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } }, fill: { patternType: "solid", fgColor: { rgb: "0369A1" } }, alignment: { horizontal: "center", vertical: "center" }, border: XL_BORDER },
       celda: { font: { sz: 10 }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: XL_BORDER },
       celdaIzq: { font: { sz: 10 }, alignment: { horizontal: "left", vertical: "center", wrapText: true }, border: XL_BORDER },
+      celdaNombre: { font: { sz: 10 }, alignment: { horizontal: "left", vertical: "center" }, border: XL_BORDER },
       link: { font: { sz: 10, color: { rgb: "1D4ED8" }, underline: true }, alignment: { horizontal: "left", vertical: "center" }, border: XL_BORDER },
       total: { font: { bold: true, sz: 10 }, fill: { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, alignment: { horizontal: "center", vertical: "center" }, border: XL_BORDER },
     };
@@ -4161,7 +4162,12 @@
       }
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
       ws["!merges"] = merges;
-      ws["!cols"] = cols.map((c, i) => ({ wch: i === 0 ? 5 : (i === 2 ? 28 : 16) }));
+      // Ancho de cada columna según el texto más largo, para que el nombre quede en una sola línea.
+      const largo = v => String(v == null ? "" : v).length;
+      ws["!cols"] = Array.from({ length: nCols }, (_, i) => {
+        const max = Math.max(largo(cols[i]), largo(colsSup[i]), ...rows.map(r => largo(r.cells[i])), ...rowsSup.map(r => largo(r.cells[i])));
+        return { wch: Math.max(i === 0 ? 5 : 10, max + 3) };
+      });
       // Estilos: títulos, encabezados con color, bordes, colores de vigencia y teléfonos con enlace tel:
       const telIdx = 3;
       const telLink = telHref;
@@ -4170,7 +4176,7 @@
       rows.forEach((r, i) => {
         const rr = rBody0 + i;
         r.cells.forEach((v, j) => {
-          const base = j === 2 ? XL_ST.celdaIzq : XL_ST.celda;
+          const base = j === 2 ? XL_ST.celdaNombre : XL_ST.celda;
           if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0F5323").replace("#", "") } } });
           else if (j === telIdx && telLink(v)) xlSet(ws, rr, j, XL_ST.link, telLink(v));
           else xlSet(ws, rr, j, base);
@@ -4182,7 +4188,7 @@
         rowsSup.forEach((r, i) => {
           const rr = rBodySup0 + i;
           r.cells.forEach((v, j) => {
-            const base = j === 2 ? XL_ST.celdaIzq : XL_ST.celda;
+            const base = j === 2 ? XL_ST.celdaNombre : XL_ST.celda;
             if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0369A1").replace("#", "") } } });
             else if (j === telIdx && telLink(v)) xlSet(ws, rr, j, XL_ST.link, telLink(v));
             else xlSet(ws, rr, j, base);
