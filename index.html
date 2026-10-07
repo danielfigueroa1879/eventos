@@ -212,6 +212,37 @@
       border-radius: 8px
     }
 
+    /* Tabla en PC: RUT, fechas, teléfono, ingreso, etc. nunca se parten en dos líneas.
+       Solo el nombre (con sus distintivos) puede ocupar más de una línea. */
+    @media (min-width:701px) {
+      table.resp th,
+      table.resp td:not([data-label="Nombre"]) {
+        white-space: nowrap
+      }
+
+      table.resp td[data-label="Nombre"] {
+        min-width: 170px
+      }
+    }
+
+    /* PC con pantalla más pequeña (notebooks): letra y espacios un poco más compactos
+       para que todas las columnas quepan sin desordenarse. */
+    @media (min-width:701px) and (max-width:1440px) {
+      table.resp {
+        font-size: 12.5px
+      }
+
+      table.resp th,
+      table.resp td {
+        padding-left: .3rem;
+        padding-right: .3rem
+      }
+
+      table.resp .badge {
+        font-size: 10.5px
+      }
+    }
+
     /* Tabla responsiva -> tarjetas en móvil */
     @media (max-width:700px) {
 
