@@ -212,16 +212,48 @@
       border-radius: 8px
     }
 
-    /* Tabla en PC: RUT, fechas, teléfono, ingreso, etc. nunca se parten en dos líneas.
-       Solo el nombre (con sus distintivos) puede ocupar más de una línea. */
+    /* Tabla en PC: ninguna celda se parte en dos líneas (RUT, fechas, teléfono, ingreso…).
+       El nombre largo se corta con "…" (ver más abajo). */
     @media (min-width:701px) {
       table.resp th,
       table.resp td:not([data-label="Nombre"]) {
         white-space: nowrap
       }
 
+      table.resp td[data-label="Nombre"] .badge {
+        margin-left: 4px
+      }
+
+      /* Nombre en UNA sola línea: si no cabe en su ancho máximo se corta con "…"
+         (el nombre completo aparece al pasar el mouse). Los distintivos quedan siempre visibles. */
+      /* La celda del nombre toma TODO el espacio que dejan las demás columnas
+         (width:100% + max-width:1px), así la tabla nunca se sale del recuadro. */
       table.resp td[data-label="Nombre"] {
-        min-width: 170px
+        width: 100%;
+        max-width: 1px;
+        white-space: nowrap
+      }
+
+      /* Dentro de la celda: primero se corta el texto del nombre; los distintivos
+         (SUPERVISOR, Pedir resolución, etc.) se mantienen visibles. */
+      table.resp td[data-label="Nombre"] .nomWrap {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        max-width: 100%
+      }
+
+      table.resp td[data-label="Nombre"] .nomTxt {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+        flex: 0 1 auto
+      }
+
+      table.resp td[data-label="Nombre"] .nomWrap>*:not(.nomTxt) {
+        flex-shrink: 0
       }
     }
 
@@ -241,6 +273,7 @@
       table.resp .badge {
         font-size: 10.5px
       }
+
     }
 
     /* PC muy angosto / tablet horizontal: un paso más compacto. */
@@ -255,9 +288,6 @@
         padding-right: .2rem
       }
 
-      table.resp td[data-label="Nombre"] {
-        min-width: 140px
-      }
 
       table.resp .badge {
         font-size: 9.5px;
@@ -3661,7 +3691,7 @@
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseSexo} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span>${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}">${esc(nom || "—")}${sup}${spd}${inf}${dobleT}${pend}</td>
+    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}"><span class="nomWrap"><span class="nomTxt" title="${esc(nom || "")}">${esc(nom || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
     <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="${esSup ? 'Autorización' : 'Examen'}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -3823,7 +3853,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium xl:whitespace-nowrap ${nomClsE}">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso (visible 2 h)"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}${dobleT}</td>
+        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso (visible 2 h)"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}</span></td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
