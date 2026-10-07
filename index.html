@@ -243,6 +243,28 @@
       }
     }
 
+    /* PC muy angosto / tablet horizontal: un paso más compacto. */
+    @media (min-width:701px) and (max-width:1023px) {
+      table.resp {
+        font-size: 11.5px
+      }
+
+      table.resp th,
+      table.resp td {
+        padding-left: .2rem;
+        padding-right: .2rem
+      }
+
+      table.resp td[data-label="Nombre"] {
+        min-width: 140px
+      }
+
+      table.resp .badge {
+        font-size: 9.5px;
+        padding: .12rem .35rem
+      }
+    }
+
     /* Tabla responsiva -> tarjetas en móvil */
     @media (max-width:700px) {
 
@@ -3728,7 +3750,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium md:whitespace-nowrap ${nomClsE}">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso (visible 2 h)"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}${dobleT}</td>
+        <td data-label="Nombre" class="pr-2 font-medium xl:whitespace-nowrap ${nomClsE}">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso (visible 2 h)"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}${sup}${spd}${inf}${dobleT}</td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
