@@ -224,12 +224,18 @@
         margin-left: 4px
       }
 
+      /* Mismo margen izquierdo que los encabezados (px-2), para que cada dato quede alineado. */
+      table.resp td {
+        padding-left: .5rem
+      }
+
       /* Nombre en UNA sola línea: si no cabe en su ancho máximo se corta con "…"
          (el nombre completo aparece al pasar el mouse). Los distintivos quedan siempre visibles. */
-      /* La celda del nombre toma TODO el espacio que dejan las demás columnas
-         (width:100% + max-width:1px), así la tabla nunca se sale del recuadro. */
+      /* La celda del nombre toma una parte del ancho (width:30%) sin que su contenido la
+         ensanche (max-width:1px): si falta espacio se achica ella y corta el texto con "…",
+         y si sobra espacio se reparte entre todas las columnas. La tabla nunca se sale. */
       table.resp td[data-label="Nombre"] {
-        width: 100%;
+        width: 30%;
         max-width: 1px;
         white-space: nowrap
       }
