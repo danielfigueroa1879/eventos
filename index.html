@@ -224,6 +224,11 @@
         margin-left: 4px
       }
 
+      /* Vigencia centrada (VIGENTE, PRÓRROGA, SPD… todos del mismo ancho y al centro). */
+      table.resp td[data-label="Vigencia"] {
+        text-align: center
+      }
+
       /* Mismo margen izquierdo que los encabezados (px-2), para que cada dato quede alineado. */
       table.resp td {
         padding-left: .5rem
@@ -2043,7 +2048,7 @@
     // columna. El aviso "⚠ Pedir resolución" NO va aquí: se muestra junto al nombre (spdAvisoHTML).
     // (Los supervisores sin SPD siguen mostrando "—".)
     function badgeVigenciaCelda(v, ev, a, g) {
-      if (g && esSPD(g, a)) return `<div class="text-center">${badgeSPD()}</div>`;
+      if (g && esSPD(g, a)) return badgeSPD().replace('class="badge"', 'class="badge badge-vig"');
       if (a && a.es_supervisor) return '<span class="text-slate-400">—</span>';
       return badge(v);
     }
@@ -3345,7 +3350,7 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
             ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
@@ -3369,7 +3374,7 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
             ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
@@ -4150,6 +4155,7 @@
     function tituloListado(ev) { return `${esPartido(ev) ? "Partido" : "Evento"}: ${ev.nombre_evento}`; }
     const VERDE_PAGINA = "#0f5323";
     // Detalle por fila con el color de vigencia, para dar formato en Excel/PDF
+    const SPD_AZUL = "#1b3a8f";   // color del distintivo SPD (pantalla, PDF y Excel)
     function detalleRows(ev, asist) {
       const usaT = eventoUsaTurnos(ev);
       return asist.map((a, i) => {
@@ -4159,10 +4165,12 @@
         const v = calcularVigencia(g.fecha_ultimo_examen);
         const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
         const tn = usaT ? calcularTurno(a.hora_ingreso, ev) : null;
-        const cells = [String(i + 1), a.rut, nom, g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), esSup ? "—" : v.vigencia, esSup ? "—" : (v.siges || "—")];
+        // Guardia autorizado por SPD: en Vigencia va "SPD" (igual que el distintivo azul de la pantalla).
+        const spd = esSPD(g, a);
+        const cells = [String(i + 1), a.rut, nom, g.telefono || "—", fechaFmt(g.fecha_ultimo_examen), spd ? "SPD" : (esSup ? "—" : v.vigencia), esSup ? "—" : (v.siges || "—")];
         if (usaT) cells.push(tn ? `${tn.fecha} ${tn.etiqueta}` : "—");
         cells.push(horaFmt(a.hora_ingreso));
-        return { cells, vigIdx: esSup ? -1 : 5, vigColor: esSup ? "#64748b" : (VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO) };
+        return { cells, spd, vigIdx: (esSup && !spd) ? -1 : 5, vigColor: spd ? SPD_AZUL : (esSup ? "#64748b" : (VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO)) };
       });
     }
 
@@ -4188,6 +4196,7 @@
       celdaIzq: { font: { sz: 10 }, alignment: { horizontal: "left", vertical: "center", wrapText: true }, border: XL_BORDER },
       celdaNombre: { font: { sz: 10 }, alignment: { horizontal: "left", vertical: "center" }, border: XL_BORDER },
       link: { font: { sz: 10, color: { rgb: "1D4ED8" }, underline: true }, alignment: { horizontal: "left", vertical: "center" }, border: XL_BORDER },
+      spd: { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } }, fill: { patternType: "solid", fgColor: { rgb: "1B3A8F" } }, alignment: { horizontal: "center", vertical: "center" }, border: XL_BORDER },
       total: { font: { bold: true, sz: 10 }, fill: { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, alignment: { horizontal: "center", vertical: "center" }, border: XL_BORDER },
     };
     // Devuelve un enlace tel: si el valor parece un teléfono (>= 8 dígitos), o null.
@@ -4215,7 +4224,7 @@
       const tdS = `text-align:center;border:1px solid #cbd5e1;padding:5px 10px;white-space:nowrap;mso-number-format:'\\@';`;
       const header = `<tr>${cols.map(c => `<th style="${thS}">${esc(c)}</th>`).join("")}</tr>`;
       const body = rows.map(r => `<tr>${r.cells.map((c, j) => {
-        const extra = j === r.vigIdx ? `background:${r.vigColor}22;color:${r.vigColor};font-weight:bold;` : "";
+        const extra = j === r.vigIdx ? (r.spd ? `background:${SPD_AZUL};color:#ffffff;font-weight:bold;` : `background:${r.vigColor}22;color:${r.vigColor};font-weight:bold;`) : "";
         return `<td style="${tdS}${extra}">${esc(String(c))}</td>`;
       }).join("")}</tr>`).join("");
       const nCols = Math.max(cols.length, colsSup.length);
@@ -4229,7 +4238,7 @@
         <tr><td colspan="${nCols}" style="background:${CELESTE_SUPERVISOR};color:#ffffff;font-weight:bold;font-size:13px;text-align:center;padding:6px;border:1px solid ${CELESTE_SUPERVISOR_BORDE};">🤵 SUPERVISORES (${asistS.length})</td></tr>
         <tr>${colsSup.map(c => `<th style="${thSupS}">${esc(c)}</th>`).join("")}</tr>
         ${rowsSup.map(r => `<tr>${r.cells.map((c, j) => {
-          const extra = j === r.vigIdx ? `background:${r.vigColor}22;color:${r.vigColor};font-weight:bold;` : `background:#e0f2fe22;`;
+          const extra = j === r.vigIdx ? (r.spd ? `background:${SPD_AZUL};color:#ffffff;font-weight:bold;` : `background:${r.vigColor}22;color:${r.vigColor};font-weight:bold;`) : `background:#e0f2fe22;`;
           return `<td style="${tdS}${extra}">${esc(String(c))}</td>`;
         }).join("")}</tr>`).join("")}` : "";
       const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
@@ -4293,7 +4302,8 @@
         const rr = rBody0 + i;
         r.cells.forEach((v, j) => {
           const base = j === 2 ? XL_ST.celdaNombre : XL_ST.celda;
-          if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0F5323").replace("#", "") } } });
+          if (j === r.vigIdx && r.spd) xlSet(ws, rr, j, XL_ST.spd);
+          else if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0F5323").replace("#", "") } } });
           else if (j === telIdx && telLink(v)) xlSet(ws, rr, j, XL_ST.link, telLink(v));
           else xlSet(ws, rr, j, base);
         });
@@ -4305,7 +4315,8 @@
           const rr = rBodySup0 + i;
           r.cells.forEach((v, j) => {
             const base = j === 2 ? XL_ST.celdaNombre : XL_ST.celda;
-            if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0369A1").replace("#", "") } } });
+            if (j === r.vigIdx && r.spd) xlSet(ws, rr, j, XL_ST.spd);
+            else if (j === r.vigIdx) xlSet(ws, rr, j, { ...base, font: { ...base.font, bold: true, color: { rgb: (r.vigColor || "#0369A1").replace("#", "") } } });
             else if (j === telIdx && telLink(v)) xlSet(ws, rr, j, XL_ST.link, telLink(v));
             else xlSet(ws, rr, j, base);
           });
@@ -4883,12 +4894,12 @@
       const colsSup = listadoColumnasSup(ev), rowsSup = detalleRows(ev, asistS);
       const th = cols.map(c => `<th>${esc(c)}</th>`).join("");
       const tr = rows.map(r => `<tr>${r.cells.map((c, j) => {
-        const st = j === r.vigIdx ? ` style="background:${r.vigColor}22;color:${r.vigColor};font-weight:bold"` : "";
+        const st = j === r.vigIdx ? (r.spd ? ` style="background:${SPD_AZUL};color:#ffffff;font-weight:bold"` : ` style="background:${r.vigColor}22;color:${r.vigColor};font-weight:bold"`) : "";
         return `<td${st}>${esc(String(c))}</td>`;
       }).join("")}</tr>`).join("");
       const thSup = colsSup.map(c => `<th>${esc(c)}</th>`).join("");
       const trSup = rowsSup.map(r => `<tr>${r.cells.map((c, j) => {
-        const st = j === r.vigIdx ? ` style="background:${r.vigColor}22;color:${r.vigColor};font-weight:bold"` : "";
+        const st = j === r.vigIdx ? (r.spd ? ` style="background:${SPD_AZUL};color:#ffffff;font-weight:bold"` : ` style="background:${r.vigColor}22;color:${r.vigColor};font-weight:bold"`) : "";
         return `<td${st}>${esc(String(c))}</td>`;
       }).join("")}</tr>`).join("");
       const bloqueSup = asistS.length ? `
@@ -4957,7 +4968,7 @@
         didParseCell: (d) => {
           if (d.section === "body") {
             const r = rows[d.row.index];
-            if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; }
+            if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = r.spd ? [255, 255, 255] : hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; if (r.spd) d.cell.styles.fillColor = hexToRgb(SPD_AZUL); }
             if (r && d.column.index === 3 && telHref(r.cells[3])) d.cell.styles.textColor = [29, 78, 216];
           }
         },
@@ -4993,7 +5004,7 @@
           didParseCell: (d) => {
             if (d.section === "body") {
               const r = rowsSup[d.row.index];
-              if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; }
+              if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = r.spd ? [255, 255, 255] : hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; if (r.spd) d.cell.styles.fillColor = hexToRgb(SPD_AZUL); }
               if (r && d.column.index === 3 && telHref(r.cells[3])) d.cell.styles.textColor = [29, 78, 216];
             }
           },
@@ -7517,7 +7528,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla completa -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
             <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
           </table>
         </div>
@@ -7535,7 +7546,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
+            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
             <tbody>${filasS.length ? filasS.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</td></tr>`}</tbody>
           </table>
         </div>
