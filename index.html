@@ -178,13 +178,12 @@
       background: rgba(27, 30, 35, .84);
     }
 
-    /* Solo en el PANEL ADMIN y en CELULAR: fondo sólido #e6f2fe (no la imagen). */
+    /* Solo en el PANEL ADMIN y en CELULAR: fondo sólido #e6f2fe (no la imagen).
+       En PC el admin muestra la imagen fondo.webp detrás de los recuadros, igual que la vista empresa. */
     @media (max-width: 767px) {
       body.vista-admin::before { background: #e6f2fe; filter: none; inset: 0; }
       body.vista-admin::after { background: #e6f2fe; }
-    }
-    html[data-theme="dark"] body.vista-admin::before { background: #1b1e23; }
-    @media (max-width: 767px) {
+      html[data-theme="dark"] body.vista-admin::before { background: #1b1e23; }
       html[data-theme="dark"] body.vista-admin::after { background: #1b1e23; }
     }
 
@@ -869,8 +868,10 @@
       background: linear-gradient(135deg, #0a2e12 0%, #0e401b 55%, #114f24 100%)
     }
 
-    html[data-theme="dark"] #main {
-      background: #1b1e23 !important
+    @media (max-width: 767px) {
+      html[data-theme="dark"] #main {
+        background: #1b1e23 !important
+      }
     }
 
     html[data-theme="dark"] .card,
@@ -2665,7 +2666,7 @@
     </aside>
 
     <!-- Main -->
-    <main id="main" class="flex-1 p-4 md:p-6 bg-slate-200"></main>
+    <main id="main" class="flex-1 p-4 md:p-6 bg-slate-200 md:bg-transparent"></main>
   </div>`;
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
