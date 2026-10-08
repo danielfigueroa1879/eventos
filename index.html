@@ -352,6 +352,30 @@
       }
     }
 
+    /* Tablas del HISTORIAL (partidos y turnos): mismo orden que la tabla principal en PC.
+       Encabezados a la izquierda y alineados con sus datos, nada se parte en dos líneas,
+       el nombre ocupa ~30% y se corta con "…" si no cabe, Vigencia centrada. */
+    table.histTabla thead { text-align: left }
+    table.histTabla th,
+    table.histTabla td {
+      white-space: nowrap;
+      padding-left: .5rem;
+      padding-right: .5rem
+    }
+    table.histTabla td:nth-child(3) {
+      width: 30%;
+      max-width: 1px;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+    table.histTabla th:nth-child(7),
+    table.histTabla td:nth-child(7) { text-align: center }
+    @media (max-width:1440px) {
+      table.histTabla { font-size: 12.5px }
+      table.histTabla th,
+      table.histTabla td { padding-left: .3rem; padding-right: .3rem }
+    }
+
     /* Tabla responsiva -> tarjetas en móvil */
     @media (max-width:700px) {
 
@@ -5176,8 +5200,8 @@
           <button id="hg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.length} guardia(s)</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm">
-          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2" style="width:99%">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
+        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">
+          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
         </table></div>
         <div class="grid grid-cols-2 gap-2 mt-3">
@@ -5220,8 +5244,8 @@
           <div class="flex gap-2 flex-shrink-0"><button id="hpv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="hpv_pdf" class="btn btn-ghost text-sm">📄 PDF</button><button id="hpv_del" class="btn btn-ghost text-sm text-red-600">🗑</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.length} guardia(s)</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm">
-          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2" style="width:99%">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
+        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">
+          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
         </table></div>`;
     }
@@ -5359,12 +5383,12 @@
           <button id="htd_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm">
-          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2" style="width:99%">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
+        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">
+          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${cuerpoG}</tbody>
         </table></div>
         ${recsS.length ? `<p class="text-xs font-bold text-sky-800 mt-3 mb-1">🤵 Supervisores (${recsS.length})</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2" style="width:99%">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}
+        <div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="htd_xls" class="btn btn-ghost text-sm">📊 Excel</button>
           <button id="htd_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
@@ -5392,17 +5416,17 @@
         return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, a, gu, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
-      const thead = `<thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2" style="width:99%">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>`;
+      const thead = `<thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>`;
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800">📁 Día ${idx + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</h2>
           <div class="flex gap-2 flex-shrink-0"><button id="htv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="htv_pdf" class="btn btn-ghost text-sm">📄 PDF</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm">${thead}
+        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">${thead}
           <tbody>${cuerpoG}</tbody>
         </table></div>
         ${recsS.length ? `<p class="text-xs font-bold text-sky-800 mt-3 mb-1">🤵 Supervisores (${recsS.length})</p>
-        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2" style="width:99%">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}`;
+        <div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}`;
     }
 
     // Historial de turnos a PANTALLA COMPLETA (escritorio): lista de turnos a la izquierda,
