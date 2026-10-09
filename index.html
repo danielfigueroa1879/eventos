@@ -1637,7 +1637,6 @@
           }
           return rows;
         },
-        async marcarSupervisorHist(r, esSup) { const a = get(K.hpa); const x = a.find(y => y.id === r.id); if (x) { x.vigencia = esSup ? "SUPERVISOR" : "GUARDIA"; set(K.hpa, a); } },
         async deleteHistorial(hid) { set(K.hp, get(K.hp).filter(x => x.id !== hid)); set(K.hpa, get(K.hpa).filter(x => x.historial_id !== hid)); ping(); },
         async listPuestos(evId) { return get(K.pu).filter(x => x.evento_id === evId).sort((a, b) => (a.orden || 0) - (b.orden || 0)); },
         async createPuesto(p) { const rec = { ...p, id: uid(), created_at: nowISO() }; const a = get(K.pu); a.push(rec); set(K.pu, a); ping(); return rec; },
@@ -1739,8 +1738,6 @@
           ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
           return hp.id;
         },
-        // Marca/desmarca a mano a alguien como supervisor en un partido archivado (columna 'vigencia').
-        async marcarSupervisorHist(r, esSup) { ok(await sb.from("partidos_historial_asist").update({ vigencia: esSup ? "SUPERVISOR" : "GUARDIA" }).eq("id", r.id)); },
         async listHistorial(evId) { return ok(await sb.from("partidos_historial").select("*").eq("evento_id", evId).order("cerrado_at", { ascending: false })); },
         async listHistorialAsist(hid) {
           const rows = ok(await sb.from("partidos_historial_asist").select("*").eq("historial_id", hid).order("hora_ingreso", { ascending: true }));
@@ -5242,7 +5239,7 @@
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(r, ev, dtSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${rows.indexOf(r)}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}${botonSupHist(r)}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${rows.indexOf(r)}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
       };
       // Guardias y supervisores en tablas separadas (como en el panel del evento).
       const rowsG = rows.filter(r => !r.es_supervisor), rowsS = rows.filter(r => r.es_supervisor);
@@ -5265,7 +5262,6 @@
         <div class="mt-2"><button id="hg_back" class="btn btn-ghost w-full">← Volver al historial</button></div>`);
       $("#hg_x").addEventListener("click", closeModal);
       enlazarFotosHistorial($("#modalBox"), ev, rows);
-      enlazarSupHistorial($("#modalBox"), rows, async () => { try { modalHistorialGuardias(ev, h, await Data.listHistorialAsist(h.id)); } catch (_) {} });
       $("#hg_back").addEventListener("click", () => modalHistorialPartidos(ev));
       $("#hg_xls").addEventListener("click", () => descargarExcel(histEvPseudo(ev, h), histRowsToAsist(rows)));
       $("#hg_pdf").addEventListener("click", () => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)));
@@ -5278,22 +5274,6 @@
     }
     function histCardSupervisores(n, tablaHTML) {
       return `<div class="card mt-4"><div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center gap-2"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 flex-shrink-0">🤵 SUPERVISOR</span><span>Supervisores registrados <span class="text-slate-400 font-normal">(${n})</span></span></div><div class="p-3">${tablaHTML}</div></div>`;
-    }
-    // Botón (solo admin) para marcar / desmarcar a mano a alguien como SUPERVISOR en un partido
-    // archivado. Sirve sobre todo para los partidos archivados antes de que existiera la marca.
-    function botonSupHist(r) {
-      if (!VER_FOTOS || !r || !r.id) return "";
-      return ` <button data-hsup="${esc(r.id)}" class="ml-1.5 align-middle text-[11px] px-1 rounded border ${r.es_supervisor ? "border-sky-300 bg-sky-50" : "border-slate-200 opacity-60 hover:opacity-100"}" title="${r.es_supervisor ? "Quitar de supervisores (pasa a guardias)" : "Marcar como supervisor"}">🤵</button>`;
-    }
-    function enlazarSupHistorial(cont, rows, recargar) {
-      if (!cont) return;
-      cont.querySelectorAll("[data-hsup]").forEach(b => b.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const r = rows.find(x => String(x.id) === String(b.dataset.hsup)); if (!r) return;
-        b.disabled = true;
-        try { await Data.marcarSupervisorHist(r, !r.es_supervisor); toast(r.es_supervisor ? "Movido a guardias." : "Marcado como supervisor."); recargar(); }
-        catch (err) { b.disabled = false; toast("No se pudo cambiar: " + (err.message || err), false); }
-      }));
     }
     // Tabla de SUPERVISORES del historial de un partido (encabezado celeste), o "" si no hay.
     function histSupervisoresHTML(rowsS, filaH) {
@@ -5321,7 +5301,7 @@
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(r, ev, dtSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${rows.indexOf(r)}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}${botonSupHist(r)}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${rows.indexOf(r)}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
       };
       // Guardias y supervisores en tablas separadas (como en el panel del evento).
       const rowsG = rows.filter(r => !r.es_supervisor), rowsS = rows.filter(r => r.es_supervisor);
@@ -5380,7 +5360,6 @@
         try { rows = await Data.listHistorialAsist(h.id); } catch (e) { det.innerHTML = `<p class="text-red-600 text-sm">Error: ${esc(e.message || String(e))}</p>`; return; }
         det.innerHTML = historialPartidoDetalleHTML(ev, h, rows);
         enlazarFotosHistorial(det, ev, rows);
-        enlazarSupHistorial(det, rows, () => pintar(h, btn));
         const evP = histEvPseudo(ev, h), asistH = histRowsToAsist(rows);
         const bx = $("#hpv_xls", det); if (bx) bx.addEventListener("click", () => descargarExcel(evP, asistH));
         const bp = $("#hpv_pdf", det); if (bp) bp.addEventListener("click", () => descargarPDF(evP, asistH));
