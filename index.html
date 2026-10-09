@@ -5217,10 +5217,10 @@
           <button id="hg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.filter(r => !r.es_supervisor).length} guardia(s)${rows.some(r => r.es_supervisor) ? ` · ${rows.filter(r => r.es_supervisor).length} supervisor(es)` : ""}</p>
-        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">
+        ${histCardGuardias(rowsG.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm">
           <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
-        </table></div>
+        </table></div>`)}
         ${bloqueSup}
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="hg_xls" class="btn btn-ghost text-sm">📊 Excel</button>
@@ -5234,11 +5234,18 @@
       $("#hg_pdf").addEventListener("click", () => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)));
     }
 
+    // Recuadros con título del historial, igual que en el panel del evento:
+    // "Guardias registrados (N)" y "🤵 SUPERVISOR  Supervisores registrados (N)".
+    function histCardGuardias(n, tablaHTML) {
+      return `<div class="card mt-2"><div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center gap-2"><span>Guardias registrados <span class="text-slate-400 font-normal">(${n})</span></span></div><div class="p-3">${tablaHTML}</div></div>`;
+    }
+    function histCardSupervisores(n, tablaHTML) {
+      return `<div class="card mt-4"><div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center gap-2"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 flex-shrink-0">🤵 SUPERVISOR</span><span>Supervisores registrados <span class="text-slate-400 font-normal">(${n})</span></span></div><div class="p-3">${tablaHTML}</div></div>`;
+    }
     // Tabla de SUPERVISORES del historial de un partido (encabezado celeste), o "" si no hay.
     function histSupervisoresHTML(rowsS, filaH) {
       if (!rowsS || !rowsS.length) return "";
-      return `<div class="mt-4 mb-1 flex items-center gap-2"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">🤵 SUPERVISOR</span><span class="font-semibold text-slate-700 text-sm">Supervisores <span class="text-slate-400 font-normal">(${rowsS.length})</span></span></div>
-        <div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${rowsS.map(filaH).join("")}</tbody></table></div>`;
+      return histCardSupervisores(rowsS.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${rowsS.map(filaH).join("")}</tbody></table></div>`);
     }
     // Foto archivada de un partido (solo admin): al tocar la miniatura se abre ampliada,
     // pidiendo un enlace firmado nuevo a partir de su ruta <evento_id>/<asistencia_id>.webp.
@@ -5272,10 +5279,10 @@
           <div class="flex gap-2 flex-shrink-0"><button id="hpv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="hpv_pdf" class="btn btn-ghost text-sm">📄 PDF</button><button id="hpv_del" class="btn btn-ghost text-sm text-red-600">🗑</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.filter(r => !r.es_supervisor).length} guardia(s)${rows.some(r => r.es_supervisor) ? ` · ${rows.filter(r => r.es_supervisor).length} supervisor(es)` : ""}</p>
-        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">
+        ${histCardGuardias(rowsG.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm">
           <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
-        </table></div>
+        </table></div>`)}
         ${bloqueSup}`;
     }
 
@@ -5412,12 +5419,11 @@
           <button id="htd_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
-        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">
+        ${histCardGuardias(recsG.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm">
           <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${cuerpoG}</tbody>
-        </table></div>
-        ${recsS.length ? `<p class="text-xs font-bold text-sky-800 mt-3 mb-1">🤵 Supervisores (${recsS.length})</p>
-        <div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}
+        </table></div>`)}
+        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="htd_xls" class="btn btn-ghost text-sm">📊 Excel</button>
           <button id="htd_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
@@ -5451,11 +5457,10 @@
           <div class="flex gap-2 flex-shrink-0"><button id="htv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="htv_pdf" class="btn btn-ghost text-sm">📄 PDF</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
-        <div class="overflow-x-auto"><table class="histTabla w-full text-sm">${thead}
+        ${histCardGuardias(recsG.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm">${thead}
           <tbody>${cuerpoG}</tbody>
-        </table></div>
-        ${recsS.length ? `<p class="text-xs font-bold text-sky-800 mt-3 mb-1">🤵 Supervisores (${recsS.length})</p>
-        <div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>` : ""}`;
+        </table></div>`)}
+        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}`;
     }
 
     // Historial de turnos a PANTALLA COMPLETA (escritorio): lista de turnos a la izquierda,
