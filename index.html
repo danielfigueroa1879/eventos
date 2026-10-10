@@ -1255,7 +1255,7 @@
        ========================================================================= */
     // FOTOS DE INGRESO: se archivan FOTO_RETENCION_DIAS días (también las de partidos archivados).
     // El administrador las recibe todas. La vista EMPRESA también las ve todas (sin límite de tiempo),
-    // pero con velo y sin poder descargarlas; en el historial no se le entregan.
+    // pero sin poder descargarlas; en el historial no se le entregan.
     // La distribución pública nunca recibe fotos.
     const FOTO_RETENCION_DIAS = 90;
     let VER_FOTOS = false;              // true solo dentro del panel del administrador (renderAdmin)
@@ -1681,7 +1681,7 @@
           // Para VER/DESCARGAR una foto ampliada, el admin pide un enlace NUEVO al hacer clic
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
           // Fuera del panel admin la foto no se entrega (ni se firma su enlace), salvo a la
-          // empresa (con velo y sin descarga).
+          // empresa (sin descarga).
           if (!fotoVisible()) as.forEach(a => { a.foto_url = null; });
           const conFoto = as.filter(a => a.foto_url);
           if (conFoto.length) {
@@ -3890,10 +3890,9 @@
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
       ${a.foto_url
         ? (modo === "empresa"
-          // Empresa: la foto se ve con un VELO BLANCO encima y NO se puede descargar/guardar
-          // (fondo CSS, sin <img>).
+          // Empresa: la foto NO se puede descargar/guardar (fondo CSS, sin <img>).
           ? (fotoEmpresaVigente(a)
-            ? `<span class="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" ${FOTO_EMPRESA_ATTR} style="background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>`
+            ? `<span class="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" ${FOTO_EMPRESA_ATTR} style="background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}"></span>`
             : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
           // Admin: <img> normal (puede ampliarla y descargarla, sin límite de tiempo).
           : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`)
@@ -3907,7 +3906,7 @@
       <span class="gChev flex-shrink-0" style="margin-left:-2px;margin-right:0"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
     </button>`;
     }
-    // Foto de ingreso en la vista empresa: con velo y sin <img>
+    // Foto de ingreso en la vista empresa: sin <img>
     // (no se puede guardar con clic derecho, arrastrar ni mantener presionado en iOS).
     const FOTO_EMPRESA_ATTR = 'oncontextmenu="return false" ondragstart="return false"';
     const FOTO_EMPRESA_CSS = "background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none";
@@ -3939,7 +3938,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}</span></td>
+        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}</span></td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -5685,14 +5684,14 @@
       // Foto chica (círculo) a la izquierda del nombre en el tooltip. Debajo va siempre el avatar,
       // así si la foto no existe o su enlace firmado caducó, se ve el avatar. Las fotos ya llegan
       // filtradas por Data.listAsistencias (admin: siempre; empresa: solo en plazo; público: nunca).
-      // En la empresa la foto va como fondo CSS con velo blanco (no se puede guardar), igual que su listado.
+      // En la empresa la foto va como fondo CSS (no se puede guardar), igual que su listado.
       // También se usa en la ficha del puesto (modalPuesto), con un tamaño mayor.
       function miniFoto(n, px = 20) {
         const av = avatarSVG(n.mujer ? "M" : (n.hombre ? "H" : ""), n.rut);
         const foto = !n.foto ? ""
           : (VER_FOTOS
             ? `<img src="${esc(n.foto)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">`
-            : `<span ${FOTO_EMPRESA_ATTR} style="position:absolute;inset:0;background-image:url('${esc(n.foto)}');${FOTO_EMPRESA_CSS}"></span><span style="position:absolute;inset:0;background:rgba(255,255,255,0.45)"></span>`);
+            : `<span ${FOTO_EMPRESA_ATTR} style="position:absolute;inset:0;background-image:url('${esc(n.foto)}');${FOTO_EMPRESA_CSS}"></span>`);
         return `<span style="position:relative;display:inline-block;width:${px}px;height:${px}px;border-radius:50%;overflow:hidden;flex-shrink:0;box-shadow:0 0 0 1px ${n.foto ? "#34d399" : "rgba(0,0,0,.1)"}">${av}${foto}</span>`;
       }
       function tooltipFor(p) {
@@ -5921,7 +5920,7 @@
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
-        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div class="flex items-center gap-2 text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}">${miniFoto({ mujer, hombre, rut: a.rut, foto: a.foto_url || null }, 28)}<span class="min-w-0"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</span></div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div ${VER_FOTOS && a.foto_url ? `data-pp-foto="${a.id}" role="button" title="Ver foto de ingreso" style="cursor:pointer"` : ""} class="flex items-center gap-2 text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}">${miniFoto({ mujer, hombre, rut: a.rut, foto: a.foto_url || null }, 28)}<span class="min-w-0"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</span></div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = (readonly && !puedeAsignar) ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             ${puedeAsignar ? `<button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>` : ""}
             ${!readonly ? `<button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
@@ -5936,6 +5935,13 @@
           ${acciones}
           <div class="mt-2"><button id="pp_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
         $("#pp_close").addEventListener("click", closeModal);
+        // Admin: tocar un guardia abre su foto de ingreso ampliada, con las restricciones del visor
+        // (marca de agua, se difumina a los 30 s, aviso de foto restringida).
+        document.querySelectorAll("[data-pp-foto]").forEach(x => x.addEventListener("click", () => {
+          const a = asig.find(r => r.id === x.dataset.ppFoto); if (!a) return;
+          const g = a.guardia || {};
+          verFotoIngresoModal(a.foto_url, ((g.nombres || "") + " " + (g.apellidos || "")).trim(), a);
+        }));
         if (puedeAsignar) { const bAsig = $("#pp_asig"); if (bAsig) bAsig.addEventListener("click", () => modalAsignar(p)); }
         if (!readonly) {
           $("#pp_edit").addEventListener("click", () => formPuesto(p));
@@ -7526,7 +7532,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
        VISTA EMPRESA (solo lectura, por evento) — ?empresa=<slug>
        ========================================================================= */
     async function renderEmpresa(slug) {
-      VER_FOTOS_EMPRESA = true;   // la empresa ve las fotos de ingreso (con velo) dentro de su plazo
+      VER_FOTOS_EMPRESA = true;   // la empresa ve las fotos de ingreso (sin poder descargarlas)
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
       let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (e) { }
       if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
