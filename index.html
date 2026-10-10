@@ -2152,7 +2152,7 @@
 
     /* =========================================================================
        QR ROTATIVO POR TURNO — el código QR cambia UNA VEZ POR TURNO.
-       El código de cada turno se activa 1 HORA ANTES de que empiece ese turno,
+       El código de cada turno se activa 2 HORAS ANTES de que empiece ese turno,
        y deja de servir cuando se activa el del turno siguiente. Así, el código de
        un turno (o de otro día) no sirve para registrarse en otro turno.
        No cambia el enlace que comparte la empresa (la vista ?empresa= sigue igual);
@@ -2160,7 +2160,7 @@
        el token depende del id del evento (que no viaja en el enlace) y del número
        de turno vigente, calculado con turno_inicio y turno_horas del evento.
        ========================================================================= */
-    const QR_LEAD_MS = 60 * 60 * 1000;   // el código del turno se activa 1 hora antes de su inicio
+    const QR_LEAD_MS = 2 * 60 * 60 * 1000; // el código del turno se activa 2 horas antes de su inicio
     // ¿Este evento usa QR rotativo? Los eventos CON turnos lo usan por defecto.
     // qr_rotativo === true/false lo fuerza; null (evento antiguo sin definir) = según turnos.
     function qrRotativo(ev) { return !!ev && (ev.qr_rotativo == null ? eventoUsaTurnos(ev) : ev.qr_rotativo === true); }
@@ -2181,7 +2181,7 @@
       base.setHours(hh, mm, 0, 0);
       return base.getTime();
     }
-    // Número del turno vigente para el QR. Cambia 1 h ANTES del inicio de cada turno.
+    // Número del turno vigente para el QR. Cambia 2 h ANTES del inicio de cada turno.
     function qrTurnoIndex(ev, nowMs) {
       const now = (nowMs == null ? Date.now() : nowMs);
       const H = Math.min(24, Math.max(1, parseFloat(ev.turno_horas) || 12));
@@ -2201,7 +2201,7 @@
     // Botones bajo el QR (+ aviso si es rotativo). En la empresa se omite el botón "Link".
     function qrBotonesHTML(ev, opts) {
       const conLink = !!(opts && opts.conLink);
-      const nota = qrRotativo(ev) ? `<div class="mt-2 text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 max-w-xs leading-snug">🔒 <b>Código por turno:</b> cambia 1 hora antes de cada turno. Escanéalo en el lugar.</div>` : "";
+      const nota = qrRotativo(ev) ? `<div class="mt-2 text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 max-w-xs leading-snug">🔒 <b>Código por turno:</b> cambia 2 horas antes de cada turno. Escanéalo en el lugar.</div>` : "";
       return `<div class="flex gap-2 mt-2 w-full max-w-xs">
         <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
         <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
@@ -7079,7 +7079,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         </div>
         <div id="m_turno_custom_wrap" hidden>${L("Horas por turno")}<input id="m_turno_custom" type="number" min="1" max="24" step="1" inputmode="numeric" class="fld fld-sm" placeholder="Ej: 10"/></div>
       </div>
-      <label class="flex items-center gap-2 text-xs text-slate-700 select-none cursor-pointer px-1" title="El código QR cambia en cada turno (1 hora antes de su inicio) y solo sirve escaneándolo en el lugar.">
+      <label class="flex items-center gap-2 text-xs text-slate-700 select-none cursor-pointer px-1" title="El código QR cambia en cada turno (2 horas antes de su inicio) y solo sirve escaneándolo en el lugar.">
         <input type="checkbox" id="m_qr_rot" class="w-4 h-4 flex-shrink-0">
         <span>🔒 <b>QR rotativo por turno</b> <span class="text-slate-400">(código presencial)</span></span>
       </label>
