@@ -807,8 +807,9 @@
     html[data-theme="dark"] #distOverlay .leaflet-tooltip-top::before { border-top-color: #1f2937; }
     html[data-theme="dark"] #distOverlay .leaflet-container { background: #1f2937; }
     /* Solo las teselas (no los puestos ni los tooltips): invertir colores y volver a girar el tono
-       deja calles claras sobre fondo oscuro, con parques verdes y agua azul. */
-    html[data-theme="dark"] #distOverlay .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.95) contrast(.9); }
+       deja calles claras sobre fondo oscuro; el gris y el brillo extra evitan el tono café y
+       que quede demasiado oscuro. */
+    html[data-theme="dark"] #distOverlay .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) grayscale(.7) brightness(1.5) contrast(.8); }
     html[data-theme="dark"] .themeBtn {
       background: #2a2f37;
       border-color: rgba(148, 163, 184, .3);
@@ -5693,7 +5694,9 @@
           const extra = total > MAX
             ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 4px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4);margin-left:-3px;position:relative;z-index:0">+${total - MAX}</span>`
             : "";
-          iconos = `<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;margin:3px auto 0;padding-left:3.5px;width:max-content;max-width:${(POR_FILA * 11) + 4}px">${chips}${extra}</div>`;
+          // En modo noche los guardias (ropa negra) van sobre una franja clara: sobre el mapa oscuro no se distinguían.
+          const fondoNoche = mapaOscuro ? `background:rgba(241,245,249,.92);border-radius:7px;padding:1px 3px 1px 6.5px;box-shadow:0 1px 3px rgba(0,0,0,.5);` : "padding-left:3.5px;";
+          iconos = `<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;margin:3px auto 0;${fondoNoche}width:max-content;max-width:${(POR_FILA * 11) + 4 + (mapaOscuro ? 6 : 0)}px">${chips}${extra}</div>`;
         }
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
       }
