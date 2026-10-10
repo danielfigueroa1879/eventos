@@ -5686,13 +5686,14 @@
       // así si la foto no existe o su enlace firmado caducó, se ve el avatar. Las fotos ya llegan
       // filtradas por Data.listAsistencias (admin: siempre; empresa: solo en plazo; público: nunca).
       // En la empresa la foto va como fondo CSS con velo blanco (no se puede guardar), igual que su listado.
-      function miniFoto(n) {
+      // También se usa en la ficha del puesto (modalPuesto), con un tamaño mayor.
+      function miniFoto(n, px = 20) {
         const av = avatarSVG(n.mujer ? "M" : (n.hombre ? "H" : ""), n.rut);
         const foto = !n.foto ? ""
           : (VER_FOTOS
             ? `<img src="${esc(n.foto)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">`
             : `<span ${FOTO_EMPRESA_ATTR} style="position:absolute;inset:0;background-image:url('${esc(n.foto)}');${FOTO_EMPRESA_CSS}"></span><span style="position:absolute;inset:0;background:rgba(255,255,255,0.45)"></span>`);
-        return `<span style="position:relative;display:inline-block;width:20px;height:20px;border-radius:50%;overflow:hidden;flex-shrink:0;box-shadow:0 0 0 1px ${n.foto ? "#34d399" : "rgba(0,0,0,.1)"}">${av}${foto}</span>`;
+        return `<span style="position:relative;display:inline-block;width:${px}px;height:${px}px;border-radius:50%;overflow:hidden;flex-shrink:0;box-shadow:0 0 0 1px ${n.foto ? "#34d399" : "rgba(0,0,0,.1)"}">${av}${foto}</span>`;
       }
       function tooltipFor(p) {
         const tx = mapaOscuro ? "#e5e7eb" : "#111", tx2 = mapaOscuro ? "#cbd5e1" : "#334155";
@@ -5920,7 +5921,7 @@
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
-        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div class="text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div class="flex items-center gap-2 text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}">${miniFoto({ mujer, hombre, rut: a.rut, foto: a.foto_url || null }, 28)}<span class="min-w-0"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</span></div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = (readonly && !puedeAsignar) ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             ${puedeAsignar ? `<button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>` : ""}
             ${!readonly ? `<button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
