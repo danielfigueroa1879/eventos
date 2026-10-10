@@ -2051,7 +2051,9 @@
       return "data:image/svg+xml," + encodeURIComponent(svg);
     }
     // Visor de la foto de ingreso (admin): vista ampliada, solo para ver (sin botón de descarga).
-    async function verFotoIngresoModal(url, nombre, a) {
+    // opts.alCerrar: se llama al cerrar la foto (✕, Cerrar o tocar fuera), p. ej. para volver a la ficha del puesto.
+    async function verFotoIngresoModal(url, nombre, a, opts) {
+      const alCerrar = opts && opts.alCerrar;
       // El admin pide un enlace FIRMADO NUEVO justo al abrir (así verla nunca
       // falla por caducidad). Si no se puede, usa el enlace que ya traía la miniatura.
       try {
@@ -2108,7 +2110,10 @@
         _vfIv = setInterval(() => { _vfSecs--; if (vTime && _vfSecs >= 0) vTime.textContent = "Se difumina en " + _vfSecs + " s"; }, 1000);
         _vfTo = setTimeout(_vfEsmerilar, 30000);
       };
-      const _cerrar = () => { _vfLimpiar(); closeModal(); };
+      const mo = $("#modal");
+      const _alFondo = (e) => { if (e.target === mo) { _vfLimpiar(); mo.removeEventListener("click", _alFondo); if (alCerrar) alCerrar(); } };
+      mo.addEventListener("click", _alFondo);   // tocar fuera: el listener general ya cierra el modal
+      const _cerrar = () => { _vfLimpiar(); mo.removeEventListener("click", _alFondo); closeModal(); if (alCerrar) alCerrar(); };
       _vfRevelar();
 
       if (vRev) vRev.addEventListener("click", _vfRevelar);
@@ -5940,7 +5945,8 @@
         document.querySelectorAll("[data-pp-foto]").forEach(x => x.addEventListener("click", () => {
           const a = asig.find(r => r.id === x.dataset.ppFoto); if (!a) return;
           const g = a.guardia || {};
-          verFotoIngresoModal(a.foto_url, ((g.nombres || "") + " " + (g.apellidos || "")).trim(), a);
+          // Al cerrar la foto se vuelve a la ficha de este puesto.
+          verFotoIngresoModal(a.foto_url, ((g.nombres || "") + " " + (g.apellidos || "")).trim(), a, { alCerrar: () => modalPuesto(p) });
         }));
         if (puedeAsignar) { const bAsig = $("#pp_asig"); if (bAsig) bAsig.addEventListener("click", () => modalAsignar(p)); }
         if (!readonly) {
