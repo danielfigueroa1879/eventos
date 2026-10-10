@@ -807,8 +807,9 @@
     html[data-theme="dark"] #distOverlay .leaflet-tooltip-top::before { border-top-color: #1f2937; }
     html[data-theme="dark"] #distOverlay .leaflet-container { background: #1f2937; }
     /* Solo las teselas (no los puestos ni los tooltips): invertir colores y volver a girar el tono
-       deja calles claras sobre fondo oscuro, con parques verdes y agua azul. */
-    html[data-theme="dark"] #distOverlay .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.95) contrast(.9); }
+       deja calles claras sobre fondo oscuro; el gris y el brillo extra evitan el tono café y
+       que quede demasiado oscuro. */
+    html[data-theme="dark"] #distOverlay .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) grayscale(.7) brightness(1.5) contrast(.8); }
     html[data-theme="dark"] .themeBtn {
       background: #2a2f37;
       border-color: rgba(148, 163, 184, .3);
@@ -1253,16 +1254,12 @@
          según la hora de ingreso.
        ========================================================================= */
     // FOTOS DE INGRESO: se archivan FOTO_RETENCION_DIAS días (también las de partidos archivados).
-    // El administrador las recibe todas. La vista EMPRESA las ve con velo y sin poder descargarlas:
-    //   - EVENTOS: cada foto, durante FOTO_EMPRESA_MS (2 h) desde ESE ingreso.
-    //   - PARTIDOS: todas las fotos, hasta FOTO_EMPRESA_PARTIDO_MS (6 h) desde el ÚLTIMO ingreso del partido.
-    // Pasado ese plazo (y en el historial) no se le entregan. La distribución pública nunca recibe fotos.
+    // El administrador las recibe todas. La vista EMPRESA también las ve todas (sin límite de tiempo),
+    // pero con velo y sin poder descargarlas; en el historial no se le entregan.
+    // La distribución pública nunca recibe fotos.
     const FOTO_RETENCION_DIAS = 90;
-    const FOTO_EMPRESA_MS = 2 * 3600 * 1000;
-    const FOTO_EMPRESA_PARTIDO_MS = 6 * 3600 * 1000;
     let VER_FOTOS = false;              // true solo dentro del panel del administrador (renderAdmin)
     let VER_FOTOS_EMPRESA = false;      // true solo en la vista empresa (renderEmpresa)
-    let FOTO_EMPRESA_PARTIDO = false;   // true si la vista empresa es de un partido (plazo de 6 h)
     // HISTORIAL DE PARTIDOS: la tabla partidos_historial_asist no tiene columnas para "supervisor"
     // ni "SPD", así que se guardan como marca en su columna de texto 'vigencia' (que la app no usa
     // para nada más: la vigencia se recalcula siempre con la fecha de examen).
@@ -1287,20 +1284,8 @@
       const m = String(r && r.vigencia || "");
       return { ...r, es_supervisor: m === "GUARDIA" ? false : (!!(r && r.es_supervisor) || m === "SUPERVISOR"), spd: !!(r && r.spd) || m === "SPD" || m === "SPD_OK", spd_verificado: !!(r && r.spd_verificado) || m === "SPD_OK" };
     }
-    // Hora (ISO) del último ingreso de una lista de asistencias.
-    function ultimoIngreso(lista) {
-      return (lista || []).reduce((m, a) => (a && a.hora_ingreso && a.hora_ingreso > m ? a.hora_ingreso : m), "");
-    }
-    // ¿La empresa todavía puede ver la foto de esta asistencia? (ver reglas arriba)
-    function fotoEmpresaEnPlazo(a, ultimo) {
-      if (FOTO_EMPRESA_PARTIDO) return Date.now() - new Date(ultimo || a.hora_ingreso || 0).getTime() < FOTO_EMPRESA_PARTIDO_MS;
-      return Date.now() - new Date(a.hora_ingreso || 0).getTime() < FOTO_EMPRESA_MS;
-    }
-    // ¿Esta asistencia conserva su foto para quien mira? (admin: siempre; empresa: según plazo)
-    function fotoVisible(a, ultimo) {
-      if (VER_FOTOS) return true;
-      return VER_FOTOS_EMPRESA && fotoEmpresaEnPlazo(a, ultimo);
-    }
+    // ¿Quien mira recibe las fotos de ingreso? (admin y empresa: sí; vista pública: no)
+    function fotoVisible() { return VER_FOTOS || VER_FOTOS_EMPRESA; }
     const TURNO_HORAS_DEFAULT = 12;      // turno de 12 horas (día/noche)
     const TURNO_INICIO_DEFAULT = "08:00"; // inicio del primer turno
     // Margen tras el fin de un turno antes de considerarlo FINALIZADO (historial/archivo).
@@ -1614,8 +1599,7 @@
         async listAsistencias(evId) {
           const as = get(K.as).filter(x => x.evento_id === evId);
           const gu = get(K.gu);
-          const ult = ultimoIngreso(as);
-          return as.map(a => ({ ...a, foto_url: fotoVisible(a, ult) ? a.foto_url : null, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
+          return as.map(a => ({ ...a, foto_url: fotoVisible() ? a.foto_url : null, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
         },
         async yaRegistrado(evId, rut) { return get(K.as).filter(x => x.evento_id === evId && x.rut === rut).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? 1 : -1))[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
@@ -1697,9 +1681,8 @@
           // Para VER/DESCARGAR una foto ampliada, el admin pide un enlace NUEVO al hacer clic
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
           // Fuera del panel admin la foto no se entrega (ni se firma su enlace), salvo a la
-          // empresa dentro de su plazo (2 h en eventos / 6 h desde el último ingreso en partidos).
-          const ult = ultimoIngreso(as);
-          as.forEach(a => { if (!fotoVisible(a, ult)) a.foto_url = null; });
+          // empresa (con velo y sin descarga).
+          if (!fotoVisible()) as.forEach(a => { a.foto_url = null; });
           const conFoto = as.filter(a => a.foto_url);
           if (conFoto.length) {
             try {
@@ -3907,8 +3890,8 @@
       <span class="gNum text-[11px] w-3.5 flex-shrink-0 text-center">${i + 1}</span>
       ${a.foto_url
         ? (modo === "empresa"
-          // Empresa: la foto SOLO se ve durante 2 horas desde el ingreso, con un VELO BLANCO encima,
-          // y NO se puede descargar/guardar (fondo CSS, sin <img>). Pasadas 2 h, vuelve el avatar.
+          // Empresa: la foto se ve con un VELO BLANCO encima y NO se puede descargar/guardar
+          // (fondo CSS, sin <img>).
           ? (fotoEmpresaVigente(a)
             ? `<span class="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" ${FOTO_EMPRESA_ATTR} style="background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>`
             : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
@@ -3924,11 +3907,11 @@
       <span class="gChev flex-shrink-0" style="margin-left:-2px;margin-right:0"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
     </button>`;
     }
-    // Foto de ingreso en la vista empresa: solo 2 h desde el ingreso, con velo y sin <img>
+    // Foto de ingreso en la vista empresa: con velo y sin <img>
     // (no se puede guardar con clic derecho, arrastrar ni mantener presionado en iOS).
     const FOTO_EMPRESA_ATTR = 'oncontextmenu="return false" ondragstart="return false"';
     const FOTO_EMPRESA_CSS = "background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none";
-    function fotoEmpresaVigente(a) { return !!(a && a.foto_url) && fotoEmpresaEnPlazo(a, EMPRESA_STATE._ultimoIngreso); }
+    function fotoEmpresaVigente(a) { return !!(a && a.foto_url); }
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
     function filaEmpresa(a, i, ev) {
       const g = a.guardia || {};
@@ -3956,7 +3939,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso (${FOTO_EMPRESA_PARTIDO ? "visible hasta 6 h después del último ingreso" : "visible 2 h"})"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}</span></td>
+        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"><span class="absolute inset-0" style="background:rgba(255,255,255,0.45)"></span></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}</span></td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -5693,7 +5676,9 @@
           const extra = total > MAX
             ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 4px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4);margin-left:-3px;position:relative;z-index:0">+${total - MAX}</span>`
             : "";
-          iconos = `<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;margin:3px auto 0;padding-left:3.5px;width:max-content;max-width:${(POR_FILA * 11) + 4}px">${chips}${extra}</div>`;
+          // En modo noche los guardias (ropa negra) van sobre una franja clara: sobre el mapa oscuro no se distinguían.
+          const fondoNoche = mapaOscuro ? `background:rgba(241,245,249,.92);border-radius:7px;padding:1px 3px 1px 6.5px;box-shadow:0 1px 3px rgba(0,0,0,.5);` : "padding-left:3.5px;";
+          iconos = `<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;margin:3px auto 0;${fondoNoche}width:max-content;max-width:${(POR_FILA * 11) + 4 + (mapaOscuro ? 6 : 0)}px">${chips}${extra}</div>`;
         }
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
       }
@@ -7544,10 +7529,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
       let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (e) { }
       if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
-      FOTO_EMPRESA_PARTIDO = esPartido(ev);   // partidos: fotos hasta 6 h después del último ingreso
       const paint = async () => {
         let asist = []; try { asist = await Data.listAsistencias(ev.id); } catch (e) { }
-        EMPRESA_STATE._ultimoIngreso = ultimoIngreso(asist);
         EMPRESA_STATE._dobleTurno = rutsDobleTurnoHoy(asist, ev);   // RUT con doble turno hoy (empresa)
         // Mapa puesto_id -> nombre de la faccion, para la columna "Distribución" (igual que el admin).
         try { const ps = {}; (await Data.listPuestos(ev.id)).forEach(p => { ps[p.id] = p.nombre; }); EMPRESA_STATE._puestosMap = ps; } catch (_) { EMPRESA_STATE._puestosMap = {}; }
@@ -7719,8 +7702,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       };
       await paint();
       Data.onChange(paint);
-      // Re-pinta cada 2 min para que las fotos de ingreso se oculten solas al vencer su plazo (2 h / 6 h)
-      // (aunque la empresa deje la pantalla abierta sin novedades).
+      // Re-pinta cada 2 min (aunque la empresa deje la pantalla abierta sin novedades) para renovar
+      // los enlaces firmados de las fotos de ingreso, que caducan a los 5 min.
       if (EMPRESA_STATE._tick) clearInterval(EMPRESA_STATE._tick);
       EMPRESA_STATE._tick = setInterval(paint, 120000);
     }
