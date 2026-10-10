@@ -802,6 +802,13 @@
       color: #dfe3e8
     }
 
+    /* Mapa de distribución en modo noche: tooltips oscuros (el mapa usa teselas oscuras). */
+    html[data-theme="dark"] #distOverlay .leaflet-tooltip { background: #1f2937; border-color: #374151; color: #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,.6); }
+    html[data-theme="dark"] #distOverlay .leaflet-tooltip-top::before { border-top-color: #1f2937; }
+    html[data-theme="dark"] #distOverlay .leaflet-container { background: #1f2937; }
+    /* Solo las teselas (no los puestos ni los tooltips): invertir colores y volver a girar el tono
+       deja calles claras sobre fondo oscuro, con parques verdes y agua azul. */
+    html[data-theme="dark"] #distOverlay .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.95) contrast(.9); }
     html[data-theme="dark"] .themeBtn {
       background: #2a2f37;
       border-color: rgba(148, 163, 184, .3);
@@ -5595,7 +5602,7 @@
           <button id="dist_menu" class="md:hidden btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
         </div>
         <div class="relative flex-1 min-h-0">
-          <div id="distMap" class="absolute inset-0" style="background:#e5e7eb"></div>
+          <div id="distMap" class="absolute inset-0" style="background:${isDarkTheme() ? "#1f2937" : "#e5e7eb"}"></div>
           <div id="distHint" class="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/85 text-white text-xs px-3 py-1.5 rounded-full shadow" hidden>👆 Toca el mapa para ubicar el puesto</div>
           <div id="distPanel" class="absolute top-0 right-0 h-full w-80 max-w-[90%] bg-white shadow-2xl border-l border-slate-200 overflow-y-auto z-[500] translate-x-full transition-transform"></div>
         </div>`;
@@ -5649,6 +5656,8 @@
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
+      // Modo noche: el mismo mapa de OSM se oscurece con un filtro CSS (ver .leaflet-tile-pane en el CSS).
+      const mapaOscuro = isDarkTheme();
       const conCoord = state.puestos.filter(p => p.lat != null && p.lng != null);
       if (conCoord.length) map.fitBounds(conCoord.map(p => [p.lat, p.lng]), { padding: [50, 50], maxZoom: 17 });
       else {
@@ -5662,7 +5671,7 @@
         return state.asist.filter(a => a.puesto_id === pid).map(a => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
-          return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M", hombre: sexoGuardia(g) === "H" };
+          return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M", hombre: sexoGuardia(g) === "H", rut: a.rut, foto: a.foto_url || null };
         });
       }
       function iconFor(p) {
@@ -5688,16 +5697,30 @@
         }
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
       }
+      // Foto chica (círculo) a la izquierda del nombre en el tooltip. Debajo va siempre el avatar,
+      // así si la foto no existe o su enlace firmado caducó, se ve el avatar. Las fotos ya llegan
+      // filtradas por Data.listAsistencias (admin: siempre; empresa: solo en plazo; público: nunca).
+      // En la empresa la foto va como fondo CSS con velo blanco (no se puede guardar), igual que su listado.
+      function miniFoto(n) {
+        const av = avatarSVG(n.mujer ? "M" : (n.hombre ? "H" : ""), n.rut);
+        const foto = !n.foto ? ""
+          : (VER_FOTOS
+            ? `<img src="${esc(n.foto)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">`
+            : `<span ${FOTO_EMPRESA_ATTR} style="position:absolute;inset:0;background-image:url('${esc(n.foto)}');${FOTO_EMPRESA_CSS}"></span><span style="position:absolute;inset:0;background:rgba(255,255,255,0.45)"></span>`);
+        return `<span style="position:relative;display:inline-block;width:20px;height:20px;border-radius:50%;overflow:hidden;flex-shrink:0;box-shadow:0 0 0 1px ${n.foto ? "#34d399" : "rgba(0,0,0,.1)"}">${av}${foto}</span>`;
+      }
       function tooltipFor(p) {
+        const tx = mapaOscuro ? "#e5e7eb" : "#111", tx2 = mapaOscuro ? "#cbd5e1" : "#334155";
         // Sin permiso de ver nombres (link público) solo se muestra el nombre del puesto y N/M.
         if (!verNombres) {
-          return `<div style="font:600 11px system-ui,sans-serif;color:#111"><div style="font-weight:800;color:${colorAnillo(p.anillo)}">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div></div>`;
+          return `<div style="font:600 11px system-ui,sans-serif;color:${tx}"><div style="font-weight:800;color:${colorAnillo(p.anillo)}">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div></div>`;
         }
+        const cMujer = mapaOscuro ? "#fca5a5" : "#991b1b", cHombre = mapaOscuro ? "#93c5fd" : "#1e3a8a";
         const nombres = guardiasDePuesto(p.id);
         const listaHTML = nombres.length
-          ? nombres.map((n, i) => `<div style="padding:1px 0${n.mujer ? ";color:#991b1b;font-weight:700" : (n.hombre ? ";color:#1e3a8a;font-weight:700" : "")}">${i + 1}. ${esc(n.nombre)}</div>`).join("")
+          ? nombres.map((n, i) => `<div style="display:flex;align-items:center;gap:5px;padding:1px 0${n.mujer ? `;color:${cMujer};font-weight:700` : (n.hombre ? `;color:${cHombre};font-weight:700` : "")}">${miniFoto(n)}<span>${i + 1}. ${esc(n.nombre)}</span></div>`).join("")
           : `<div style="color:#94a3b8;padding:2px 0">Sin guardias asignados</div>`;
-        return `<div style="font:600 11px system-ui,sans-serif;color:#111;max-width:220px"><div style="font-weight:800;color:${colorAnillo(p.anillo)};margin-bottom:3px">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div><div style="font-weight:500;color:#334155">${listaHTML}</div></div>`;
+        return `<div style="font:600 11px system-ui,sans-serif;color:${tx};max-width:240px"><div style="font-weight:800;color:${colorAnillo(p.anillo)};margin-bottom:3px">${esc(p.nombre)} · ${asignados(p.id)}/${p.guardias_plan || 0}</div><div style="font-weight:500;color:${tx2}">${listaHTML}</div></div>`;
       }
       function addMarker(p) {
         if (p.lat == null || p.lng == null) return;
