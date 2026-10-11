@@ -1309,6 +1309,12 @@
     // (Compatibilidad: eventos antiguos sin el campo usa_turnos se consideran CON turnos.)
     function eventoUsaTurnos(ev) { return !!ev && ev.tipo !== "partido" && ev.usa_turnos !== false; }
     function esPartido(ev) { return !!ev && ev.tipo === "partido"; }
+    // Asistencias de los turnos VIGENTES: sin los turnos ya finalizados (+2 h tras su término), que
+    // pasan al 📁 historial. Es lo que muestran el listado y la vista empresa, y lo que deben contar.
+    function asistVigentes(ev, asist) {
+      if (!eventoUsaTurnos(ev)) return asist || [];
+      return (asist || []).filter(a => { const tn = calcularTurno(a.hora_ingreso, ev); return !(tn && Date.now() > tn.fin.getTime() + GRACIA_TURNO_MS); });
+    }
 
     function calcularTurno(iso, ev) {
       if (!iso) return null;
@@ -2914,7 +2920,9 @@
       lista.forEach(async e => {
         let as = [];
         try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
-        const g = as.filter(a => !a.es_supervisor), sup = as.filter(a => a.es_supervisor);
+        // Solo los turnos vigentes (igual que el listado); los finalizados están en el historial.
+        const asV = asistVigentes(e, as);
+        const g = asV.filter(a => !a.es_supervisor), sup = asV.filter(a => a.es_supervisor);
         const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length}/${e.cantidad_esperada || "—"} GG.SS. · ${sup.length}/${dotacionEv(e).supervisores || "—"} SUP.`;
         if (e.id === ADMIN_STATE.expandido) {
           const elR = $(`[data-reg="${e.id}"]`); if (elR) elR.textContent = g.length;
@@ -3304,6 +3312,7 @@
         return !(usaT && turnoFinalizado(a));
       });
       const nActivos = usaT ? asistGuardias.filter(a => !turnoFinalizado(a)).length : asistGuardias.length;
+      const nSupActivos = usaT ? asistSupervisores.filter(a => !turnoFinalizado(a)).length : asistSupervisores.length;
       const pct = total ? Math.min(100, Math.round(filas.length / total * 100)) : 0;
       // Lo mostrado en pantalla (turno vigente / filtrado). Las descargas del listado usan esto,
       // para que coincidan con lo que se ve. Los turnos pasados se descargan desde 📁 Historial.
@@ -3350,8 +3359,8 @@
           const d = dotacionEv(ev), sep = `<span class="text-slate-300">·</span>`;
           const partes = [];
           if (ev.resol_numero || ev.resol_fecha) partes.push(`<span class="whitespace-nowrap">📄 Resol.<span class="hidden sm:inline"> DD.FF.</span> ${esc(ev.resol_numero || "—")}${ev.resol_fecha ? " · " + esc(fechaFmt(ev.resol_fecha)) : ""}</span>`);
-          partes.push(`<span class="whitespace-nowrap" title="Guardias registrados / esperados por turno"><span class="sm:hidden">GG.SS.</span><span class="hidden sm:inline">Guardias</span> ${guardiaIcon()} <b class="text-slate-700">${asistGuardias.length}/${total || "—"}</b></span>`);
-          partes.push(`<span class="whitespace-nowrap" title="Supervisores registrados / esperados por turno"><span class="sm:hidden">SUP.</span><span class="hidden sm:inline">Supervisores</span> 🤵 <b class="text-slate-700">${asistSupervisores.length}/${d.supervisores || "—"}</b></span>`);
+          partes.push(`<span class="whitespace-nowrap" title="Guardias registrados / esperados por turno"><span class="sm:hidden">GG.SS.</span><span class="hidden sm:inline">Guardias</span> ${guardiaIcon()} <b class="text-slate-700">${nActivos}/${total || "—"}</b></span>`);
+          partes.push(`<span class="whitespace-nowrap" title="Supervisores registrados / esperados por turno"><span class="sm:hidden">SUP.</span><span class="hidden sm:inline">Supervisores</span> 🤵 <b class="text-slate-700">${nSupActivos}/${d.supervisores || "—"}</b></span>`);
           d.otros.forEach(o => partes.push(`<span class="whitespace-nowrap" title="${esc(o.cargo)} por turno">⭐ <b class="text-slate-700">${esc(o.cantidad || 1)}</b> ${esc(o.cargo)}</span>`));
           return `<div class="text-xs text-slate-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">${partes.join(sep)}</div>`;
         })()}
@@ -3568,12 +3577,12 @@
           } catch (e) { toast("Error al archivar: " + (e.message || e), false); }
         });
       });
-      const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asist));
-      const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asist));
+      const bC1 = $("#btnCuentaOS10Top"); if (bC1) bC1.addEventListener("click", () => modalCuentaOS10(ev, asistVigentes(ev, asist)));
+      const bC2 = $("#cuentaOS10"); if (bC2) bC2.addEventListener("click", () => modalCuentaOS10(ev, asistVigentes(ev, asist)));
       const bEvXls = $("#expEventosXls"); if (bEvXls) bEvXls.addEventListener("click", modalExportEventos);
       const bInf = $("#expInfractores"); if (bInf) bInf.addEventListener("click", modalInfractores);
       const bSexo = $("#revSexo"); if (bSexo) bSexo.addEventListener("click", modalRevisarSexo);
-      const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asist));
+      const bC3 = $("#cuentaMovil"); if (bC3) bC3.addEventListener("click", () => modalCuentaOS10(ev, asistVigentes(ev, asist)));
       // Candado ABIERTO/CERRADO: alterna si los guardias pueden corregir sus datos al registrarse.
       const toggleLock = async (btn) => {
         if (!btn) return;
