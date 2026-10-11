@@ -2249,10 +2249,25 @@
       if (dist) return renderDistPublica(dist);
       const emp = params.get("empresa");
       if (emp) return renderEmpresa(emp);
+      const vista = params.get("vista");
+      if (vista) return renderEmpresa(vista, { soloVista: true });
       if (params.has("admin")) return renderMasterGate();
       return renderAdminGate();
     }
     function empresaLink(slug) { return location.origin + location.pathname.replace(/index\.html$/, "") + "?empresa=" + encodeURIComponent(slug); }
+    // Link de empresa SOLO VISTA: no permite cambiar nada (tampoco la distribución) y vence a las
+    // 12 h. Es "?vista=<slug>&ver=<vence_ms>.<firma>" (no "?empresa=", así quitarle el token no lo
+    // convierte en el link editable); la firma usa el id del evento, que no viaja en el enlace.
+    const VISTA_MS = 12 * 3600 * 1000;
+    const firmaVista = (ev, exp) => qrHash(String(ev.id || ev.slug) + "|vista|" + exp).slice(0, 12);
+    function vistaLink(ev) { const exp = Date.now() + VISTA_MS; return { url: location.origin + location.pathname.replace(/index\.html$/, "") + "?vista=" + encodeURIComponent(ev.slug) + "&ver=" + exp + "." + firmaVista(ev, exp), exp }; }
+    // Devuelve el vencimiento (ms) si el token es válido y está vigente; si no, null.
+    function vistaVence(ev, ver) {
+      const m = /^(\d+)\.([0-9a-z]+)$/.exec(String(ver || "")); if (!m) return null;
+      const exp = +m[1];
+      return (m[2] === firmaVista(ev, exp) && Date.now() < exp && exp - Date.now() <= VISTA_MS + 60000) ? exp : null;
+    }
+    let SOLO_VISTA = false;   // true en la vista empresa abierta con link "solo vista"
     function distLink(slug) { return location.origin + location.pathname.replace(/index\.html$/, "") + "?dist=" + encodeURIComponent(slug); }
 
     // Vista pública SOLO LECTURA de la distribución (para compartir)
@@ -3408,6 +3423,7 @@
         ${usaT ? `<button id="histTurnos" class="btn btn-ghost text-sm" title="Turnos anteriores archivados. Abre cada turno para ver el detalle y descargar su Excel/PDF.">📁 Historial de turnos${nTurnosHist ? ` (${nTurnosHist})` : ""}</button>` : ""}
         <button id="distEv" class="btn btn-ghost text-sm">🗺️ Distribución</button>
         <button id="linkEmpresa" class="btn btn-ghost text-sm">👁 Link empresa</button>
+        <button id="linkVista" class="btn btn-ghost text-sm" title="Link de la vista empresa sin poder cambiar nada (ni la distribución). Vence en 12 horas.">🕒 Compartir solo vista</button>
         <button id="editEv" class="btn btn-ghost text-sm">${esPartido(ev) ? "✎ Cambiar equipos" : "✎ Editar evento"}</button>
         <button id="archEv" class="btn btn-ghost text-sm" title="${eventoArchivado(ev) ? "Devolver el evento a la lista de eventos actuales" : "Mover el evento al 📁 Archivo (no se borra; la empresa lo sigue viendo)"}">${eventoArchivado(ev) ? "↩ Desarchivar" : "📁 Archivar"}</button>
         <button id="delEv" class="btn btn-ghost text-sm text-red-600">🗑 Eliminar</button>
@@ -3579,6 +3595,7 @@
       if (btnHistT) btnHistT.addEventListener("click", () => modalHistorialTurnos(ev));
       $("#distEv").addEventListener("click", () => abrirDistribucion(ev));
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
+      $("#linkVista").addEventListener("click", () => modalLinkVista(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       // Interruptor global "Foto de ingreso" (dentro del menú del QR). Aplica a todos los eventos y dispositivos.
       const btnFotoQR = $("#toggleFotoQR");
@@ -5655,6 +5672,8 @@
     function colorAnillo(a) { return ({ "Anillo 1": "#dc2626", "Anillo 2": "#dc2626", "Interior": "#16a34a", "Exterior": "#dc2626", "Otro": "#ea580c" })[a] || "#0f5323"; }
 
     async function abrirDistribucion(ev, opts = {}) {
+      // Link "solo vista": ve nombres y fotos, pero no puede asignar ni editar puestos.
+      if (SOLO_VISTA) opts = { ...opts, readonly: true, verNombres: true, permitirAsignar: false };
       const readonly = !!opts.readonly;
       // ¿Se muestran los nombres de los guardias en el tooltip del mapa? En el link PÚBLICO
       // (readonly sin verNombres) se ocultan por privacidad; la empresa (readonly + verNombres)
@@ -7578,6 +7597,26 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       $("#le_close").addEventListener("click", closeModal);
     }
 
+    /* ---- Modal: link de empresa SOLO VISTA (12 h) ---- */
+    function modalLinkVista(ev) {
+      const { url: link, exp } = vistaLink(ev);
+      const puedeCompartir = !!(navigator.canShare && navigator.share);
+      const texto = `${ev.nombre_evento} — vista de guardias (solo vista, vence ${horaFmt(new Date(exp).toISOString())}): ${link}`;
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">🕒 Compartir solo vista</h2>
+    <p class="text-sm text-slate-500 mb-3">Quien abra este enlace verá la vista de empresa de "<b>${esc(ev.nombre_evento)}</b>" (guardias, fotos y distribución) <b>sin poder cambiar nada</b>, ni siquiera la distribución. <b>Vence el ${esc(horaFmt(new Date(exp).toISOString()))}</b> (12 horas).</p>
+    <input id="lv_url" class="fld text-xs" readonly value="${esc(link)}">
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button id="lv_copy" class="btn btn-p col-span-2">🔗 Copiar link</button>
+      <a href="https://wa.me/?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener" class="btn btn-ghost flex items-center justify-center gap-1">📲 WhatsApp</a>
+      ${puedeCompartir ? `<button id="lv_share" class="btn btn-ghost">📤 Compartir…</button>` : `<button id="lv_close" class="btn btn-ghost">Cerrar</button>`}
+    </div>
+    ${puedeCompartir ? `<div class="mt-2"><button id="lv_close" class="btn btn-ghost w-full">Cerrar</button></div>` : ""}`);
+      $("#lv_copy").addEventListener("click", () => { $("#lv_url").select(); navigator.clipboard.writeText(link).then(() => toast("Link copiado")); });
+      $("#lv_close").addEventListener("click", closeModal);
+      const sh = $("#lv_share");
+      if (sh) sh.addEventListener("click", async () => { try { await navigator.share({ title: ev.nombre_evento + " — solo vista", text: texto, url: link }); } catch (e) { } });
+    }
+
     function modalCompartirDistribucion(ev) {
       const link = distLink(ev.slug);
       const puedeCompartir = !!(navigator.canShare && navigator.share);
@@ -7649,12 +7688,24 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       const recien = [...nuevos].filter(([rut]) => !vistos.has(rut)).map(([, nom]) => nom);
       if (recien.length) toast(`🔴 ${recien.length === 1 ? "Nuevo guardia" : recien.length + " guardias nuevos"}: ${recien.join(", ")} · pendiente de aprobación del administrador`, false, 7000);
     }
-    async function renderEmpresa(slug) {
+    async function renderEmpresa(slug, opts) {
       VER_FOTOS_EMPRESA = true;   // la empresa ve las fotos de ingreso (sin poder descargarlas)
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
       let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (e) { }
       if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }
+      // Link "solo vista" (?ver=...): se valida la firma y el vencimiento de 12 h.
+      const ver = new URLSearchParams(location.search).get("ver");
+      SOLO_VISTA = !!(opts && opts.soloVista);
+      const venceVista = SOLO_VISTA ? vistaVence(ev, ver) : null;
+      const vistaVencida = () => {
+        if (EMPRESA_STATE._tick) clearInterval(EMPRESA_STATE._tick);
+        app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center max-w-sm"><div class="text-4xl mb-2">⏰</div><h1 class="font-bold text-slate-800">Enlace vencido</h1><p class="text-sm text-slate-500 mt-1">Este enlace de solo vista duraba 12 horas. Pide uno nuevo al administrador.</p></div></div>`;
+      };
+      if (SOLO_VISTA && !venceVista) { vistaVencida(); return; }
+      // Al vencer con la pantalla abierta, se cierra todo (también el mapa) y queda el aviso.
+      if (SOLO_VISTA) setTimeout(() => { ["distOverlay", "htOverlay"].forEach(id => { const o = document.getElementById(id); if (o) o.remove(); }); closeModal(); vistaVencida(); }, Math.max(0, venceVista - Date.now()));
       const paint = async () => {
+        if (SOLO_VISTA && Date.now() >= venceVista) { vistaVencida(); return; }
         let asist = []; try { asist = await Data.listAsistencias(ev.id); } catch (e) { }
         EMPRESA_STATE._dobleTurno = rutsDobleTurnoHoy(asist, ev);   // RUT con doble turno hoy (empresa)
         avisoNuevosEmpresa(ev, asist);
@@ -7693,7 +7744,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         ${esPartido(ev) ? `<span aria-hidden="true" class="pointer-events-none select-none absolute left-1/3 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/10 leading-none" style="font-size:8rem">⚽</span>` : ""}
         <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" title="Ir a os10coquimbo.cl" class="relative flex-shrink-0"><img src="images/logo-os10-original.webp" class="w-14 h-14 rounded-full bg-white/90" alt="OS10 Coquimbo"></a>
         <div class="flex-1 min-w-0 relative">
-          <div class="text-xs uppercase tracking-widest opacity-90 font-semibold">Vista de empresa · solo lectura</div>
+          <div class="text-xs uppercase tracking-widest opacity-90 font-semibold">${SOLO_VISTA ? `Solo vista · vence ${esc(horaFmt(new Date(venceVista).toISOString()))}` : "Vista de empresa · solo lectura"}</div>
           <h1 class="text-xl font-bold leading-tight">${esc(ev.nombre_evento)}</h1>
           <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
         </div>
