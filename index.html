@@ -3949,6 +3949,9 @@
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="badge" style="background:${infC.bg};color:${infC.fg};font-weight:bold" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const dobleT = (EMPRESA_STATE._dobleTurno && EMPRESA_STATE._dobleTurno.has(a.rut)) ? ` <span class="badge" style="background:#ede9fe;color:#6d28d9;font-weight:bold" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
+      // Mismo aviso que ve el admin: guardia nuevo o con datos editados, pendiente de su aprobación.
+      const esNuevoG = g.revision_tipo === 'NUEVO';
+      const pend = g.aprobado === false ? ` <span class="badge" style="background:${esNuevoG ? '#fee2e2' : '#fef9c3'};color:${esNuevoG ? '#b91c1c' : '#a16207'}" title="Pendiente de aprobación del administrador">${esNuevoG ? '🔴 Nuevo guardia' : '🟡 Datos editados'}</span>` : '';
       const fechaLabel = a.es_supervisor ? "Autorización" : "Examen";
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
@@ -3960,7 +3963,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}</span></td>
+        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -5031,13 +5034,32 @@
       return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
     }
     // --- PDF real y ordenado (jsPDF + autoTable); se ve bien al compartir en celular ---
-    function construirPDF(ev, asist) {
+    // fotos (opcional): Map asistencia -> dataURL JPEG (ver fotosParaPDF). Si viene, se agrega
+    // la columna "Foto" después del "#" y cada fila se dibuja más alta con la miniatura.
+    function construirPDF(ev, asist, fotos) {
       const JsPDF = window.jspdf && window.jspdf.jsPDF;
       if (!JsPDF) return null;
       const asistG = asist.filter(a => !a.es_supervisor);
       const asistS = asist.filter(a => a.es_supervisor);
       const cols = listadoColumnas(ev), rows = detalleRows(ev, asistG);
       const colsSup = listadoColumnasSup(ev), rowsSup = detalleRows(ev, asistS);
+      const conFotos = !!(fotos && fotos.size);
+      const telCol = conFotos ? 4 : 3;
+      if (conFotos) {
+        [cols, colsSup].forEach(c => c.splice(1, 0, "Foto"));
+        [[rows, asistG], [rowsSup, asistS]].forEach(([rs, as]) => rs.forEach((r, i) => {
+          r.cells.splice(1, 0, "");
+          if (r.vigIdx >= 0) r.vigIdx++;
+          r.foto = fotos.get(as[i]) || null;
+        }));
+      }
+      // Miniatura 3:4 centrada en la celda "Foto".
+      const dibujarFoto = (d, r) => {
+        if (!conFotos || d.column.index !== 1 || !r || !r.foto) return;
+        const h = d.cell.height - 4, w = h * 0.75;
+        try { doc.addImage(r.foto, "JPEG", d.cell.x + (d.cell.width - w) / 2, d.cell.y + 2, w, h); } catch (_) { }
+      };
+      const fotoStyles = conFotos ? { 1: { cellWidth: 34, minCellHeight: 42 } } : {};
       // Siempre oficio horizontal: con hoja vertical las columnas se montan unas sobre otras.
       const landscape = true;
       const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: [612, 936] }); // hoja oficio
@@ -5059,19 +5081,20 @@
         styles: { fontSize: 8, cellPadding: 4, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
         headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
         alternateRowStyles: { fillColor: [244, 247, 245] },
-        columnStyles: { 0: { cellWidth: landscape ? 26 : 22 } },
+        columnStyles: { 0: { cellWidth: landscape ? 26 : 22 }, ...fotoStyles },
         margin: { left: 28, right: 28, bottom: 40 },
         didParseCell: (d) => {
           if (d.section === "body") {
             const r = rows[d.row.index];
             if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = r.spd ? [255, 255, 255] : hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; if (r.spd) d.cell.styles.fillColor = hexToRgb(SPD_AZUL); }
-            if (r && d.column.index === 3 && telHref(r.cells[3])) d.cell.styles.textColor = [29, 78, 216];
+            if (r && d.column.index === telCol && telHref(r.cells[telCol])) d.cell.styles.textColor = [29, 78, 216];
           }
         },
         didDrawCell: (d) => {
           if (d.section === "body") {
             const r = rows[d.row.index];
-            const href = r && d.column.index === 3 && telHref(r.cells[3]);
+            dibujarFoto(d, r);
+            const href = r && d.column.index === telCol && telHref(r.cells[telCol]);
             if (href) doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url: href });
           }
         },
@@ -5095,19 +5118,20 @@
           styles: { fontSize: 8, cellPadding: 4, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
           headStyles: { fillColor: celesteRGB, textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
           alternateRowStyles: { fillColor: [224, 242, 254] },
-          columnStyles: { 0: { cellWidth: landscape ? 26 : 22 } },
+          columnStyles: { 0: { cellWidth: landscape ? 26 : 22 }, ...fotoStyles },
           margin: { left: 28, right: 28, bottom: 40 },
           didParseCell: (d) => {
             if (d.section === "body") {
               const r = rowsSup[d.row.index];
               if (r && d.column.index === r.vigIdx) { d.cell.styles.textColor = r.spd ? [255, 255, 255] : hexToRgb(r.vigColor); d.cell.styles.fontStyle = "bold"; if (r.spd) d.cell.styles.fillColor = hexToRgb(SPD_AZUL); }
-              if (r && d.column.index === 3 && telHref(r.cells[3])) d.cell.styles.textColor = [29, 78, 216];
+              if (r && d.column.index === telCol && telHref(r.cells[telCol])) d.cell.styles.textColor = [29, 78, 216];
             }
           },
           didDrawCell: (d) => {
             if (d.section === "body") {
               const r = rowsSup[d.row.index];
-              const href = r && d.column.index === 3 && telHref(r.cells[3]);
+              dibujarFoto(d, r);
+              const href = r && d.column.index === telCol && telHref(r.cells[telCol]);
               if (href) doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url: href });
             }
           }
@@ -5129,6 +5153,40 @@
       if (!w) { toast("Permite las ventanas emergentes para generar el PDF", false); return; }
       w.document.write(listadoPrintHTML(ev, asist)); w.document.close();
     }
+
+    // Fotos de ingreso para el PDF (solo admin): pide un enlace firmado nuevo (los de la
+    // pantalla caducan a los 5 min), la achica a 120x160 y la pasa a JPEG (jsPDF no lee WebP).
+    async function fotoJPEG(a) {
+      let url = a.foto_url;
+      const evId = a.evento_id || (a.foto_ref && a.foto_ref.ev), asId = (a.foto_ref && a.foto_ref.id) || a.id;
+      if (evId && asId && Data.signFoto) { try { const f = await Data.signFoto(evId, asId); if (f) url = f; } catch (_) { } }
+      if (!url) return null;
+      try {
+        const blob = await (await fetch(url)).blob();
+        const bmp = await createImageBitmap(blob);
+        const c = document.createElement("canvas"); c.width = 120; c.height = 160;
+        const cx = c.getContext("2d");
+        const k = Math.max(c.width / bmp.width, c.height / bmp.height);   // recorte tipo "cover"
+        const w = bmp.width * k, h = bmp.height * k;
+        cx.drawImage(bmp, (c.width - w) / 2, (c.height - h) / 2, w, h);
+        return c.toDataURL("image/jpeg", 0.8);
+      } catch (e) { console.warn("foto PDF:", e && e.message); return null; }
+    }
+    async function fotosParaPDF(asist) {
+      const fotos = new Map();
+      await Promise.all(asist.filter(a => a.foto_url).map(async a => { const d = await fotoJPEG(a); if (d) fotos.set(a, d); }));
+      return fotos;
+    }
+    async function descargarPDFConFotos(ev, asist) {
+      if (!asist.length) { toast("No hay guardias para exportar", false); return; }
+      toast("Generando PDF con fotos…");
+      const fotos = await fotosParaPDF(asist);
+      const doc = construirPDF(ev, asist, fotos);
+      if (!doc) { toast("No se pudo generar el PDF", false); return; }
+      doc.save(`Listado-${ev.slug}-fotos.pdf`);
+    }
+    // Botón "PDF con fotos" del historial: solo para el admin y si hay alguna foto.
+    const btnPdfFotosHTML = (id, recs, cls) => (VER_FOTOS && recs.some(a => a.foto_url)) ? `<button id="${id}" class="btn btn-ghost ${cls || "text-sm"}" title="PDF con la foto de ingreso de cada guardia">📸 PDF con fotos</button>` : "";
 
     // --- Texto resumen para WhatsApp / correo ---
     function listadoTexto(ev, asist) {
@@ -5205,7 +5263,7 @@
     /* ---- Historial de partidos archivados ---- */
     // Convierte filas del snapshot al formato de "asistencia" que usan los exports
     function histRowsToAsist(rows) {
-      return rows.map(r => ({ rut: r.rut, hora_ingreso: r.hora_ingreso, es_supervisor: !!r.es_supervisor, guardia: { nombres: r.nombres, apellidos: r.apellidos, telefono: r.telefono, fecha_ultimo_examen: r.fecha_ultimo_examen, spd: !!r.spd, spd_verificado: !!r.spd_verificado } }));
+      return rows.map(r => ({ rut: r.rut, hora_ingreso: r.hora_ingreso, es_supervisor: !!r.es_supervisor, foto_url: r.foto_url || null, foto_ref: (m => m ? { ev: m[1], id: m[2] } : null)(String(r.foto_path || "").match(/^([^/]+)\/([^/]+)\.webp$/)), guardia: { nombres: r.nombres, apellidos: r.apellidos, telefono: r.telefono, fecha_ultimo_examen: r.fecha_ultimo_examen, spd: !!r.spd, spd_verificado: !!r.spd_verificado } }));
     }
     function histEvPseudo(ev, h) {
       return { nombre_evento: `${h.partido || ev.nombre_evento} (${fechaFmt(h.fecha || h.cerrado_at)})`, empresa: ev.empresa, fecha_evento: h.fecha, tipo: "partido", partido: h.partido, usa_turnos: false, slug: `${ev.slug}-${String(h.fecha || "").replace(/-/g, "") || Date.now()}` };
@@ -5269,6 +5327,7 @@
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="hg_xls" class="btn btn-ghost text-sm">📊 Excel</button>
           <button id="hg_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
+          ${btnPdfFotosHTML("hg_pdff", rows, "text-sm col-span-2")}
         </div>
         <div class="mt-2"><button id="hg_back" class="btn btn-ghost w-full">← Volver al historial</button></div>`);
       $("#hg_x").addEventListener("click", closeModal);
@@ -5276,6 +5335,7 @@
       $("#hg_back").addEventListener("click", () => modalHistorialPartidos(ev));
       $("#hg_xls").addEventListener("click", () => descargarExcel(histEvPseudo(ev, h), histRowsToAsist(rows)));
       $("#hg_pdf").addEventListener("click", () => descargarPDF(histEvPseudo(ev, h), histRowsToAsist(rows)));
+      const bff = $("#hg_pdff"); if (bff) bff.addEventListener("click", () => descargarPDFConFotos(histEvPseudo(ev, h), histRowsToAsist(rows)));
     }
 
     // Recuadros con título del historial, igual que en el panel del evento:
@@ -5320,7 +5380,7 @@
       const bloqueSup = histSupervisoresHTML(rowsS, filaH);
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800 truncate">${esc(h.partido || ev.nombre_evento)}</h2>
-          <div class="flex gap-2 flex-shrink-0"><button id="hpv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="hpv_pdf" class="btn btn-ghost text-sm">📄 PDF</button><button id="hpv_del" class="btn btn-ghost text-sm text-red-600">🗑</button></div>
+          <div class="flex gap-2 flex-shrink-0"><button id="hpv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="hpv_pdf" class="btn btn-ghost text-sm">📄 PDF</button>${btnPdfFotosHTML("hpv_pdff", rows)}<button id="hpv_del" class="btn btn-ghost text-sm text-red-600">🗑</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.filter(r => !r.es_supervisor).length} guardia(s)${rows.some(r => r.es_supervisor) ? ` · ${rows.filter(r => r.es_supervisor).length} supervisor(es)` : ""}</p>
         ${histCardGuardias(rowsG.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm">
@@ -5374,6 +5434,7 @@
         const evP = histEvPseudo(ev, h), asistH = histRowsToAsist(rows);
         const bx = $("#hpv_xls", det); if (bx) bx.addEventListener("click", () => descargarExcel(evP, asistH));
         const bp = $("#hpv_pdf", det); if (bp) bp.addEventListener("click", () => descargarPDF(evP, asistH));
+        const bpf = $("#hpv_pdff", det); if (bpf) bpf.addEventListener("click", () => descargarPDFConFotos(evP, asistH));
         const bd = $("#hpv_del", det); if (bd) bd.addEventListener("click", () => confirmar(`¿Eliminar del historial el partido "${h.partido || ""}" (${fechaFmt(h.fecha || h.cerrado_at)})? Esta acción no se puede deshacer.`, async () => { try { await Data.deleteHistorial(h.id); toast("Registro eliminado del historial."); ov.remove(); modalHistorialPartidos(ev); } catch (e) { toast("Error: " + (e.message || e), false); } }));
         det.scrollTop = 0;
       };
@@ -5488,12 +5549,14 @@
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="htd_xls" class="btn btn-ghost text-sm">📊 Excel</button>
           <button id="htd_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
+          ${btnPdfFotosHTML("htd_pdff", g.recs, "text-sm col-span-2")}
         </div>
         <div class="mt-2"><button id="htd_back" class="btn btn-ghost w-full">← Volver al historial</button></div>`);
       $("#htd_x").addEventListener("click", closeModal);
       $("#htd_back").addEventListener("click", () => modalHistorialTurnos(ev));
       $("#htd_xls").addEventListener("click", () => descargarExcel(evP, g.recs));
       $("#htd_pdf").addEventListener("click", () => descargarPDF(evP, g.recs));
+      const bff = $("#htd_pdff"); if (bff) bff.addEventListener("click", () => descargarPDFConFotos(evP, g.recs));
       bindFotosHist($("#modalBox"), g.recs, () => modalHistorialTurnoDetalle(ev, g, finalizados));
     }
 
@@ -5517,7 +5580,7 @@
       const thead = `<thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Foto</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>`;
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800">📁 Día ${idx + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</h2>
-          <div class="flex gap-2 flex-shrink-0"><button id="htv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="htv_pdf" class="btn btn-ghost text-sm">📄 PDF</button></div>
+          <div class="flex gap-2 flex-shrink-0"><button id="htv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="htv_pdf" class="btn btn-ghost text-sm">📄 PDF</button>${btnPdfFotosHTML("htv_pdff", g.recs)}</div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
         ${histCardGuardias(recsG.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm">${thead}
@@ -5570,6 +5633,7 @@
         const evP = turnoEvPseudo(ev, g);
         const bx = $("#htv_xls", det); if (bx) bx.addEventListener("click", () => descargarExcel(evP, g.recs));
         const bp = $("#htv_pdf", det); if (bp) bp.addEventListener("click", () => descargarPDF(evP, g.recs));
+        const bpf = $("#htv_pdff", det); if (bpf) bpf.addEventListener("click", () => descargarPDFConFotos(evP, g.recs));
         bindFotosHist(det, g.recs);   // el visor se abre encima del historial, que queda abierto detrás
         det.scrollTop = 0;
       };
@@ -7574,6 +7638,17 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
     /* =========================================================================
        VISTA EMPRESA (solo lectura, por evento) — ?empresa=<slug>
        ========================================================================= */
+    // Aviso (toast) a la empresa cuando ingresa un guardia NUEVO pendiente de aprobación, igual que
+    // al admin. La primera carga solo fija la línea base; quien lo aprueba es el administrador.
+    function avisoNuevosEmpresa(ev, asist) {
+      const nuevos = new Map();
+      (asist || []).forEach(a => { const g = a.guardia; if (g && g.aprobado === false && g.revision_tipo === "NUEVO") nuevos.set(a.rut, ((g.nombres || "") + " " + (g.apellidos || "")).trim() || a.rut); });
+      const vistos = EMPRESA_STATE._nuevosEv === ev.id ? EMPRESA_STATE._nuevosSigs : null;
+      EMPRESA_STATE._nuevosEv = ev.id; EMPRESA_STATE._nuevosSigs = new Set(nuevos.keys());
+      if (!vistos) return;
+      const recien = [...nuevos].filter(([rut]) => !vistos.has(rut)).map(([, nom]) => nom);
+      if (recien.length) toast(`🔴 ${recien.length === 1 ? "Nuevo guardia" : recien.length + " guardias nuevos"}: ${recien.join(", ")} · pendiente de aprobación del administrador`, false, 7000);
+    }
     async function renderEmpresa(slug) {
       VER_FOTOS_EMPRESA = true;   // la empresa ve las fotos de ingreso (sin poder descargarlas)
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
@@ -7582,6 +7657,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       const paint = async () => {
         let asist = []; try { asist = await Data.listAsistencias(ev.id); } catch (e) { }
         EMPRESA_STATE._dobleTurno = rutsDobleTurnoHoy(asist, ev);   // RUT con doble turno hoy (empresa)
+        avisoNuevosEmpresa(ev, asist);
         // Mapa puesto_id -> nombre de la faccion, para la columna "Distribución" (igual que el admin).
         try { const ps = {}; (await Data.listPuestos(ev.id)).forEach(p => { ps[p.id] = p.nombre; }); EMPRESA_STATE._puestosMap = ps; } catch (_) { EMPRESA_STATE._puestosMap = {}; }
         // Supervisores en su propio listado, no se mezclan con los guardias.
