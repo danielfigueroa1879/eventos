@@ -82,12 +82,15 @@ const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
 });
 
-async function asistenciaExiste(evId, asisId) {
-  const u = `${SUPABASE_URL}/rest/v1/asistencias?select=id&id=eq.${asisId}&evento_id=eq.${evId}&limit=1`;
+// Estado de la asistencia para SUBIR: null si no existe; { conFoto } si existe. Una asistencia que
+// ya tiene foto no recibe enlace de subida: así nadie puede reemplazar una foto ya guardada.
+async function asistenciaParaSubir(evId, asisId) {
+  const u = `${SUPABASE_URL}/rest/v1/asistencias?select=id,foto_url&id=eq.${asisId}&evento_id=eq.${evId}&limit=1`;
   const r = await fetch(u, { headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
   if (!r.ok) throw new Error("supabase " + r.status);
   const d = await r.json();
-  return Array.isArray(d) && d.length > 0;
+  if (!Array.isArray(d) || !d.length) return null;
+  return { conFoto: !!d[0].foto_url };
 }
 
 // Devuelve cuántas se borraron y cuáles fallaron (para que el panel no olvide su referencia).
@@ -155,7 +158,9 @@ export default async (req) => {
     if (b.accion === "subir") {
       const ev = String(b.evento_id || ""), as = String(b.asistencia_id || "");
       if (!RE_UUID.test(ev) || !RE_UUID.test(as)) return json({ error: "ids inválidos" }, 400);
-      if (!(await asistenciaExiste(ev, as))) return json({ error: "asistencia no encontrada" }, 404);
+      const est = await asistenciaParaSubir(ev, as);
+      if (!est) return json({ error: "asistencia no encontrada" }, 404);
+      if (est.conFoto) return json({ error: "la asistencia ya tiene foto" }, 409);
       const tipo = TIPOS.includes(b.tipo) ? b.tipo : "image/webp";
       const tipoMini = TIPOS.includes(b.tipoMini) ? b.tipoMini : "image/webp";
       const enlace = (clave, ct) => {

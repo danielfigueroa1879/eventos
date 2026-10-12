@@ -355,7 +355,7 @@
     /* Tablas del HISTORIAL (partidos y turnos): mismo orden que la tabla principal en PC.
        Encabezados a la izquierda y alineados con sus datos, nada se parte en dos líneas,
        el nombre ocupa ~30% y se corta con "…" si no cabe, RUT y Vigencia centrados.
-       Con la columna Foto (clase .conFoto, historial de turnos) todo se corre una columna. */
+       Con la columna Img (clase .conFoto, entre RUT y Nombre) todo se corre una columna. */
     table.histTabla thead { text-align: left }
     table.histTabla th,
     table.histTabla td {
@@ -374,8 +374,10 @@
     table.histTabla:not(.conFoto) td:nth-child(2),
     table.histTabla:not(.conFoto) th:nth-child(7),
     table.histTabla:not(.conFoto) td:nth-child(7),
-    table.histTabla.conFoto th:nth-child(-n+3),
-    table.histTabla.conFoto td:nth-child(-n+3),
+    table.histTabla.conFoto th:nth-child(2),
+    table.histTabla.conFoto td:nth-child(2),
+    table.histTabla.conFoto th:nth-child(3),
+    table.histTabla.conFoto td:nth-child(3),
     table.histTabla.conFoto th:nth-child(8),
     table.histTabla.conFoto td:nth-child(8) { text-align: center }
     @media (max-width:1440px) {
@@ -1919,10 +1921,11 @@
         async createEvento(e) { return ok(await sb.from("eventos").insert({ ...e, activo: true }).select().single()); },
         async updateEvento(id, patch) { ok(await sb.from("eventos").update(patch).eq("id", id)); },
         async deleteEvento(id) {
-          // Limpieza: borra la carpeta de fotos del evento en el bucket (evita dejar imágenes huérfanas).
+          // PRIMERO se elimina el evento (sus asistencias e historial caen en cascada). Solo si eso
+          // funcionó se borra la carpeta de fotos: si fallara, el evento queda intacto con sus fotos.
+          ok(await sb.from("eventos").delete().eq("id", id));
           try { const { data: files } = await sb.storage.from("ingresos").list(id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${id}/${f.name}`)); } catch (e) { console.warn("borrar fotos evento:", e && e.message); }
           await borrarCarpetaR2(id);
-          ok(await sb.from("eventos").delete().eq("id", id));
         },
         async getEventoBySlug(slug) { const d = ok(await sb.from("eventos").select("*").eq("slug", slug).limit(1)); return d[0] || null; },
         async getGuardia(rut) { const d = ok(await sb.from("guardias_central").select("*").eq("rut", rut).limit(1)); return d[0] || null; },
@@ -1994,18 +1997,33 @@
           // La foto de ingreso se ARCHIVA con el partido: se guarda la ruta del bucket
           // (<evento_id>/<asistencia_id>.webp) y el archivo se conserva FOTO_RETENCION_DIAS días.
           const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: (a.foto_path || a.foto_url) ? (esR2(a.foto_path) ? a.foto_path : rutaFotoAsis(ev.id, a.id)) : null }; });
-          let fotosArchivadas = !rows.length;
+          // Solo se reintenta sin una columna si el error dice que ESA columna no existe (base antigua).
+          // Cualquier otro error (red, permisos…) detiene el cierre sin borrar nada.
+          const faltaColumna = (e, col) => { const c = e && e.code, m = String((e && (e.message || "")) + " " + (e && (e.details || "") || "")).toLowerCase(); return (c === "PGRST204" || c === "42703" || m.includes("does not exist") || m.includes("could not find")) && m.includes(col); };
+          let fotosArchivadas = true;
           if (rows.length) {
-            try { ok(await sb.from("partidos_historial_asist").insert(rows)); fotosArchivadas = true; }
-            catch (e) {
-              try { const rowsSinFoto = rows.map(({ foto_url, ...r }) => r); ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto)); } // por si falta la columna 'foto_url'
-              catch (e2) { const rowsSin = rows.map(({ foto_url, puesto, ...r }) => r); ok(await sb.from("partidos_historial_asist").insert(rowsSin)); } // por si falta también 'puesto'
+            try {
+              try { ok(await sb.from("partidos_historial_asist").insert(rows)); }
+              catch (e) {
+                if (!faltaColumna(e, "foto_url")) throw e;
+                fotosArchivadas = false;
+                const rowsSinFoto = rows.map(({ foto_url, ...r }) => r);
+                try { ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto)); }
+                catch (e2) { if (!faltaColumna(e2, "puesto")) throw e2; ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto.map(({ puesto, ...r }) => r))); }
+              }
+            } catch (e) {
+              // No quedó archivado: se deshace la cabecera del historial y la lista del panel queda intacta.
+              try { await sb.from("partidos_historial").delete().eq("id", hp.id); } catch (_) { }
+              throw e;
             }
           }
-          // Si la base aún no tiene la columna foto_url en el historial, las fotos no se pueden
-          // archivar: se borran como antes para no dejar imágenes huérfanas en el bucket.
-          if (!fotosArchivadas) { try { const { data: files } = await sb.storage.from("ingresos").list(ev.id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${ev.id}/${f.name}`)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } await borrarCarpetaR2(ev.id); }
-          ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
+          // Base sin columna foto_url en el historial: esas fotos no se pueden archivar y se borran,
+          // pero SOLO las de los guardias de este cierre (nunca la carpeta completa del evento).
+          if (!fotosArchivadas) { try { await borrarFotos(rows.map(r => r.foto_url)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } }
+          // Se borran SOLO las asistencias archivadas: si alguien ingresó durante el cierre, su
+          // registro sigue en la lista y entra en el próximo cierre.
+          const ids = asist.map(a => a.id).filter(Boolean);
+          for (let k = 0; k < ids.length; k += 100) ok(await sb.from("asistencias").delete().in("id", ids.slice(k, k + 100)));
           return hp.id;
         },
         async listHistorial(evId) { return ok(await sb.from("partidos_historial").select("*").eq("evento_id", evId).order("cerrado_at", { ascending: false })); },
@@ -5737,24 +5755,25 @@
     }
     function modalHistorialGuardias(ev, h, rows) {
       const dtSet = rutsDobleTurnoHistorial(rows, ev);   // doble turno (solo aplica si el evento usa turnos)
+      const conFoto = rows.some(r => r.foto_url);   // columna "Img" solo si el partido tiene alguna foto
       const filaH = (r, i) => {
         const v = calcularVigencia(r.fecha_ultimo_examen);
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(r, ev, dtSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap">${esc(r.rut)}</td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${rows.indexOf(r)}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap">${esc(r.rut)}</td>${conFoto ? tdFotoHistPartido(r, rows) : ""}<td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
       };
       // Guardias y supervisores en tablas separadas (como en el panel del evento).
       const rowsG = rows.filter(r => !r.es_supervisor), rowsS = rows.filter(r => r.es_supervisor);
-      const filas = rowsG.length ? rowsG.map(filaH).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
-      const bloqueSup = histSupervisoresHTML(rowsS, filaH);
+      const filas = rowsG.length ? rowsG.map(filaH).join("") : `<tr><td colspan="${conFoto ? 10 : 9}" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
+      const bloqueSup = histSupervisoresHTML(rowsS, filaH, conFoto);
       openModal(`<div class="flex items-center justify-between mb-1">
           <h2 class="font-bold text-slate-800">${esc(h.partido || ev.nombre_evento)}</h2>
           <button id="hg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none">✕</button>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.filter(r => !r.es_supervisor).length} guardia(s)${rows.some(r => r.es_supervisor) ? ` · ${rows.filter(r => r.es_supervisor).length} supervisor(es)` : ""}</p>
-        ${histCardGuardias(rowsG.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm">
-          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
+        ${histCardGuardias(rowsG.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm">
+          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
         </table></div>`)}
         ${bloqueSup}
@@ -5781,9 +5800,14 @@
       return `<div class="card mt-4"><div class="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700 flex items-center gap-2"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 flex-shrink-0">🤵 SUPERVISOR</span><span>Supervisores registrados <span class="text-slate-400 font-normal">(${n})</span></span></div><div class="p-3">${tablaHTML}</div></div>`;
     }
     // Tabla de SUPERVISORES del historial de un partido (encabezado celeste), o "" si no hay.
-    function histSupervisoresHTML(rowsS, filaH) {
+    // Celda "Img" del historial de partidos (solo admin recibe la foto archivada; se amplía al tocarla).
+    function tdFotoHistPartido(r, rows) {
+      if (!r.foto_url) return `<td class="pr-2 text-center text-slate-300">—</td>`;
+      return `<td class="pr-2 text-center"><button data-hfoto="${rows.indexOf(r)}" class="ring-1 ring-emerald-400 hover:ring-2" style="width:26px;height:26px;border-radius:999px;overflow:hidden;display:inline-block;vertical-align:middle;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" style="width:100%;height:100%;object-fit:cover" loading="lazy"></button></td>`;
+    }
+    function histSupervisoresHTML(rowsS, filaH, conFoto) {
       if (!rowsS || !rowsS.length) return "";
-      return histCardSupervisores(rowsS.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${rowsS.map(filaH).join("")}</tbody></table></div>`);
+      return histCardSupervisores(rowsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${rowsS.map(filaH).join("")}</tbody></table></div>`);
     }
     // Foto archivada de un partido (solo admin): al tocar la miniatura se abre ampliada,
     // pidiendo un enlace firmado nuevo a partir de su ruta <evento_id>/<asistencia_id>.webp.
@@ -5801,24 +5825,25 @@
     // HTML del detalle de un partido archivado (tabla de guardias). Reutilizable.
     function historialPartidoDetalleHTML(ev, h, rows) {
       const dtSet = rutsDobleTurnoHistorial(rows, ev);   // doble turno (solo aplica si el evento usa turnos)
+      const conFoto = rows.some(r => r.foto_url);   // columna "Img" solo si el partido tiene alguna foto
       const filaH = (r, i) => {
         const v = calcularVigencia(r.fecha_ultimo_examen);
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim() || "—";
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(r, ev, dtSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${r.foto_url ? `<button data-hfoto="${rows.indexOf(r)}" class="inline-block align-middle rounded overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-400 mr-1.5" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso"><img src="${esc(r.foto_url)}" alt="" class="w-full h-full object-cover" loading="lazy"></button>` : ""}${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(r.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(r.rut)}</span></td>${conFoto ? tdFotoHistPartido(r, rows) : ""}<td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, r, r, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${r.puesto ? `<span class="text-indigo-600 font-semibold">📍 ${esc(r.puesto)}</span>` : '<span class="text-slate-300">—</span>'}</td><td class="pr-2 whitespace-nowrap">${esc(r.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(r.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, r, r)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${r.es_supervisor ? "—" : esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(r.hora_ingreso))}</td></tr>`;
       };
       // Guardias y supervisores en tablas separadas (como en el panel del evento).
       const rowsG = rows.filter(r => !r.es_supervisor), rowsS = rows.filter(r => r.es_supervisor);
-      const filas = rowsG.length ? rowsG.map(filaH).join("") : `<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
-      const bloqueSup = histSupervisoresHTML(rowsS, filaH);
+      const filas = rowsG.length ? rowsG.map(filaH).join("") : `<tr><td colspan="${conFoto ? 10 : 9}" class="text-center text-slate-400 py-6">Sin guardias en este partido.</td></tr>`;
+      const bloqueSup = histSupervisoresHTML(rowsS, filaH, conFoto);
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800 truncate">${esc(h.partido || ev.nombre_evento)}</h2>
           <div class="flex gap-2 flex-shrink-0"><button id="hpv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="hpv_pdf" class="btn btn-ghost text-sm">📄 PDF</button>${btnFotosHTML("hpv", rows)}<button id="hpv_del" class="btn btn-ghost text-sm text-red-600">🗑</button></div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(fechaFmt(h.fecha || h.cerrado_at))} · ${rows.filter(r => !r.es_supervisor).length} guardia(s)${rows.some(r => r.es_supervisor) ? ` · ${rows.filter(r => r.es_supervisor).length} supervisor(es)` : ""}</p>
-        ${histCardGuardias(rowsG.length, `<div class="overflow-x-auto"><table class="histTabla w-full text-sm">
-          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
+        ${histCardGuardias(rowsG.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm">
+          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${filas}</tbody>
         </table></div>`)}
         ${bloqueSup}`;
@@ -5966,7 +5991,7 @@
         const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(a, ev, _dtHistSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td>${conFoto ? tdFotoHist(a) : ""}<td class="pr-6 font-mono whitespace-nowrap">${esc(a.rut)}</td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, a, gu, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap">${esc(a.rut)}</td>${conFoto ? tdFotoHist(a) : ""}<td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, a, gu, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="${conFoto ? 10 : 9}" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
       const evP = turnoEvPseudo(ev, g);
@@ -5976,10 +6001,10 @@
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
         ${histCardGuardias(recsG.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm">
-          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
+          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${cuerpoG}</tbody>
         </table></div>`)}
-        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}
+        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="htd_xls" class="btn btn-ghost text-sm">📊 Excel</button>
           <button id="htd_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
@@ -6008,10 +6033,10 @@
         const pu = (a.puesto_id && _puMapHistTurno[a.puesto_id]) ? `<span class="text-indigo-600 font-semibold">📍 ${esc(_puMapHistTurno[a.puesto_id])}</span>` : '<span class="text-slate-300">—</span>';
         const sigesCls = v.siges === 'OK' ? 'text-green-700' : (v.siges ? 'text-amber-700' : 'text-slate-400');
         const dobleT = esDobleTurnoHist(a, ev, _dtHistSet) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche el mismo día">🔁 (Doble turno)</span>` : '';
-        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td>${conFoto ? tdFotoHist(a) : ""}<td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, a, gu, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td><td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>${conFoto ? tdFotoHist(a) : ""}<td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, a, gu, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="${conFoto ? 10 : 9}" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
-      const thead = `<thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>`;
+      const thead = `<thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>`;
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800">📁 Día ${idx + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</h2>
           <div class="flex gap-2 flex-shrink-0"><button id="htv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="htv_pdf" class="btn btn-ghost text-sm">📄 PDF</button>${btnFotosHTML("htv", g.recs)}</div>
@@ -6020,7 +6045,7 @@
         ${histCardGuardias(recsG.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm">${thead}
           <tbody>${cuerpoG}</tbody>
         </table></div>`)}
-        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}`;
+        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}`;
     }
 
     // Historial de turnos a PANTALLA COMPLETA (escritorio): lista de turnos a la izquierda,
