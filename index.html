@@ -3729,10 +3729,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Img</th>' : ""}<th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -3753,10 +3753,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Img</th>' : ""}<th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
+            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -4083,7 +4083,7 @@
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseSexo} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span>${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}"><span class="nomWrap">${FOTO_INGRESO_ON && a.foto_url ? `<button data-foto="${a.id}" class="inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 hover:ring-2 mr-1.5 flex-shrink-0" style="width:24px;height:24px;line-height:0" title="Ver foto de ingreso (ampliar)"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" style="display:block" loading="lazy"></button>` : ``}<span class="nomTxt" title="${esc(nom || "")}">${esc(nom || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
+    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}"><span class="nomWrap"><span class="nomTxt" title="${esc(nom || "")}">${esc(nom || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
     <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="${esSup ? 'Autorización' : 'Examen'}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -4091,6 +4091,9 @@
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
+    ${FOTO_INGRESO_ON ? `<td data-label="Img" class="pr-2 text-center" style="width:1%">${a.foto_url
+      ? `<button data-foto="${a.id}" class="inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 hover:ring-2" style="width:24px;height:24px;line-height:0" title="Ver foto de ingreso (ampliar)"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" style="display:block" loading="lazy"></button>`
+      : `<span class="text-slate-300" title="Sin foto">—</span>`}</td>` : ""}
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
       ${esSPD(g, a) && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
@@ -4244,7 +4247,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 mr-1.5" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"></span>` : ``}<span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
+        <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap"><span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
         <td data-label="${fechaLabel}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -4252,6 +4255,7 @@
         <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
         <td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>
         <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
+        <td data-label="Img" class="pr-2 text-center" style="width:1%">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"></span>` : `<span class="text-slate-300">—</span>`}</td>
       </tr>`;
     }
     // Normaliza un teléfono chileno para WhatsApp (wa.me) y para llamar (tel:)
@@ -5327,7 +5331,7 @@
       const conFotos = !!(fotos && fotos.size);
       const telCol = conFotos ? 4 : 3;
       if (conFotos) {
-        [cols, colsSup].forEach(c => c.splice(1, 0, "Foto"));
+        [cols, colsSup].forEach(c => c.splice(1, 0, "Img"));
         [[rows, asistG], [rowsSup, asistS]].forEach(([rs, as]) => rs.forEach((r, i) => {
           r.cells.splice(1, 0, "");
           if (r.vigIdx >= 0) r.vigIdx++;
@@ -5509,7 +5513,7 @@
       try { ExcelJS = await cargarExcelJS(); } catch (e) { toast("No se pudo cargar el generador de Excel. Revisa tu conexión.", false); return; }
       const fotos = await fotosParaPDF(asist);
       const asistG = asist.filter(a => !a.es_supervisor), asistS = asist.filter(a => a.es_supervisor);
-      const conFoto = c => { const x = c.slice(); x.splice(1, 0, "Foto"); return x; };
+      const conFoto = c => { const x = c.slice(); x.splice(1, 0, "Img"); return x; };
       const cols = conFoto(listadoColumnas(ev)), colsSup = conFoto(listadoColumnasSup(ev));
       const rows = detalleRows(ev, asistG), rowsSup = detalleRows(ev, asistS);
       const nCols = Math.max(cols.length, colsSup.length);
@@ -5925,10 +5929,10 @@
         </div>
         <p class="text-xs text-slate-500 mb-3">${esc(g.tn.rango)} · ${recsG.length} guardia(s)${recsS.length ? " · " + recsS.length + " supervisor(es)" : ""}</p>
         ${histCardGuardias(recsG.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm">
-          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Foto</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
+          <thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>
           <tbody>${cuerpoG}</tbody>
         </table></div>`)}
-        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Foto</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}
+        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}
         <div class="grid grid-cols-2 gap-2 mt-3">
           <button id="htd_xls" class="btn btn-ghost text-sm">📊 Excel</button>
           <button id="htd_pdf" class="btn btn-ghost text-sm">📄 PDF</button>
@@ -5960,7 +5964,7 @@
         return `<tr class="border-b border-slate-50"><td class="py-1.5 pr-2 text-slate-400">${i + 1}</td>${conFoto ? tdFotoHist(a) : ""}<td class="pr-6 font-mono whitespace-nowrap"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td><td class="pr-2 font-medium text-slate-800">${esc(nom)}${spdAvisoHTML(ev, a, gu, false)}${dobleT}</td><td class="pr-2 whitespace-nowrap">${pu}</td><td class="pr-2 whitespace-nowrap">${esc(gu.telefono || "—")}</td><td class="pr-2 whitespace-nowrap">${esc(fechaFmt(gu.fecha_ultimo_examen))}</td><td class="pr-2 text-center">${badgeVigenciaCelda(v, ev, a, gu)}</td><td class="pr-2 text-xs font-semibold ${sigesCls} whitespace-nowrap">${esc(v.siges || "—")}</td><td class="pr-2 text-slate-500 whitespace-nowrap">${esc(horaFmt(a.hora_ingreso))}</td></tr>`;
       };
       const cuerpoG = recsG.length ? recsG.map(filaDet).join("") : `<tr><td colspan="${conFoto ? 10 : 9}" class="text-center text-slate-400 py-6">Sin guardias en este turno.</td></tr>`;
-      const thead = `<thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Foto</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>`;
+      const thead = `<thead class="text-center"><tr class="text-white" style="background:#0f5323"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Examen</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead>`;
       return `<div class="flex items-center justify-between gap-2 mb-1">
           <h2 class="font-bold text-slate-800">📁 Día ${idx + 1} · ${esc(g.tn.fecha)} · ${esc(g.tn.etiqueta)}</h2>
           <div class="flex gap-2 flex-shrink-0"><button id="htv_xls" class="btn btn-ghost text-sm">📊 Excel</button><button id="htv_pdf" class="btn btn-ghost text-sm">📄 PDF</button>${btnFotosHTML("htv", g.recs)}</div>
@@ -5969,7 +5973,7 @@
         ${histCardGuardias(recsG.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm">${thead}
           <tbody>${cuerpoG}</tbody>
         </table></div>`)}
-        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Foto</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}`;
+        ${recsS.length ? histCardSupervisores(recsS.length, `<div class="overflow-x-auto"><table class="histTabla${conFoto ? " conFoto" : ""} w-full text-sm"><thead class="text-center"><tr class="text-white" style="background:#0369a1"><th class="py-1.5 px-2 rounded-tl-lg">#</th>${conFoto ? `<th class="px-2 whitespace-nowrap">Img</th>` : ""}<th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2 whitespace-nowrap">Teléfono</th><th class="px-2 whitespace-nowrap">Autorización</th><th class="px-2 text-center whitespace-nowrap">Vigencia</th><th class="px-2 whitespace-nowrap">SIGES</th><th class="px-2 rounded-tr-lg whitespace-nowrap">Ingreso</th></tr></thead><tbody>${recsS.map(filaDet).join("")}</tbody></table></div>`) : ""}`;
     }
 
     // Historial de turnos a PANTALLA COMPLETA (escritorio): lista de turnos a la izquierda,
@@ -8190,8 +8194,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla completa -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2">Ingreso</th><th class="px-2 text-center rounded-tr-lg">Img</th></tr></thead>
+            <tbody>${filasG.length ? filasG.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="11" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial (dentro del QR)." : "Aún no hay guardias registrados."}</td></tr>`}</tbody>
           </table>
         </div>
       </div>
@@ -8208,8 +8212,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <!-- Escritorio: tabla -->
         <div class="hidden md:block p-3 overflow-x-auto">
           <table class="resp w-full text-sm">
-            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2 rounded-tr-lg">Ingreso</th></tr></thead>
-            <tbody>${filasS.length ? filasS.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="10" class="text-center text-slate-400 py-6">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</td></tr>`}</tbody>
+            <thead class="text-left"><tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th><th class="px-2">Turno</th><th class="px-2">Ingreso</th><th class="px-2 text-center rounded-tr-lg">Img</th></tr></thead>
+            <tbody>${filasS.length ? filasS.map((a, i) => filaEmpresa(a, i, ev)).join("") : `<tr><td colspan="11" class="text-center text-slate-400 py-6">${nSupE ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados."}</td></tr>`}</tbody>
           </table>
         </div>
       </div>
