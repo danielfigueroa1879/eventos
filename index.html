@@ -1719,6 +1719,12 @@
         .on("postgres_changes", { event: "*", schema: "public" }, (pl) => {
           // La ficha de un guardia que cambió en otro equipo se actualiza en la caché con la fila que llega.
           // Lo que cambió en otro equipo deja de servir en la memoria corta (se vuelve a pedir).
+          // FILTRO DE RUIDO: si en la ficha de un guardia solo cambió updated_at (los datos que se ven
+          // son iguales a los que ya hay en este equipo), se actualiza la copia y NO se repinta.
+          if (pl && pl.table === "guardias_central" && pl.eventType === "UPDATE" && pl.new && pl.new.rut) {
+            const c = guCache.get(pl.new.rut);
+            if (c && mismaFicha(c.g, pl.new)) { c.g = pl.new; return; }
+          }
           if (pl && pl.table) invalidar(TABLA_TAGS[pl.table] || TODO);
           if (pl && pl.table === "guardias_central") {
             const fila = pl.new && pl.new.rut ? pl.new : null;
@@ -1742,6 +1748,12 @@
       // Fichas de guardias guardadas en el equipo: antes se descargaban TODAS en cada recarga.
       // Ahora solo se piden las que faltan (o con más de 15 min), y los cambios llegan por tiempo real.
       const guCache = new Map();   // rut -> { g, t }
+      // ¿Misma ficha sin contar updated_at? (todas las demás columnas iguales)
+      const mismaFicha = (a, b) => {
+        const k = new Set([...Object.keys(a), ...Object.keys(b)]); k.delete("updated_at");
+        for (const x of k) if (JSON.stringify(a[x] ?? null) !== JSON.stringify(b[x] ?? null)) return false;
+        return true;
+      };
       const GU_TTL = 15 * 60 * 1000;
       async function guardiasDe(ruts) {
         const ahora = Date.now();
@@ -2840,8 +2852,9 @@
               fecha.value !== (g0.fecha_ultimo_examen || "");
             if (modificado) {
               await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value, aprobado: false, revision_tipo: 'MODIFICADO' }), TIMEOUT_MS);
-            } else {
-              // Si no modificó nada, solo actualizamos los datos básicos sin tocar su estado de aprobación
+            } else if (nom !== (g0.nombres || "") || ape !== (g0.apellidos || "") || telf !== (g0.telefono || "") || fecha.value !== (g0.fecha_ultimo_examen || "")) {
+              // Solo diferencias de formato (mayúsculas/espacios): se normalizan sin tocar su aprobación.
+              // Si es idéntico NO se escribe nada (evita un updated_at nuevo y un aviso en vivo a todos los paneles).
               await conTimeout(Data.upsertGuardia({ rut: rutV, nombres: nom, apellidos: ape, telefono: telf, fecha_ultimo_examen: fecha.value }), TIMEOUT_MS);
             }
           }
