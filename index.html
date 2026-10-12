@@ -1707,6 +1707,8 @@
       sb.channel("os10-rt")
         .on("postgres_changes", { event: "*", schema: "public" }, (pl) => {
           // La ficha de un guardia que cambió en otro equipo se actualiza en la caché con la fila que llega.
+          // Lo que cambió en otro equipo deja de servir en la memoria corta (se vuelve a pedir).
+          if (pl && pl.table) invalidar(TABLA_TAGS[pl.table] || TODO);
           if (pl && pl.table === "guardias_central") {
             const fila = pl.new && pl.new.rut ? pl.new : null;
             if (fila) guCache.set(fila.rut, { g: fila, t: Date.now() }); else if (pl.old && pl.old.rut) guCache.delete(pl.old.rut);
@@ -1766,7 +1768,47 @@
       }
       // Rutas a borrar del bucket: cada foto con su miniatura.
       const conMinis = paths => paths.flatMap(p => [p, rutaMini(p)]);
-      return {
+      // MEMORIA CORTA de lecturas (ahorro de datos): la misma consulta (eventos, asistencias, puestos,
+      // config, historial) se reutiliza hasta 2 min, en vez de pedirla en cada clic o repintado.
+      // Se borra AL INSTANTE cuando cambia algo: por una escritura de este equipo o por el tiempo
+      // real (cambio en otro equipo). Así se ahorra sin mostrar datos viejos.
+      const MEM_TTL = 2 * 60 * 1000;
+      const memoria = new Map();   // clave -> { t, p (promesa), tags }
+      const TODO = ["eventos", "asistencias", "puestos", "historial", "config"];
+      const TABLA_TAGS = { eventos: ["eventos"], asistencias: ["asistencias"], guardias_central: ["asistencias"], puestos: ["puestos", "asistencias"], partidos_historial: ["historial"], partidos_historial_asist: ["historial"], config: ["config"] };
+      function invalidar(tags) { for (const [k, v] of memoria) if (v.tags.some(t => tags.includes(t))) memoria.delete(k); }
+      const LECTURAS = { listEventos: ["eventos"], listAsistencias: ["asistencias"], listAsistenciasConteo: ["asistencias"], listPuestos: ["puestos"], getConfig: ["config"], listHistorial: ["historial"], listHistorialAsist: ["historial"] };
+      const ESCRITURAS = {
+        createEvento: ["eventos"], updateEvento: ["eventos"], deleteEvento: TODO,
+        upsertGuardia: ["asistencias"], bulkUpsertGuardias: ["asistencias"],
+        createAsistencia: ["asistencias"], setAsistenciaSupervisor: ["asistencias"], setAsistenciaHora: ["asistencias"], setAsistenciaRut: ["asistencias"], deleteAsistencia: ["asistencias"], asignarPuesto: ["asistencias"], subirFotoIngreso: ["asistencias"],
+        cerrarPartido: ["asistencias", "historial"], deleteHistorial: ["historial"],
+        createPuesto: ["puestos"], updatePuesto: ["puestos"], deletePuesto: ["puestos", "asistencias"],
+        setConfig: ["config"], purgarFotosAntiguas: ["asistencias", "historial"],
+      };
+      const copiar = x => (x == null || typeof x !== "object") ? x : structuredClone(x);
+      function conMemoria(obj) {
+        Object.keys(LECTURAS).forEach(n => {
+          const f = obj[n]; if (typeof f !== "function") return;
+          obj[n] = async (...args) => {
+            // Las fotos dependen de quién mira (admin / empresa / público): va en la clave.
+            const clave = n + "|" + JSON.stringify(args) + "|" + VER_FOTOS + VER_FOTOS_EMPRESA;
+            let c = memoria.get(clave);
+            if (!c || Date.now() - c.t > MEM_TTL) {
+              c = { t: Date.now(), p: f.apply(obj, args), tags: LECTURAS[n] };
+              memoria.set(clave, c);
+              c.p.catch(() => { if (memoria.get(clave) === c) memoria.delete(clave); });
+            }
+            return copiar(await c.p);
+          };
+        });
+        Object.keys(ESCRITURAS).forEach(n => {
+          const f = obj[n]; if (typeof f !== "function") return;
+          obj[n] = async (...args) => { try { return await f.apply(obj, args); } finally { invalidar(ESCRITURAS[n]); } };
+        });
+        return obj;
+      }
+      const api = {
         onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
         // Verifica la clave EN EL SERVIDOR (función RPC). La contraseña real vive en Supabase, no en este código.
         async verificarClave(nombre, clave) { const { data, error } = await sb.rpc("verificar_clave", { p_nombre: nombre, p_clave: clave }); if (error) throw error; return data === true; },
@@ -1911,6 +1953,7 @@
           return n;
         },
       };
+      return conMemoria(api);
     })();
 
     const Data = Remote || Local;
