@@ -1742,9 +1742,35 @@
       // (lo que agotó la cuota). Con el mismo enlace, el navegador usa la copia que ya tiene.
       const FIRMA_SEG = 3600, FIRMA_MARGEN_MS = 10 * 60 * 1000;
       const firmas = new Map();   // ruta -> { url|null, vence }
+      // FOTOS EN CLOUDFLARE R2: las fotos nuevas se guardan en R2 y su ruta en la base lleva el
+      // prefijo "r2:" (r2:<evento_id>/<asistencia_id>.webp). Las antiguas (sin prefijo) siguen en
+      // Supabase Storage. Los enlaces de R2 los firma la función de Netlify (las claves de R2 están
+      // solo allí) con una fecha fija por semana: el enlace no cambia entre recargas ni entre equipos,
+      // así el navegador reutiliza la foto que ya bajó. Se recuerdan en este equipo hasta que vencen.
+      const FOTOS_API = "/.netlify/functions/fotos";
+      const esR2 = p => String(p || "").startsWith("r2:");
+      const fotosR2 = new Set();   // ids de asistencias cuya foto está en R2
+      const R2_LS = "os10_r2firmas";
+      try { const g = JSON.parse(localStorage.getItem(R2_LS) || "{}"), t = Date.now(); Object.entries(g).forEach(([k, v]) => { if (v && v.url && v.vence - t > FIRMA_MARGEN_MS) firmas.set(k, v); }); } catch (e) { }
+      const guardarFirmasR2 = () => { try { const t = Date.now(), o = {}; firmas.forEach((v, k) => { if (esR2(k) && v.url && v.vence > t) o[k] = v; }); localStorage.setItem(R2_LS, JSON.stringify(o)); } catch (e) { } };
+      async function apiFotos(cuerpo) {
+        const r = await fetch(FOTOS_API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+        return d;
+      }
       async function firmarRutas(paths) {
         const ahora = Date.now();
-        const faltan = [...new Set(paths)].filter(p => { const c = firmas.get(p); return !c || c.vence - ahora < FIRMA_MARGEN_MS; });
+        const pendientes = [...new Set(paths)].filter(p => { const c = firmas.get(p); return !c || c.vence - ahora < FIRMA_MARGEN_MS; });
+        const enR2 = pendientes.filter(esR2), faltan = pendientes.filter(p => !esR2(p));
+        for (let i = 0; i < enR2.length; i += 200) {
+          const lote = enR2.slice(i, i + 200);
+          try {
+            const d = await apiFotos({ accion: "ver", paths: lote.map(p => p.slice(3)) });
+            lote.forEach(p => { const u = d.urls && d.urls[p.slice(3)]; if (u) firmas.set(p, { url: u, vence: d.vence }); });
+          } catch (e) { console.warn("firmar fotos R2:", e && e.message); }
+        }
+        if (enR2.length) guardarFirmasR2();
         for (let i = 0; i < faltan.length; i += 100) {
           const lote = faltan.slice(i, i + 100);
           try {
@@ -1773,6 +1799,17 @@
       }
       // Rutas a borrar del bucket: cada foto con su miniatura.
       const conMinis = paths => paths.flatMap(p => [p, rutaMini(p)]);
+      // Ruta de la foto de una asistencia: con "r2:" si está en Cloudflare R2.
+      const rutaFotoAsis = (evId, asisId) => (fotosR2.has(asisId) ? "r2:" : "") + `${evId}/${asisId}.webp`;
+      // Borra fotos (y sus miniaturas) donde estén: R2 (vía la función) o Supabase Storage.
+      async function borrarFotos(rutas) {
+        const todas = conMinis(rutas.filter(Boolean));
+        const r2 = todas.filter(esR2).map(p => p.slice(3)), sbp = todas.filter(p => !esR2(p));
+        for (let i = 0; i < r2.length; i += 500) { try { await apiFotos({ accion: "borrar", paths: r2.slice(i, i + 500) }); } catch (e) { console.warn("borrar fotos R2:", e && e.message); } }
+        for (let i = 0; i < sbp.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(sbp.slice(i, i + 100)); if (r.error) console.warn("borrar fotos:", r.error.message); } catch (e) { console.warn("borrar fotos:", e && e.message); } }
+      }
+      // Borra la carpeta completa de un evento en R2 (si R2 no está configurado, no hace nada).
+      const borrarCarpetaR2 = async evId => { try { await apiFotos({ accion: "borrar", prefijo: evId }); } catch (e) { console.warn("borrar carpeta R2:", e && e.message); } };
       // MEMORIA CORTA de lecturas (ahorro de datos): la misma consulta (eventos, asistencias, puestos,
       // config, historial) se reutiliza hasta 2 min, en vez de pedirla en cada clic o repintado.
       // Se borra AL INSTANTE cuando cambia algo: por una escritura de este equipo o por el tiempo
@@ -1823,6 +1860,7 @@
         async deleteEvento(id) {
           // Limpieza: borra la carpeta de fotos del evento en el bucket (evita dejar imágenes huérfanas).
           try { const { data: files } = await sb.storage.from("ingresos").list(id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${id}/${f.name}`)); } catch (e) { console.warn("borrar fotos evento:", e && e.message); }
+          await borrarCarpetaR2(id);
           ok(await sb.from("eventos").delete().eq("id", id));
         },
         async getEventoBySlug(slug) { const d = ok(await sb.from("eventos").select("*").eq("slug", slug).limit(1)); return d[0] || null; },
@@ -1841,8 +1879,8 @@
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
           // Fuera del panel admin la foto no se entrega (ni se firma su enlace), salvo a la
           // empresa durante 3 h desde el ingreso (sin descarga).
-          as.forEach(a => { if (!fotoVisible(a)) a.foto_url = null; });
-          await ponerFotos(as, a => a.foto_url ? `${evId}/${a.id}.webp` : null, "foto_url");
+          as.forEach(a => { if (esR2(a.foto_url)) fotosR2.add(a.id); if (!fotoVisible(a)) a.foto_url = null; });
+          await ponerFotos(as, a => a.foto_url ? rutaFotoAsis(evId, a.id) : null, "foto_url");
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
         },
         // Versión LIVIANA para contadores (barra lateral): solo las columnas necesarias, sin fichas
@@ -1853,7 +1891,7 @@
         // Genera un enlace firmado NUEVO para UNA foto, en el momento (lo usa el admin al ver/descargar
         // la foto ampliada). Dura poco, pero como se pide al hacer clic, siempre está vigente.
         async signFoto(evId, asisId) {
-          const p = `${evId}/${asisId}.webp`;
+          const p = rutaFotoAsis(evId, asisId);
           return (await firmarRutas([p])).get(p) || null;
         },
         async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).order("hora_ingreso", { ascending: false }).limit(1)); return d[0] || null; },
@@ -1868,7 +1906,7 @@
           const puMap = {}; try { (ok(await sb.from("puestos").select("id,nombre").eq("evento_id", ev.id)) || []).forEach(p => { puMap[p.id] = p.nombre; }); } catch (_) {}
           // La foto de ingreso se ARCHIVA con el partido: se guarda la ruta del bucket
           // (<evento_id>/<asistencia_id>.webp) y el archivo se conserva FOTO_RETENCION_DIAS días.
-          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: a.foto_url ? `${ev.id}/${a.id}.webp` : null }; });
+          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: a.foto_url ? rutaFotoAsis(ev.id, a.id) : null }; });
           let fotosArchivadas = !rows.length;
           if (rows.length) {
             try { ok(await sb.from("partidos_historial_asist").insert(rows)); fotosArchivadas = true; }
@@ -1879,7 +1917,7 @@
           }
           // Si la base aún no tiene la columna foto_url en el historial, las fotos no se pueden
           // archivar: se borran como antes para no dejar imágenes huérfanas en el bucket.
-          if (!fotosArchivadas) { try { const { data: files } = await sb.storage.from("ingresos").list(ev.id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${ev.id}/${f.name}`)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } }
+          if (!fotosArchivadas) { try { const { data: files } = await sb.storage.from("ingresos").list(ev.id); if (files && files.length) await sb.storage.from("ingresos").remove(files.map(f => `${ev.id}/${f.name}`)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } await borrarCarpetaR2(ev.id); }
           ok(await sb.from("asistencias").delete().eq("evento_id", ev.id));
           return hp.id;
         },
@@ -1887,7 +1925,7 @@
         async listHistorialAsist(hid) {
           const rows = ok(await sb.from("partidos_historial_asist").select("*").eq("historial_id", hid).order("hora_ingreso", { ascending: true }));
           // Fotos archivadas: solo el admin las ve, con enlace firmado corto (bucket privado).
-          rows.forEach(r => { r.foto_path = r.foto_url || null; r.foto_url = null; });
+          rows.forEach(r => { r.foto_path = r.foto_url || null; r.foto_url = null; const m = esR2(r.foto_path) && r.foto_path.match(/\/([^/]+)\.webp$/); if (m) fotosR2.add(m[1]); });
           if (VER_FOTOS) await ponerFotos(rows, r => r.foto_path, "foto_url");
           const out = rows.map(leerMarcaHist);
           try {
@@ -1908,9 +1946,7 @@
           // Borra también las fotos archivadas de ese partido.
           try {
             const fr = ok(await sb.from("partidos_historial_asist").select("foto_url").eq("historial_id", hid).not("foto_url", "is", null));
-            const paths = fr.map(r => r.foto_url).filter(Boolean);
-            const todas = conMinis(paths);
-            for (let i = 0; i < todas.length; i += 100) await sb.storage.from("ingresos").remove(todas.slice(i, i + 100));
+            await borrarFotos(fr.map(r => r.foto_url));
           } catch (e) { console.warn("borrar fotos historial:", e && e.message); }
           ok(await sb.from("partidos_historial").delete().eq("id", hid));
         },
@@ -1925,17 +1961,30 @@
         // Sube la foto de verificación (WebP HD) al bucket privado "ingresos".
         async subirFotoIngreso(evId, asisId, blob) {
           const path = `${evId}/${asisId}.webp`;
-          const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true, cacheControl: "86400" });
-          if (up.error) throw up.error;
           // Miniatura 120x160 para listas/mapa (ahorra descarga). Si falla, se usa la foto completa.
+          let mini = null;
           try {
             const bmp = await createImageBitmap(blob);
             const c = document.createElement("canvas"); c.width = 120; c.height = 160;
             const k = Math.max(120 / bmp.width, 160 / bmp.height), w = bmp.width * k, h = bmp.height * k;
             c.getContext("2d").drawImage(bmp, (120 - w) / 2, (160 - h) / 2, w, h);
-            const mini = await new Promise(r => c.toBlob(r, "image/webp", 0.55));
-            if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" });
+            mini = await new Promise(r => c.toBlob(r, "image/webp", 0.55));
           } catch (e) { console.warn("miniatura:", e && e.message); }
+          // 1) Cloudflare R2: la función entrega enlaces de subida firmados y el navegador sube directo.
+          //    Si R2 aún no está configurado o falla, se usa Supabase Storage como antes.
+          try {
+            const chica = mini || blob;
+            const d = await apiFotos({ accion: "subir", evento_id: evId, asistencia_id: asisId, tipo: blob.type || "image/webp", tipoMini: chica.type || "image/webp" });
+            const put = async (e, b) => { const r = await fetch(e.url, { method: "PUT", headers: e.headers, body: b }); if (!r.ok) throw new Error("PUT " + r.status); };
+            await Promise.all([put(d.foto, blob), put(d.mini, chica)]);
+            fotosR2.add(asisId);
+            ok(await sb.from("asistencias").update({ foto_url: "r2:" + path }).eq("id", asisId));
+            return "r2:" + path;
+          } catch (e) { console.warn("foto en R2 (se usa Supabase):", e && e.message); }
+          // 2) Supabase Storage (respaldo).
+          const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true, cacheControl: "86400" });
+          if (up.error) throw up.error;
+          try { if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" }); } catch (e) { console.warn("miniatura:", e && e.message); }
           // Bucket PRIVADO: se guarda la RUTA (no una URL pública). El panel genera un enlace firmado
           // temporal al mostrar la foto, así no queda ningún enlace abierto/permanente a la imagen.
           ok(await sb.from("asistencias").update({ foto_url: path }).eq("id", asisId));
@@ -1946,15 +1995,14 @@
         // Se ejecuta desde el panel del admin (throttled). Mantiene liviano el almacenamiento.
         async purgarFotosAntiguas(dias) {
           const corte = new Date(Date.now() - (dias || FOTO_RETENCION_DIAS) * 86400000).toISOString();
-          const borrarPaths = async (rutas) => { const paths = conMinis(rutas); for (let i = 0; i < paths.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(paths.slice(i, i + 100)); if (r.error) console.warn("purga (storage):", r.error.message); } catch (e) { console.warn("purga (storage):", e && e.message); } } };
           const limpiar = async (tabla, ids) => { for (let i = 0; i < ids.length; i += 100) { try { ok(await sb.from(tabla).update({ foto_url: null }).in("id", ids.slice(i, i + 100))); } catch (e) { console.warn("purga (update):", e && e.message); } } };
           let n = 0;
           let viejas = [];
-          try { viejas = ok(await sb.from("asistencias").select("id,evento_id,hora_ingreso").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { console.warn("purga (select):", e && e.message); }
-          if (viejas.length) { await borrarPaths(viejas.map(a => `${a.evento_id}/${a.id}.webp`)); await limpiar("asistencias", viejas.map(a => a.id)); n += viejas.length; }
+          try { viejas = ok(await sb.from("asistencias").select("id,evento_id,hora_ingreso,foto_url").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { console.warn("purga (select):", e && e.message); }
+          if (viejas.length) { await borrarFotos(viejas.map(a => esR2(a.foto_url) ? a.foto_url : `${a.evento_id}/${a.id}.webp`)); await limpiar("asistencias", viejas.map(a => a.id)); n += viejas.length; }
           let viejasH = [];
           try { viejasH = ok(await sb.from("partidos_historial_asist").select("id,foto_url").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { /* columna foto_url aún no creada */ }
-          if (viejasH.length) { await borrarPaths(viejasH.map(r => r.foto_url)); await limpiar("partidos_historial_asist", viejasH.map(r => r.id)); n += viejasH.length; }
+          if (viejasH.length) { await borrarFotos(viejasH.map(r => r.foto_url)); await limpiar("partidos_historial_asist", viejasH.map(r => r.id)); n += viejasH.length; }
           return n;
         },
       };
@@ -5335,7 +5383,8 @@
     async function fotoJPEG(a) {
       // Primero la miniatura que ya está en pantalla (liviana); si su enlace venció, se firma la completa.
       const evId = a.evento_id || (a.foto_ref && a.foto_ref.ev), asId = (a.foto_ref && a.foto_ref.id) || a.id;
-      const bajar = async u => { const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); };
+      // cache "no-store": la miniatura en caché viene de un <img> (sin CORS) y fetch() no podría leerla.
+      const bajar = async u => { const r = await fetch(u, { cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); };
       try {
         let blob = null;
         try { if (a.foto_url) blob = await bajar(a.foto_url); } catch (_) { }
@@ -5518,7 +5567,7 @@
     /* ---- Historial de partidos archivados ---- */
     // Convierte filas del snapshot al formato de "asistencia" que usan los exports
     function histRowsToAsist(rows) {
-      return rows.map(r => ({ rut: r.rut, hora_ingreso: r.hora_ingreso, es_supervisor: !!r.es_supervisor, foto_url: r.foto_url || null, foto_ref: (m => m ? { ev: m[1], id: m[2] } : null)(String(r.foto_path || "").match(/^([^/]+)\/([^/]+)\.webp$/)), guardia: { nombres: r.nombres, apellidos: r.apellidos, telefono: r.telefono, fecha_ultimo_examen: r.fecha_ultimo_examen, spd: !!r.spd, spd_verificado: !!r.spd_verificado } }));
+      return rows.map(r => ({ rut: r.rut, hora_ingreso: r.hora_ingreso, es_supervisor: !!r.es_supervisor, foto_url: r.foto_url || null, foto_ref: (m => m ? { ev: m[1], id: m[2] } : null)(String(r.foto_path || "").match(/^(?:r2:)?([^/]+)\/([^/]+)\.webp$/)), guardia: { nombres: r.nombres, apellidos: r.apellidos, telefono: r.telefono, fecha_ultimo_examen: r.fecha_ultimo_examen, spd: !!r.spd, spd_verificado: !!r.spd_verificado } }));
     }
     function histEvPseudo(ev, h) {
       return { nombre_evento: `${h.partido || ev.nombre_evento} (${fechaFmt(h.fecha || h.cerrado_at)})`, empresa: ev.empresa, fecha_evento: h.fecha, tipo: "partido", partido: h.partido, usa_turnos: false, slug: `${ev.slug}-${String(h.fecha || "").replace(/-/g, "") || Date.now()}` };
@@ -5613,7 +5662,7 @@
       cont.querySelectorAll("[data-hfoto]").forEach(b => b.addEventListener("click", (e) => {
         e.stopPropagation();
         const r = rows[+b.dataset.hfoto]; if (!r || !r.foto_url) return;
-        const m = String(r.foto_path || "").match(/^([^/]+)\/([^/]+)\.webp$/);
+        const m = String(r.foto_path || "").match(/^(?:r2:)?([^/]+)\/([^/]+)\.webp$/);
         const nom = ((r.nombres || "") + " " + (r.apellidos || "")).trim();
         verFotoIngresoModal(r.foto_url, nom, { ...r, evento_id: m ? m[1] : null, id: m ? m[2] : null });
       }));
