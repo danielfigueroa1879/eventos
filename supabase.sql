@@ -45,6 +45,10 @@ alter table eventos add column if not exists comuna    text;
 -- Dotación por turno además de los guardias (cantidad_esperada):
 -- { "supervisores": 2, "otros": [ { "cargo": "Jefe de seguridad", "cantidad": 1 } ] }
 alter table eventos add column if not exists dotacion jsonb default '{}'::jsonb;
+-- QR rotativo por turno (true/false lo fuerza; null = según si el evento usa turnos).
+alter table eventos add column if not exists qr_rotativo boolean;
+-- Datos guardados de la "Cuenta OS10" (informe para WhatsApp) de cada evento.
+alter table eventos add column if not exists reporte_os10 jsonb;
 
 create table if not exists guardias_central (
   rut                 text primary key,          -- formateado: 12345678-9

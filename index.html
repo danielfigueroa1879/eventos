@@ -1201,8 +1201,8 @@
        ========================================================================= */
     // 1) Pega aquí tu URL y ANON KEY de Supabase para pasar a PRODUCCIÓN.
     //    Déjalas vacías para usar MODO DEMO (datos guardados solo en este dispositivo).
-    const SUPABASE_URL = "https://ncnopdsbiirbicslfnvk.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jbm9wZHNiaWlyYmljc2xmbnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NDQ5NzcsImV4cCI6MjEwNDAyMDk3N30.498aWvQrs6Zqgd-PoKmKT11AQukcjuQ9VmZs0PUun2A";
+    const SUPABASE_URL = "https://ixdpjkfkbndcijowynxn.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZHBqa2ZrYm5kY2lqb3d5bnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTgxNTIsImV4cCI6MjEwNzMzNDE1Mn0.qeeELjWAkMcDviavQSvsC5IQvLB-iG-KkdpdH3OCHdI";
 
     // 2) Contraseñas (PIN de admin y clave para eliminar): YA NO están en este código.
     //    Se verifican EN EL SERVIDOR mediante la función RPC 'verificar_clave' de Supabase,
@@ -1615,6 +1615,7 @@
           const gu = get(K.gu);
           return as.map(a => ({ ...a, foto_url: fotoVisible() ? a.foto_url : null, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
         },
+        async listAsistenciasConteo(evId) { return get(K.as).filter(x => x.evento_id === evId); },
         async yaRegistrado(evId, rut) { return get(K.as).filter(x => x.evento_id === evId && x.rut === rut).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? 1 : -1))[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { const rec = { id: uid(), evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }; const a = get(K.as); a.push(rec); set(K.as, a); ping(); return rec; },
         async setAsistenciaSupervisor(id, esSup) { const a = get(K.as); const r = a.find(x => x.id === id); if (r) { r.es_supervisor = !!esSup; set(K.as, a); ping(); } return r; },
@@ -1663,10 +1664,49 @@
       if (!USING_SUPABASE) return null;
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       let listeners = [];
+      // AHORRO DE DATOS (cuota de descarga de Supabase): una ráfaga de cambios (p. ej. varios
+      // ingresos seguidos) dispara UNA sola recarga, no una por cada cambio.
+      let rtTimer = null;
       sb.channel("os10-rt")
-        .on("postgres_changes", { event: "*", schema: "public" }, () => listeners.forEach(f => f()))
+        .on("postgres_changes", { event: "*", schema: "public" }, () => { clearTimeout(rtTimer); rtTimer = setTimeout(() => listeners.forEach(f => f()), 2500); })
         .subscribe();
       const ok = (r) => { if (r.error) throw r.error; return r.data; };
+      // Enlaces firmados de las fotos, REUTILIZADOS mientras les quede vigencia. Antes se pedía un
+      // enlace nuevo en cada recarga y el navegador volvía a descargar todas las fotos cada vez
+      // (lo que agotó la cuota). Con el mismo enlace, el navegador usa la copia que ya tiene.
+      const FIRMA_SEG = 3600, FIRMA_MARGEN_MS = 10 * 60 * 1000;
+      const firmas = new Map();   // ruta -> { url|null, vence }
+      async function firmarRutas(paths) {
+        const ahora = Date.now();
+        const faltan = [...new Set(paths)].filter(p => { const c = firmas.get(p); return !c || c.vence - ahora < FIRMA_MARGEN_MS; });
+        for (let i = 0; i < faltan.length; i += 100) {
+          const lote = faltan.slice(i, i + 100);
+          try {
+            const { data } = await sb.storage.from("ingresos").createSignedUrls(lote, FIRMA_SEG);
+            (data || []).forEach((f, j) => {
+              // Si el archivo no existe (p. ej. foto antigua sin miniatura) se recuerda 10 min para no volver a preguntar.
+              if (f && f.signedUrl && !f.error) firmas.set(lote[j], { url: f.signedUrl, vence: ahora + FIRMA_SEG * 1000 });
+              else firmas.set(lote[j], { url: null, vence: ahora + FIRMA_MARGEN_MS + 10 * 60 * 1000 });
+            });
+          } catch (e) { console.warn("firmar fotos:", e && e.message); }
+        }
+        const out = new Map(); paths.forEach(p => { const c = firmas.get(p); out.set(p, c ? c.url : null); });
+        return out;
+      }
+      // Miniatura liviana (120x160, ~5 KB) que se sube junto a cada foto: las listas, el mapa y los
+      // PDF/Excel usan la miniatura; la foto completa solo se baja al ampliarla.
+      const rutaMini = path => String(path).replace(/\.webp$/, "_t.webp");
+      // Firma miniatura (o la foto completa si no hay miniatura) y la deja en obj[campo].
+      async function ponerFotos(items, rutaDe, campo) {
+        const conRuta = items.map(it => [it, rutaDe(it)]).filter(([, r]) => r);
+        if (!conRuta.length) return;
+        const minis = await firmarRutas(conRuta.map(([, r]) => rutaMini(r)));
+        const sinMini = conRuta.filter(([, r]) => !minis.get(rutaMini(r)));
+        const completas = sinMini.length ? await firmarRutas(sinMini.map(([, r]) => r)) : new Map();
+        conRuta.forEach(([it, r]) => { it[campo] = minis.get(rutaMini(r)) || completas.get(r) || null; });
+      }
+      // Rutas a borrar del bucket: cada foto con su miniatura.
+      const conMinis = paths => paths.flatMap(p => [p, rutaMini(p)]);
       return {
         onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
         // Verifica la clave EN EL SERVIDOR (función RPC). La contraseña real vive en Supabase, no en este código.
@@ -1689,31 +1729,26 @@
           const ruts = [...new Set(as.map(a => a.rut))];
           let gu = []; if (ruts.length) gu = ok(await sb.from("guardias_central").select("*").in("rut", ruts));
           // Bucket PRIVADO: las fotos no tienen URL pública. Se genera un enlace FIRMADO temporal
-          // y CORTO (5 min) solo para las miniaturas del panel. Así, si alguien copia una de esas
-          // URLs desde DevTools, deja de funcionar muy pronto. La ruta es siempre
+          // (1 h, reutilizado mientras dure: ver firmarRutas) para las miniaturas. La ruta es siempre
           // <evento_id>/<asistencia_id>.webp (sirve también para fotos antiguas del bucket).
           // Para VER/DESCARGAR una foto ampliada, el admin pide un enlace NUEVO al hacer clic
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
           // Fuera del panel admin la foto no se entrega (ni se firma su enlace), salvo a la
           // empresa (sin descarga).
           if (!fotoVisible()) as.forEach(a => { a.foto_url = null; });
-          const conFoto = as.filter(a => a.foto_url);
-          if (conFoto.length) {
-            try {
-              const paths = conFoto.map(a => `${evId}/${a.id}.webp`);
-              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(paths, 300);
-              if (Array.isArray(firmadas)) firmadas.forEach((f, i) => { if (f && f.signedUrl && !f.error) conFoto[i].foto_url = f.signedUrl; });
-            } catch (e) { console.warn("firmar fotos:", e && e.message); }
-          }
+          await ponerFotos(as, a => a.foto_url ? `${evId}/${a.id}.webp` : null, "foto_url");
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
+        },
+        // Versión LIVIANA para contadores (barra lateral): solo las columnas necesarias, sin fichas
+        // de guardias ni fotos. Ahorra la mayor parte de la descarga en cada recarga.
+        async listAsistenciasConteo(evId) {
+          return ok(await sb.from("asistencias").select("id,rut,hora_ingreso,es_supervisor").eq("evento_id", evId));
         },
         // Genera un enlace firmado NUEVO para UNA foto, en el momento (lo usa el admin al ver/descargar
         // la foto ampliada). Dura poco, pero como se pide al hacer clic, siempre está vigente.
         async signFoto(evId, asisId) {
-          try {
-            const { data } = await sb.storage.from("ingresos").createSignedUrl(`${evId}/${asisId}.webp`, 300);
-            return (data && data.signedUrl) || null;
-          } catch (e) { return null; }
+          const p = `${evId}/${asisId}.webp`;
+          return (await firmarRutas([p])).get(p) || null;
         },
         async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).order("hora_ingreso", { ascending: false }).limit(1)); return d[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }).select().single()); },
@@ -1747,13 +1782,7 @@
           const rows = ok(await sb.from("partidos_historial_asist").select("*").eq("historial_id", hid).order("hora_ingreso", { ascending: true }));
           // Fotos archivadas: solo el admin las ve, con enlace firmado corto (bucket privado).
           rows.forEach(r => { r.foto_path = r.foto_url || null; r.foto_url = null; });
-          const conFoto = VER_FOTOS ? rows.filter(r => r.foto_path) : [];
-          if (conFoto.length) {
-            try {
-              const { data: firmadas } = await sb.storage.from("ingresos").createSignedUrls(conFoto.map(r => r.foto_path), 300);
-              if (Array.isArray(firmadas)) firmadas.forEach((f, i) => { if (f && f.signedUrl && !f.error) conFoto[i].foto_url = f.signedUrl; });
-            } catch (e) { console.warn("firmar fotos historial:", e && e.message); }
-          }
+          if (VER_FOTOS) await ponerFotos(rows, r => r.foto_path, "foto_url");
           const out = rows.map(leerMarcaHist);
           try {
             const hp = ok(await sb.from("partidos_historial").select("cerrado_at").eq("id", hid).maybeSingle());
@@ -1774,7 +1803,8 @@
           try {
             const fr = ok(await sb.from("partidos_historial_asist").select("foto_url").eq("historial_id", hid).not("foto_url", "is", null));
             const paths = fr.map(r => r.foto_url).filter(Boolean);
-            for (let i = 0; i < paths.length; i += 100) await sb.storage.from("ingresos").remove(paths.slice(i, i + 100));
+            const todas = conMinis(paths);
+            for (let i = 0; i < todas.length; i += 100) await sb.storage.from("ingresos").remove(todas.slice(i, i + 100));
           } catch (e) { console.warn("borrar fotos historial:", e && e.message); }
           ok(await sb.from("partidos_historial").delete().eq("id", hid));
         },
@@ -1789,8 +1819,17 @@
         // Sube la foto de verificación (WebP HD) al bucket privado "ingresos".
         async subirFotoIngreso(evId, asisId, blob) {
           const path = `${evId}/${asisId}.webp`;
-          const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true });
+          const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true, cacheControl: "86400" });
           if (up.error) throw up.error;
+          // Miniatura 120x160 para listas/mapa (ahorra descarga). Si falla, se usa la foto completa.
+          try {
+            const bmp = await createImageBitmap(blob);
+            const c = document.createElement("canvas"); c.width = 120; c.height = 160;
+            const k = Math.max(120 / bmp.width, 160 / bmp.height), w = bmp.width * k, h = bmp.height * k;
+            c.getContext("2d").drawImage(bmp, (120 - w) / 2, (160 - h) / 2, w, h);
+            const mini = await new Promise(r => c.toBlob(r, "image/webp", 0.7));
+            if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" });
+          } catch (e) { console.warn("miniatura:", e && e.message); }
           // Bucket PRIVADO: se guarda la RUTA (no una URL pública). El panel genera un enlace firmado
           // temporal al mostrar la foto, así no queda ningún enlace abierto/permanente a la imagen.
           ok(await sb.from("asistencias").update({ foto_url: path }).eq("id", asisId));
@@ -1801,7 +1840,7 @@
         // Se ejecuta desde el panel del admin (throttled). Mantiene liviano el almacenamiento.
         async purgarFotosAntiguas(dias) {
           const corte = new Date(Date.now() - (dias || FOTO_RETENCION_DIAS) * 86400000).toISOString();
-          const borrarPaths = async (paths) => { for (let i = 0; i < paths.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(paths.slice(i, i + 100)); if (r.error) console.warn("purga (storage):", r.error.message); } catch (e) { console.warn("purga (storage):", e && e.message); } } };
+          const borrarPaths = async (rutas) => { const paths = conMinis(rutas); for (let i = 0; i < paths.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(paths.slice(i, i + 100)); if (r.error) console.warn("purga (storage):", r.error.message); } catch (e) { console.warn("purga (storage):", e && e.message); } } };
           const limpiar = async (tabla, ids) => { for (let i = 0; i < ids.length; i += 100) { try { ok(await sb.from(tabla).update({ foto_url: null }).in("id", ids.slice(i, i + 100))); } catch (e) { console.warn("purga (update):", e && e.message); } } };
           let n = 0;
           let viejas = [];
@@ -1898,7 +1937,8 @@
        FOTO DE VERIFICACIÓN (ingreso) — captura con guía ovalada + conversión a WebP HD
        ---------------------------------------------------------------------------
        - La foto NO se guarda en Full HD: se recorta a retrato 3:4 y se limita a HD
-         (alto máx. 1000 px) y se comprime a WebP (calidad 0.6). Pesa muy poco (~80–150 KB).
+         (alto máx. 800 px) y se comprime a WebP (calidad 0.6). Pesa poco (~50–100 KB). Además se
+         sube una miniatura de 120x160 (~5 KB) que es la que usan las listas y el mapa.
        - Sirve para dejar registro de QUIÉN ingresó realmente los datos en el QR.
        ========================================================================= */
     function blobToDataURL(blob) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); }); }
@@ -1912,7 +1952,7 @@
           let cropW = sw, cropH = sw / ratio;  // recorte centrado con proporción 3:4
           if (cropH > sh) { cropH = sh; cropW = sh * ratio; }
           const sx = (sw - cropW) / 2, sy = (sh - cropH) / 2;
-          const maxH = 1000;                   // límite HD (Full HD sería ~1440+): mantiene el archivo liviano
+          const maxH = 800;                    // alto máx. (antes 1000): archivo más liviano, menos descarga
           const outH = Math.min(maxH, cropH), outW = outH * ratio;
           const c = document.createElement("canvas");
           c.width = Math.round(outW); c.height = Math.round(outH);
@@ -2918,8 +2958,9 @@
       habilitarReordenEventos(cont);
       // contadores + resumen del evento expandido
       lista.forEach(async e => {
+        // Contador: consulta liviana. Solo el evento con el resumen abierto pide la ficha completa (H/M).
         let as = [];
-        try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
+        try { as = e.id === ADMIN_STATE.expandido ? await Data.listAsistencias(e.id) : await Data.listAsistenciasConteo(e.id); } catch (_) { as = []; }
         // Solo los turnos vigentes (igual que el listado); los finalizados están en el historial.
         const asV = asistVigentes(e, as);
         const g = asV.filter(a => !a.es_supervisor), sup = asV.filter(a => a.es_supervisor);
@@ -5182,15 +5223,17 @@
       w.document.write(listadoPrintHTML(ev, asist)); w.document.close();
     }
 
-    // Fotos de ingreso para el PDF (solo admin): pide un enlace firmado nuevo (los de la
-    // pantalla caducan a los 5 min), la achica a 120x160 y la pasa a JPEG (jsPDF no lee WebP).
+    // Fotos de ingreso para el PDF/Excel (solo admin): usa la miniatura, la deja en 120x160 y la
+    // pasa a JPEG (jsPDF no lee WebP).
     async function fotoJPEG(a) {
-      let url = a.foto_url;
+      // Primero la miniatura que ya está en pantalla (liviana); si su enlace venció, se firma la completa.
       const evId = a.evento_id || (a.foto_ref && a.foto_ref.ev), asId = (a.foto_ref && a.foto_ref.id) || a.id;
-      if (evId && asId && Data.signFoto) { try { const f = await Data.signFoto(evId, asId); if (f) url = f; } catch (_) { } }
-      if (!url) return null;
+      const bajar = async u => { const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); };
       try {
-        const blob = await (await fetch(url)).blob();
+        let blob = null;
+        try { if (a.foto_url) blob = await bajar(a.foto_url); } catch (_) { }
+        if (!blob && evId && asId && Data.signFoto) { const f = await Data.signFoto(evId, asId); if (f) blob = await bajar(f); }
+        if (!blob) return null;
         const bmp = await createImageBitmap(blob);
         const c = document.createElement("canvas"); c.width = 120; c.height = 160;
         const cx = c.getContext("2d");
@@ -7967,10 +8010,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       };
       await paint();
       Data.onChange(paint);
-      // Re-pinta cada 2 min (aunque la empresa deje la pantalla abierta sin novedades) para renovar
-      // los enlaces firmados de las fotos de ingreso, que caducan a los 5 min.
+      // Re-pinta cada 5 min aunque no haya novedades (los cambios llegan solos en tiempo real);
+      // los enlaces de las fotos duran 1 h y se renuevan solos antes de vencer.
       if (EMPRESA_STATE._tick) clearInterval(EMPRESA_STATE._tick);
-      EMPRESA_STATE._tick = setInterval(paint, 120000);
+      EMPRESA_STATE._tick = setInterval(paint, 5 * 60 * 1000);
     }
 
     /* =========================================================================
