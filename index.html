@@ -1660,10 +1660,10 @@
     })();
 
     /* ---- Pausa de la app (ahorro de datos) ----
-       Mientras la pestaña está oculta, o si nadie la toca en 12 h, la app no se recarga sola.
+       Mientras la pestaña está oculta, o si nadie la toca en 8 h, la app no se recarga sola.
        Al volver a mostrarla (o al tocar "Continuar") se pone al día una sola vez. */
     const pausaApp = (() => {
-      const INACTIVO_MS = 12 * 3600 * 1000;
+      const INACTIVO_MS = 8 * 3600 * 1000;
       let ultimo = Date.now();
       const api = {
         pendiente: false, alReanudar: null, aviso: null,
@@ -1680,7 +1680,7 @@
           if (!document.hidden && api.inactiva() && !api.aviso) {
             const d = document.createElement("div");
             d.className = "fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4";
-            d.innerHTML = `<div class="card p-6 text-center max-w-sm"><div class="text-4xl mb-2">⏸</div><h2 class="font-bold text-slate-800">Vista en pausa</h2><p class="text-sm text-slate-500 mt-1 mb-4">No se usó en las últimas 12 horas, así que dejó de actualizarse para ahorrar datos.</p><button class="btn btn-p w-full">Continuar</button></div>`;
+            d.innerHTML = `<div class="card p-6 text-center max-w-sm"><div class="text-4xl mb-2">⏸</div><h2 class="font-bold text-slate-800">Vista en pausa</h2><p class="text-sm text-slate-500 mt-1 mb-4">No se usó en las últimas 8 horas, así que dejó de actualizarse para ahorrar datos.</p><button class="btn btn-p w-full">Continuar</button></div>`;
             d.querySelector("button").addEventListener("click", () => { ultimo = Date.now(); api.reanudar(); });
             document.body.appendChild(d); api.aviso = d;
           }
@@ -1700,7 +1700,7 @@
       // AHORRO DE DATOS (cuota de descarga de Supabase): una ráfaga de cambios (p. ej. varios
       // ingresos seguidos) dispara UNA sola recarga, no una por cada cambio.
       // Además: si la pestaña está oculta (segundo plano, pantalla apagada) o nadie la usa hace
-      // 12 h, NO se recarga; queda pendiente y se pone al día al volver (ver pausaApp).
+      // 8 h, NO se recarga; queda pendiente y se pone al día al volver (ver pausaApp).
       let rtTimer = null;
       const avisar = () => { if (pausaApp.activa()) { pausaApp.pendiente = true; return; } listeners.forEach(f => f()); };
       pausaApp.alReanudar = () => listeners.forEach(f => f());
