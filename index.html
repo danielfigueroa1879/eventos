@@ -1787,7 +1787,7 @@
       try { const g = JSON.parse(localStorage.getItem(R2_LS) || "{}"), t = Date.now(); Object.entries(g).forEach(([k, v]) => { if (v && v.url && v.vence - t > FIRMA_MARGEN_MS) firmas.set(k, v); }); } catch (e) { }
       const guardarFirmasR2 = () => { try { const t = Date.now(), o = {}; firmas.forEach((v, k) => { if (esR2(k) && v.url && v.vence > t) o[k] = v; }); localStorage.setItem(R2_LS, JSON.stringify(o)); } catch (e) { } };
       async function apiFotos(cuerpo) {
-        const r = await fetch(FOTOS_API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) });
+        const r = await conTimeout(fetch(FOTOS_API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) }), 15000, "Sin respuesta de la función de fotos");
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
         return d;
@@ -1872,7 +1872,9 @@
             const clave = n + "|" + JSON.stringify(args) + "|" + VER_FOTOS + VER_FOTOS_EMPRESA;
             let c = memoria.get(clave);
             if (!c || Date.now() - c.t > MEM_TTL) {
-              c = { t: Date.now(), p: f.apply(obj, args), tags: LECTURAS[n] };
+              // Límite de 20 s: si el servidor no responde (p. ej. tras reposo o cambio de red), la
+              // consulta falla y se borra de la memoria, así el siguiente intento vuelve a pedirla.
+              c = { t: Date.now(), p: conTimeout(f.apply(obj, args), 20000, "Sin respuesta del servidor"), tags: LECTURAS[n] };
               memoria.set(clave, c);
               c.p.catch(() => { if (memoria.get(clave) === c) memoria.delete(clave); });
             }
@@ -6034,7 +6036,7 @@
           <button id="dist_menu" class="md:hidden btn text-lg leading-none px-3" style="${btnStyle}" aria-label="Menú">☰</button>
         </div>
         <div class="relative flex-1 min-h-0">
-          <div id="distMap" class="absolute inset-0" style="background:${isDarkTheme() ? "#1f2937" : "#e5e7eb"}"></div>
+          <div id="distMap" class="absolute inset-0" style="position:absolute;inset:0;background:${isDarkTheme() ? "#1f2937" : "#e5e7eb"}"></div>
           <div id="distHint" class="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/85 text-white text-xs px-3 py-1.5 rounded-full shadow" hidden>👆 Toca el mapa para ubicar el puesto</div>
           <div id="distPanel" class="absolute top-0 right-0 h-full w-80 max-w-[90%] bg-white shadow-2xl border-l border-slate-200 overflow-y-auto z-[500] translate-x-full transition-transform"></div>
         </div>`;
@@ -6081,13 +6083,18 @@
       distActions.querySelectorAll("button").forEach(b => b.addEventListener("click", closeMenu));
       ov.addEventListener("click", (e) => { if (distActions.classList.contains("flex") && !distActions.contains(e.target) && e.target !== distMenu) closeMenu(); });
 
-      try { state.puestos = await Data.listPuestos(ev.id); }
-      catch (e) { toast("Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
-      try { state.asist = await cargarAsist(); } catch (e) { }
-
+      // El mapa se dibuja de INMEDIATO (no queda la pantalla en blanco mientras llegan los datos).
+      // OJO: #distMap lleva position/inset en línea. Si Leaflet lo crea antes de que Tailwind genere
+      // la clase "absolute", le fija position:relative y el mapa queda con altura 0 (pantalla blanca).
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
+      map.setView([-29.9427, -71.2530], 15);
+
+      try { state.puestos = await Data.listPuestos(ev.id); }
+      catch (e) { toast(/Sin respuesta/.test(e && e.message) ? "El servidor no respondió. Cierra el mapa y vuelve a abrirlo." : "Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
+      try { state.asist = await cargarAsist(); } catch (e) { }
+      if (!document.body.contains(ov)) return;   // se cerró el mapa mientras cargaba
       // Modo noche: el mismo mapa de OSM se oscurece con un filtro CSS (ver .leaflet-tile-pane en el CSS).
       const mapaOscuro = isDarkTheme();
       const conCoord = state.puestos.filter(p => p.lat != null && p.lng != null);
