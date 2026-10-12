@@ -1863,22 +1863,42 @@
         return new Set(lista.filter(p => malas.has(interna(p)) || malas.has(interna(rutaMini(p)))));
       }
       // Guarda la ruta de la foto en la asistencia y COMPRUEBA que se actualizó la fila. Si la
-      // asistencia ya no existe (el partido se archivó mientras subía la foto), la enlaza en su fila
-      // del historial (mismo RUT y hora de ingreso, aún sin foto). Si no hay dónde, es un error.
-      async function guardarRefFoto(asisId, ruta, ref) {
+      // asistencia ya no existe (el partido se archivó mientras subía la foto), la enlaza en SU fila
+      // del historial, identificada por el id de la asistencia original. Si no hay dónde, es un error.
+      async function guardarRefFoto(asisId, ruta) {
         const d = ok(await sb.from("asistencias").update({ foto_url: ruta }).eq("id", asisId).select("id"));
         if (d && d.length) return;
-        if (ref && ref.rut && ref.hora_ingreso) {
-          const h = ok(await sb.from("partidos_historial_asist").update({ foto_url: ruta }).eq("rut", ref.rut).eq("hora_ingreso", ref.hora_ingreso).is("foto_url", null).select("id"));
-          if (h && h.length) return;
-        }
+        let h = [];
+        try { h = ok(await sb.from("partidos_historial_asist").update({ foto_url: ruta }).eq("asistencia_id", asisId).is("foto_url", null).select("id")); } catch (_) { /* base sin columna asistencia_id */ }
+        if (h && h.length) return;
         throw new Error("La asistencia ya no existe: la foto quedó sin enlazar.");
       }
       // Borra la carpeta completa de un evento en R2 (si R2 no está configurado, no hace nada).
+      // Devuelve true si se borró; si no, la deja PENDIENTE para la próxima limpieza.
       const borrarCarpetaR2 = async evId => {
-        const pin = pinAdmin(); if (!pin) { console.warn("borrar carpeta R2: falta el PIN (vuelve a entrar al panel)"); return; }
-        try { await apiFotos({ accion: "borrar", pin, prefijo: evId }); } catch (e) { console.warn("borrar carpeta R2:", e && e.message); }
+        const pin = pinAdmin();
+        try {
+          if (!pin) throw new Error("falta el PIN (vuelve a entrar al panel)");
+          const d = await apiFotos({ accion: "borrar", pin, prefijo: evId });
+          if (d && d.fallidas && d.fallidas.length) throw new Error(d.fallidas.length + " archivo(s) sin borrar");
+          return true;
+        } catch (e) { console.warn("borrar carpeta R2:", e && e.message); anotarPendientes(["carpeta:" + evId]); return false; }
       };
+      // BORRADOS PENDIENTES: fotos (o carpetas de eventos) que no se pudieron borrar al quitar un
+      // guardia, borrar un historial o eliminar un evento. Se guardan en este equipo y se
+      // reintentan en la limpieza automática del panel, así no quedan archivos huérfanos.
+      const PEND_LS = "os10_fotos_pend";
+      const leerPendientes = () => { try { const a = JSON.parse(localStorage.getItem(PEND_LS) || "[]"); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+      const guardarPendientes = a => { try { if (a.length) localStorage.setItem(PEND_LS, JSON.stringify(a.slice(-2000))); else localStorage.removeItem(PEND_LS); } catch (_) { } };
+      function anotarPendientes(rutas) { const r = [...rutas].filter(Boolean); if (r.length) guardarPendientes([...new Set([...leerPendientes(), ...r])]); }
+      async function reintentarPendientes() {
+        const pend = leerPendientes(); if (!pend.length) return;
+        guardarPendientes([]);
+        const carpetas = pend.filter(p => p.startsWith("carpeta:")).map(p => p.slice(8));
+        const fallo = await borrarFotos(pend.filter(p => !p.startsWith("carpeta:")));
+        anotarPendientes(fallo);
+        for (const id of carpetas) await borrarCarpetaR2(id);   // si vuelve a fallar, se anota sola
+      }
       // MEMORIA CORTA de lecturas (ahorro de datos): la misma consulta (eventos, asistencias, puestos,
       // config, historial) se reutiliza hasta 2 min, en vez de pedirla en cada clic o repintado.
       // Se borra AL INSTANTE cuando cambia algo: por una escritura de este equipo o por el tiempo
@@ -2000,51 +2020,54 @@
           // .select() devuelve la fila borrada en la MISMA consulta: así se sabe si tenía foto sin otra lectura.
           const d = ok(await sb.from("asistencias").delete().eq("id", id).select("evento_id,foto_url"));
           const a = d && d[0];
-          if (a && a.foto_url) borrarFotos([esR2(a.foto_url) ? a.foto_url : `${a.evento_id}/${id}.webp`]).catch(() => {});
+          if (a && a.foto_url) { const ruta = esR2(a.foto_url) ? a.foto_url : `${a.evento_id}/${id}.webp`; borrarFotos([ruta]).then(anotarPendientes).catch(() => anotarPendientes([ruta])); }
         },
         async cerrarPartido(ev, asist) {
-          const porId = new Map(asist.filter(a => a && a.id).map(a => [a.id, a]));
-          const ids = [...porId.keys()];
-          const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: ids.length }).select().single());
-          const deshacerCabecera = async () => { try { await sb.from("partidos_historial").delete().eq("id", hp.id); } catch (_) { } };
+          const lista = asist.filter(a => a && a.id);
           // Mapa puesto_id -> nombre para guardar la facción de cada guardia.
           const puMap = {}; try { (ok(await sb.from("puestos").select("id,nombre").eq("evento_id", ev.id)) || []).forEach(p => { puMap[p.id] = p.nombre; }); } catch (_) {}
-          // RECLAMO: se borran las asistencias y la base devuelve las filas que ESTE cierre borró
-          // (con su foto_url real y al día). Si dos administradores cierran a la vez, cada fila la
-          // borra uno solo, así ningún guardia ni foto queda en dos historiales.
-          let tomadas = [];
-          try {
-            for (let k = 0; k < ids.length; k += 100) tomadas = tomadas.concat(ok(await sb.from("asistencias").delete().in("id", ids.slice(k, k + 100)).select("*")) || []);
-          } catch (e) {
-            if (tomadas.length) { try { ok(await sb.from("asistencias").insert(tomadas)); } catch (e2) { console.error("restaurar asistencias:", e2); } }
-            await deshacerCabecera(); throw e;
-          }
-          if (!tomadas.length) { await deshacerCabecera(); throw new Error("Este partido ya fue archivado (por otro administrador o en otra pestaña)."); }
-          if (tomadas.length !== ids.length) { try { await sb.from("partidos_historial").update({ total: tomadas.length }).eq("id", hp.id); } catch (_) { } }
-          // La foto de ingreso se ARCHIVA con el partido: se guarda la ruta del bucket
-          // (<evento_id>/<asistencia_id>.webp) y el archivo se conserva FOTO_RETENCION_DIAS días.
-          const rows = tomadas.map(t => { const a = { ...(porId.get(t.id) || {}), ...t }; const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: t.foto_url ? (esR2(t.foto_url) ? t.foto_url : `${ev.id}/${t.id}.webp`) : null }; });
+          const datos = a => { const g = a.guardia || {}; return { nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), puesto: (a.puesto_id && puMap[a.puesto_id]) || null }; };
+          const partido = ev.partido || ev.nombre_evento, fecha = ev.fecha_evento || nowISO().slice(0, 10);
+          // 1) CIERRE EN EL SERVIDOR (función cerrar_partido, ver supabase-cierre.sql): archiva y borra
+          //    en UNA transacción. O se hace todo o no cambia nada, aunque se corte la conexión.
+          //    La foto y la hora se toman de la base (no de la lista en pantalla).
+          const r = await sb.rpc("cerrar_partido", { p_evento_id: ev.id, p_partido: partido, p_fecha: fecha, p_filas: lista.map(a => ({ id: a.id, ...datos(a) })) });
+          if (!r.error) return r.data;
+          const msg = String(r.error.message || "");
+          if (msg.includes("ya_archivado")) throw new Error("Este partido ya fue archivado (por otro administrador o en otra pestaña).");
+          const sinFuncion = r.error.code === "PGRST202" || r.error.code === "42883" || /could not find the function|does not exist/i.test(msg);
+          if (!sinFuncion) throw r.error;
+          // 2) RESPALDO (la base aún no tiene cerrar_partido): primero se ARCHIVA y recién después se
+          //    borran esas asistencias por id. Si algo falla a mitad, lo peor es un registro repetido,
+          //    nunca uno perdido. Para el cierre en una sola transacción, ejecuta supabase-cierre.sql.
+          console.warn("cerrar_partido no instalado en Supabase: se usa el cierre del navegador.");
+          const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido, fecha, total: lista.length }).select().single());
+          const fotoDe = a => (a.foto_path || a.foto_url) ? (esR2(a.foto_path) ? a.foto_path : rutaFotoAsis(ev.id, a.id)) : null;
+          let rows = lista.map(a => ({ historial_id: hp.id, asistencia_id: a.id, rut: a.rut, hora_ingreso: a.hora_ingreso, foto_url: fotoDe(a), ...datos(a) }));
           // Solo se reintenta sin una columna si el error dice que ESA columna no existe (base antigua).
-          // Cualquier otro error (red, permisos…) deshace el cierre: se devuelven las asistencias.
           const faltaColumna = (e, col) => { const c = e && e.code, m = String((e && (e.message || "")) + " " + (e && (e.details || "") || "")).toLowerCase(); return (c === "PGRST204" || c === "42703" || m.includes("does not exist") || m.includes("could not find")) && m.includes(col); };
           let fotosArchivadas = true;
-          try {
-            try { ok(await sb.from("partidos_historial_asist").insert(rows)); }
-            catch (e) {
-              if (!faltaColumna(e, "foto_url")) throw e;
-              fotosArchivadas = false;
-              const rowsSinFoto = rows.map(({ foto_url, ...r }) => r);
-              try { ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto)); }
-              catch (e2) { if (!faltaColumna(e2, "puesto")) throw e2; ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto.map(({ puesto, ...r }) => r))); }
+          if (rows.length) {
+            try {
+              for (let intento = 0; ; intento++) {
+                try { ok(await sb.from("partidos_historial_asist").insert(rows)); break; }
+                catch (e) {
+                  const col = intento < 3 && ["asistencia_id", "foto_url", "puesto"].find(c => rows[0] && c in rows[0] && faltaColumna(e, c));
+                  if (!col) throw e;
+                  if (col === "foto_url") fotosArchivadas = false;
+                  rows = rows.map(({ [col]: _, ...x }) => x);
+                }
+              }
+            } catch (e) {
+              try { await sb.from("partidos_historial").delete().eq("id", hp.id); } catch (_) { }
+              throw e;
             }
-          } catch (e) {
-            // No quedó archivado: se devuelven las asistencias tal cual y se deshace la cabecera.
-            try { ok(await sb.from("asistencias").insert(tomadas)); } catch (e2) { console.error("restaurar asistencias:", e2); }
-            await deshacerCabecera(); throw e;
           }
-          // Base sin columna foto_url en el historial: esas fotos no se pueden archivar y se borran,
-          // pero SOLO las de los guardias de este cierre (nunca la carpeta completa del evento).
-          if (!fotosArchivadas) { try { await borrarFotos(rows.map(r => r.foto_url)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } }
+          // Base sin columna foto_url en el historial: se borran SOLO las fotos de este cierre.
+          if (!fotosArchivadas) { try { await borrarFotos(lista.map(fotoDe)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } }
+          // Se borran SOLO las asistencias archivadas (quien ingresó durante el cierre sigue en la lista).
+          const ids = lista.map(a => a.id);
+          for (let k = 0; k < ids.length; k += 100) ok(await sb.from("asistencias").delete().in("id", ids.slice(k, k + 100)));
           return hp.id;
         },
         async listHistorial(evId) { return ok(await sb.from("partidos_historial").select("*").eq("evento_id", evId).order("cerrado_at", { ascending: false })); },
@@ -2069,12 +2092,12 @@
           return out;
         },
         async deleteHistorial(hid) {
-          // Borra también las fotos archivadas de ese partido.
-          try {
-            const fr = ok(await sb.from("partidos_historial_asist").select("foto_url").eq("historial_id", hid).not("foto_url", "is", null));
-            await borrarFotos(fr.map(r => r.foto_url));
-          } catch (e) { console.warn("borrar fotos historial:", e && e.message); }
+          // Borra también las fotos archivadas de ese partido: se leen sus rutas, se elimina el
+          // historial y RECIÉN DESPUÉS las fotos (las que fallen quedan pendientes para reintentar).
+          let rutas = [];
+          try { rutas = ok(await sb.from("partidos_historial_asist").select("foto_url").eq("historial_id", hid).not("foto_url", "is", null)).map(r => r.foto_url); } catch (e) { console.warn("fotos historial:", e && e.message); }
           ok(await sb.from("partidos_historial").delete().eq("id", hid));
+          if (rutas.length) { try { anotarPendientes(await borrarFotos(rutas)); } catch (e) { anotarPendientes(rutas); } }
         },
         async listPuestos(evId) { return ok(await sb.from("puestos").select("*").eq("evento_id", evId).order("orden", { ascending: true })); },
         async createPuesto(p) { return ok(await sb.from("puestos").insert(p).select().single()); },
@@ -2085,9 +2108,7 @@
         async getConfig(clave) { try { const d = ok(await sb.from("config").select("valor").eq("clave", clave).limit(1)); return d && d[0] ? d[0].valor : null; } catch (e) { console.warn("getConfig:", e && e.message); return null; } },
         async setConfig(clave, valor) { ok(await sb.from("config").upsert({ clave, valor, updated_at: nowISO() })); },
         // Sube la foto de verificación (WebP HD) al bucket privado "ingresos".
-        // ref (opcional) = { rut, hora_ingreso } de la asistencia: sirve para enlazar la foto en el
-        // historial si el partido se archivó mientras la foto subía.
-        async subirFotoIngreso(evId, asisId, blob, ref) {
+        async subirFotoIngreso(evId, asisId, blob) {
           const path = `${evId}/${asisId}.webp`;
           // Miniatura 120x160 para listas/mapa (ahorra descarga). Si falla, se usa la foto completa.
           let mini = null;
@@ -2105,8 +2126,12 @@
             const chica = mini || blob;
             const d = await apiFotos({ accion: "subir", evento_id: evId, asistencia_id: asisId, tipo: blob.type || "image/webp", tipoMini: chica.type || "image/webp" });
             const put = async (e, b) => { const r = await fetch(e.url, { method: "PUT", headers: e.headers, body: b }); if (!r.ok) throw new Error("PUT " + r.status); };
-            await Promise.all([put(d.foto, blob), put(d.mini, chica)]);
-            enR2 = true;
+            await put(d.foto, blob);
+            enR2 = true;   // la foto ya está en R2: nada de esto se reenvía a Supabase
+            // Miniatura: un reintento y, si sigue fallando, se usa la foto completa como miniatura
+            // (pesa más pero se ve). Si aun así falla, la foto queda guardada igual.
+            try { await put(d.mini, chica); }
+            catch (_) { try { await put(d.mini, chica); } catch (_) { try { await put(d.mini, blob); } catch (e2) { console.warn("miniatura R2:", e2 && e2.message); } } }
           } catch (e) {
             // Rechazo DEFINITIVO de la función (400/401/404/409: ids inválidos, asistencia inexistente o
             // que YA tiene foto): se detiene aquí. Solo un fallo técnico (red, 5xx, R2 caído) usa el respaldo.
@@ -2119,7 +2144,7 @@
             fotosR2.add(asisId);
             let err = null;
             for (let i = 0; i < 3; i++) {
-              try { await guardarRefFoto(asisId, "r2:" + path, ref); return "r2:" + path; }
+              try { await guardarRefFoto(asisId, "r2:" + path); return "r2:" + path; }
               catch (e) { err = e; if (i < 2) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
             }
             throw err;
@@ -2130,7 +2155,7 @@
           try { if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" }); } catch (e) { console.warn("miniatura:", e && e.message); }
           // Bucket PRIVADO: se guarda la RUTA (no una URL pública). El panel genera un enlace firmado
           // temporal al mostrar la foto, así no queda ningún enlace abierto/permanente a la imagen.
-          await guardarRefFoto(asisId, path, ref);
+          await guardarRefFoto(asisId, path);
           return path;
         },
         // RETENCIÓN: borra del bucket las fotos con más de N días (por defecto FOTO_RETENCION_DIAS)
@@ -2138,6 +2163,7 @@
         // Se ejecuta desde el panel del admin (throttled). Mantiene liviano el almacenamiento.
         async purgarFotosAntiguas(dias) {
           const corte = new Date(Date.now() - (dias || FOTO_RETENCION_DIAS) * 86400000).toISOString();
+          try { await reintentarPendientes(); } catch (e) { console.warn("pendientes:", e && e.message); }
           const limpiar = async (tabla, ids) => { for (let i = 0; i < ids.length; i += 100) { try { ok(await sb.from(tabla).update({ foto_url: null }).in("id", ids.slice(i, i + 100))); } catch (e) { console.warn("purga (update):", e && e.message); } } };
           let n = 0;
           let viejas = [];
@@ -2985,7 +3011,7 @@
           //     Es "mejor esfuerzo": si fallara la subida NO se pierde el ingreso ya registrado.
           if (fotoBlob) {
             submit.textContent = "Guardando foto…";
-            try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fotoBlob, { rut: asis.rut, hora_ingreso: asis.hora_ingreso }), TIMEOUT_MS); if (u) asis.foto_url = u; fotoBlob = null; }
+            try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fotoBlob), TIMEOUT_MS); if (u) asis.foto_url = u; fotoBlob = null; }
             catch (e) { console.error("foto:", e); toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500); }
           }
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".

@@ -255,3 +255,59 @@ create policy "ingresos_reemplazo" on storage.objects for update using (bucket_i
 -- Borrado: permite que el panel elimine las fotos vencidas (retención de 7 días) y las de
 -- eventos borrados/partidos cerrados, para no acumular peso en el almacenamiento.
 create policy "ingresos_borrado"   on storage.objects for delete using (bucket_id = 'ingresos');
+
+-- ---------- CIERRE DE PARTIDO TRANSACCIONAL ----------
+-- (mismo contenido que supabase-cierre.sql; ver ese archivo para la explicación)
+alter table partidos_historial_asist add column if not exists asistencia_id uuid;
+alter table partidos_historial_asist add column if not exists puesto text;
+alter table partidos_historial_asist add column if not exists foto_url text;
+create index if not exists idx_hista_asis on partidos_historial_asist(asistencia_id);
+
+alter table asistencias add column if not exists creada timestamptz default now();
+
+create or replace function public.cerrar_partido(p_evento_id uuid, p_partido text, p_fecha date, p_filas jsonb)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_hid uuid;
+  v_n   integer;
+begin
+  insert into partidos_historial (evento_id, partido, fecha, total)
+  values (p_evento_id, p_partido, p_fecha, 0)
+  returning id into v_hid;
+
+  -- Borra SOLO las asistencias pedidas de ESTE evento y archiva exactamente las que borró,
+  -- con su foto real. Todo dentro de la misma transacción.
+  with borradas as (
+    delete from asistencias a
+     where a.evento_id = p_evento_id
+       and a.id in (select (f->>'id')::uuid from jsonb_array_elements(p_filas) f)
+    returning a.*
+  ), ins as (
+    insert into partidos_historial_asist
+      (historial_id, asistencia_id, rut, nombres, apellidos, telefono, fecha_ultimo_examen, vigencia, hora_ingreso, puesto, foto_url)
+    select v_hid, b.id, b.rut, f->>'nombres', f->>'apellidos', f->>'telefono',
+           nullif(f->>'fecha_ultimo_examen', '')::date, f->>'vigencia', b.hora_ingreso, nullif(f->>'puesto', ''),
+           case when b.foto_url is null then null
+                when b.foto_url like 'r2:%' then b.foto_url
+                else p_evento_id::text || '/' || b.id::text || '.webp' end
+      from borradas b
+      join jsonb_array_elements(p_filas) f on (f->>'id')::uuid = b.id
+    returning 1
+  )
+  select count(*) into v_n from ins;
+
+  -- Nada que archivar (otro administrador ya lo cerró): se deshace todo, incluida la cabecera.
+  if v_n = 0 then
+    raise exception 'ya_archivado' using errcode = 'P0001';
+  end if;
+
+  update partidos_historial set total = v_n where id = v_hid;
+  return v_hid;
+end;
+$$;
+
+grant execute on function public.cerrar_partido(uuid, text, date, jsonb) to anon, authenticated;

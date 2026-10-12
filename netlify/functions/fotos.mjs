@@ -82,15 +82,22 @@ const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
 });
 
-// Estado de la asistencia para SUBIR: null si no existe; { conFoto } si existe. Una asistencia que
-// ya tiene foto no recibe enlace de subida: así nadie puede reemplazar una foto ya guardada.
+// Estado de la asistencia para SUBIR: null si no existe; { conFoto, creadaMs } si existe.
+// - Una asistencia que ya tiene foto no recibe enlace (nadie puede reemplazar una foto guardada).
+// - "creada" es la hora del SERVIDOR de Supabase en que se creó la asistencia (columna agregada por
+//   supabase-cierre.sql). Solo los ingresos recién hechos reciben enlace. Si la base aún no tiene esa
+//   columna, se consulta sin ella y no se aplica el plazo.
+const SUBIDA_PLAZO_MS = 15 * 60 * 1000;
 async function asistenciaParaSubir(evId, asisId) {
-  const u = `${SUPABASE_URL}/rest/v1/asistencias?select=id,foto_url&id=eq.${asisId}&evento_id=eq.${evId}&limit=1`;
-  const r = await fetch(u, { headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+  const pedir = cols => fetch(`${SUPABASE_URL}/rest/v1/asistencias?select=${cols}&id=eq.${asisId}&evento_id=eq.${evId}&limit=1`,
+    { headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+  let r = await pedir("id,foto_url,creada");
+  if (r.status === 400) r = await pedir("id,foto_url");   // base sin la columna "creada"
   if (!r.ok) throw new Error("supabase " + r.status);
   const d = await r.json();
   if (!Array.isArray(d) || !d.length) return null;
-  return { conFoto: !!d[0].foto_url };
+  const c = d[0].creada ? Date.parse(d[0].creada) : NaN;
+  return { conFoto: !!d[0].foto_url, creadaMs: isNaN(c) ? null : c };
 }
 
 // Devuelve cuántas se borraron y cuáles fallaron (para que el panel no olvide su referencia).
@@ -161,6 +168,7 @@ export default async (req) => {
       const est = await asistenciaParaSubir(ev, as);
       if (!est) return json({ error: "asistencia no encontrada" }, 404);
       if (est.conFoto) return json({ error: "la asistencia ya tiene foto" }, 409);
+      if (est.creadaMs != null && Date.now() - est.creadaMs > SUBIDA_PLAZO_MS) return json({ error: "plazo de subida vencido" }, 403);
       const tipo = TIPOS.includes(b.tipo) ? b.tipo : "image/webp";
       const tipoMini = TIPOS.includes(b.tipoMini) ? b.tipoMini : "image/webp";
       const enlace = (clave, ct) => {
