@@ -1262,11 +1262,11 @@
          según la hora de ingreso.
        ========================================================================= */
     // FOTOS DE INGRESO: se archivan FOTO_RETENCION_DIAS días (también las de partidos archivados).
-    // El administrador las recibe todas. La vista EMPRESA las ve solo durante FOTO_EMPRESA_MS (3 h)
+    // El administrador las recibe todas. La vista EMPRESA las ve solo durante FOTO_EMPRESA_MS (12 h)
     // desde cada ingreso, sin poder descargarlas; en el historial no se le entregan.
     // La distribución pública nunca recibe fotos.
     const FOTO_RETENCION_DIAS = 30;
-    const FOTO_EMPRESA_MS = 3 * 3600 * 1000;
+    const FOTO_EMPRESA_MS = 12 * 3600 * 1000;
     let VER_FOTOS = false;              // true solo dentro del panel del administrador (renderAdmin)
     let VER_FOTOS_EMPRESA = false;      // true solo en la vista empresa (renderEmpresa)
     // HISTORIAL DE PARTIDOS: la tabla partidos_historial_asist no tiene columnas para "supervisor"
@@ -1295,7 +1295,7 @@
     }
     // ¿Quien mira recibe las fotos de ingreso? (admin y empresa: sí; vista pública: no)
     function fotoEmpresaEnPlazo(a) { return !!a && Date.now() - new Date(a.hora_ingreso || 0).getTime() < FOTO_EMPRESA_MS; }
-    // ¿Quien mira recibe la foto de esta asistencia? (admin: siempre; empresa: 3 h; público: no)
+    // ¿Quien mira recibe la foto de esta asistencia? (admin: siempre; empresa: 12 h; público: no)
     function fotoVisible(a) { return VER_FOTOS || (VER_FOTOS_EMPRESA && fotoEmpresaEnPlazo(a)); }
     const TURNO_HORAS_DEFAULT = 12;      // turno de 12 horas (día/noche)
     const TURNO_INICIO_DEFAULT = "08:00"; // inicio del primer turno
@@ -1889,7 +1889,7 @@
       }
       const api = {
         onChange(f) { listeners.push(f); conectarRT(); return () => { listeners = listeners.filter(x => x !== f) }; },
-        // Olvida la memoria corta (p. ej. cuando vence la foto de 3 h de la vista empresa).
+        // Olvida la memoria corta (p. ej. cuando vence la foto de 12 h de la vista empresa).
         refrescar() { invalidar(TODO); },
         // Verifica la clave EN EL SERVIDOR (función RPC). La contraseña real vive en Supabase, no en este código.
         async verificarClave(nombre, clave) { const { data, error } = await sb.rpc("verificar_clave", { p_nombre: nombre, p_clave: clave }); if (error) throw error; return data === true; },
@@ -1917,7 +1917,7 @@
           // Para VER/DESCARGAR una foto ampliada, el admin pide un enlace NUEVO al hacer clic
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
           // Fuera del panel admin la foto no se entrega (ni se firma su enlace), salvo a la
-          // empresa durante 3 h desde el ingreso (sin descarga).
+          // empresa durante 12 h desde el ingreso (sin descarga).
           as.forEach(a => { if (esR2(a.foto_url)) fotosR2.add(a.id); if (!fotoVisible(a)) a.foto_url = null; });
           await ponerFotos(as, a => a.foto_url ? rutaFotoAsis(evId, a.id) : null, "foto_url");
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
@@ -8255,7 +8255,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       await paint();
       // Sin refresco periódico: la vista se actualiza SOLO cuando llega un cambio en tiempo real.
       // Además se programa un repintado justo cuando vence algo por hora: la foto de un ingreso
-      // (3 h) o el fin de un turno (pasa al historial), para no mostrar nada fuera de plazo.
+      // (12 h) o el fin de un turno (pasa al historial), para no mostrar nada fuera de plazo.
       if (EMPRESA_STATE._tick) clearInterval(EMPRESA_STATE._tick);
       const programarVencimiento = async () => {
         clearTimeout(EMPRESA_STATE._vence);
