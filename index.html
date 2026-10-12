@@ -1933,6 +1933,26 @@
           const p = rutaFotoAsis(evId, asisId);
           return (await firmarRutas([p])).get(p) || null;
         },
+        // Respaldo del PDF/Excel con fotos: baja vía la función las fotos de R2 que el navegador no
+        // pudo leer directo. refs: [{ evId, asId }] -> Map "evId/asId" -> Blob (miniatura o, si falta, la completa).
+        async bajarFotosR2(refs) {
+          const out = new Map();
+          const r2 = refs.filter(r => r.evId && r.asId && fotosR2.has(r.asId));
+          const pedir = async claves => {
+            const res = {};
+            for (let i = 0; i < claves.length; i += 60) {
+              try { const d = await apiFotos({ accion: "bajar", paths: claves.slice(i, i + 60) }); Object.assign(res, d.datos || {}); }
+              catch (e) { console.warn("bajar fotos R2:", e && e.message); }
+            }
+            return res;
+          };
+          const aBlob = x => { const bin = atob(x.b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: x.tipo }); };
+          const minis = await pedir(r2.map(r => `${r.evId}/${r.asId}_t.webp`));
+          const sinMini = r2.filter(r => !minis[`${r.evId}/${r.asId}_t.webp`]);
+          const completas = sinMini.length ? await pedir(sinMini.map(r => `${r.evId}/${r.asId}.webp`)) : {};
+          r2.forEach(r => { const k = `${r.evId}/${r.asId}`, x = minis[k + "_t.webp"] || completas[k + ".webp"]; if (x) out.set(k, aBlob(x)); });
+          return out;
+        },
         async yaRegistrado(evId, rut) { const d = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).eq("rut", rut).order("hora_ingreso", { ascending: false }).limit(1)); return d[0] || null; },
         async createAsistencia(evId, rut, esSupervisor) { return ok(await sb.from("asistencias").insert({ evento_id: evId, rut, hora_ingreso: nowISO(), es_supervisor: !!esSupervisor }).select().single()); },
         async setAsistenciaSupervisor(id, esSup) { ok(await sb.from("asistencias").update({ es_supervisor: !!esSup }).eq("id", id)); },
@@ -5420,28 +5440,50 @@
 
     // Fotos de ingreso para el PDF/Excel (solo admin): usa la miniatura, la deja en 120x160 y la
     // pasa a JPEG (jsPDF no lee WebP).
+    // Ids de la foto de un registro (asistencia en vivo o fila del historial con foto_ref).
+    const refFoto = a => ({ evId: a.evento_id || (a.foto_ref && a.foto_ref.ev), asId: (a.foto_ref && a.foto_ref.id) || a.id });
+    // Deja la imagen en 120x160 (recorte tipo "cover") y la pasa a JPEG.
+    async function blobAJPEG(blob) {
+      const bmp = await createImageBitmap(blob);
+      const c = document.createElement("canvas"); c.width = 120; c.height = 160;
+      const cx = c.getContext("2d");
+      const k = Math.max(c.width / bmp.width, c.height / bmp.height);
+      const w = bmp.width * k, h = bmp.height * k;
+      cx.drawImage(bmp, (c.width - w) / 2, (c.height - h) / 2, w, h);
+      return c.toDataURL("image/jpeg", 0.8);
+    }
     async function fotoJPEG(a) {
       // Primero la miniatura que ya está en pantalla (liviana); si su enlace venció, se firma la completa.
-      const evId = a.evento_id || (a.foto_ref && a.foto_ref.ev), asId = (a.foto_ref && a.foto_ref.id) || a.id;
+      const { evId, asId } = refFoto(a);
       // cache "no-store": la miniatura en caché viene de un <img> (sin CORS) y fetch() no podría leerla.
       const bajar = async u => { const r = await fetch(u, { cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); };
       try {
         let blob = null;
         try { if (a.foto_url) blob = await bajar(a.foto_url); } catch (_) { }
-        if (!blob && evId && asId && Data.signFoto) { const f = await Data.signFoto(evId, asId); if (f) blob = await bajar(f); }
+        if (!blob && evId && asId && Data.signFoto) { try { const f = await Data.signFoto(evId, asId); if (f) blob = await bajar(f); } catch (_) { } }
         if (!blob) return null;
-        const bmp = await createImageBitmap(blob);
-        const c = document.createElement("canvas"); c.width = 120; c.height = 160;
-        const cx = c.getContext("2d");
-        const k = Math.max(c.width / bmp.width, c.height / bmp.height);   // recorte tipo "cover"
-        const w = bmp.width * k, h = bmp.height * k;
-        cx.drawImage(bmp, (c.width - w) / 2, (c.height - h) / 2, w, h);
-        return c.toDataURL("image/jpeg", 0.8);
+        return await blobAJPEG(blob);
       } catch (e) { console.warn("foto PDF:", e && e.message); return null; }
     }
     async function fotosParaPDF(asist) {
       const fotos = new Map();
-      await Promise.all(asist.filter(a => a.foto_url).map(async a => { const d = await fotoJPEG(a); if (d) fotos.set(a, d); }));
+      const conFoto = asist.filter(a => a.foto_url);
+      // De a 6 a la vez: con muchas fotos en paralelo algunas descargas fallaban y quedaban fuera.
+      for (let i = 0; i < conFoto.length; i += 6) {
+        await Promise.all(conFoto.slice(i, i + 6).map(async a => { const d = await fotoJPEG(a); if (d) fotos.set(a, d); }));
+      }
+      // Las que el navegador no pudo leer directo (p. ej. R2 sin CORS de lectura) se piden a la función.
+      const faltan = conFoto.filter(a => !fotos.has(a));
+      if (faltan.length && Data.bajarFotosR2) {
+        try {
+          const blobs = await Data.bajarFotosR2(faltan.map(refFoto));
+          await Promise.all(faltan.map(async a => {
+            const { evId, asId } = refFoto(a), b = blobs.get(`${evId}/${asId}`);
+            if (!b) return;
+            try { fotos.set(a, await blobAJPEG(b)); } catch (e) { console.warn("foto PDF:", e && e.message); }
+          }));
+        } catch (e) { console.warn("fotos PDF (respaldo):", e && e.message); }
+      }
       return fotos;
     }
     async function descargarPDFConFotos(ev, asist) {
