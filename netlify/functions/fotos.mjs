@@ -149,6 +149,23 @@ export default async (req) => {
       return json({ urls, vence: fecha.getTime() + VIGENCIA_S * 1000 });
     }
 
+    // Respaldo para el PDF/Excel con fotos: si el navegador no puede leer la imagen directo desde R2
+    // (CORS), la función baja las miniaturas (~4 KB c/u) y las devuelve en base64. Solo se usa al
+    // exportar y solo para las fotos que fallaron.
+    if (b.accion === "bajar") {
+      const paths = (Array.isArray(b.paths) ? b.paths.slice(0, 60) : []).filter(p => typeof p === "string" && RE_RUTA.test(p));
+      const datos = {};
+      await Promise.all(paths.map(async clave => {
+        try {
+          const r = await fetch(prefirmar(cfg, { metodo: "GET", clave, fecha: new Date(), expira: 300 }));
+          if (!r.ok) return;
+          const buf = Buffer.from(await r.arrayBuffer());
+          if (buf.length && buf.length <= 300 * 1024) datos[clave] = { tipo: r.headers.get("content-type") || "image/webp", b64: buf.toString("base64") };
+        } catch { /* foto no disponible */ }
+      }));
+      return json({ datos });
+    }
+
     if (b.accion === "borrar") {
       let claves = [];
       if (b.prefijo) {
