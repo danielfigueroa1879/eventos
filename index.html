@@ -1725,7 +1725,10 @@
             const c = guCache.get(pl.new.rut);
             if (c && mismaFicha(c.g, pl.new)) { c.g = pl.new; return; }
           }
-          if (pl && pl.table) invalidar(TABLA_TAGS[pl.table] || TODO);
+          // Si el cambio trae su evento (ingresos, puestos, historial), solo se olvida la memoria de ESE
+          // evento: los paneles de otros eventos se repintan desde la memoria, sin volver a descargar.
+          const evDe = pl && ((pl.new && pl.new.evento_id) || (pl.old && pl.old.evento_id));
+          if (pl && pl.table) invalidar(TABLA_TAGS[pl.table] || TODO, evDe);
           if (pl && pl.table === "guardias_central") {
             const fila = pl.new && pl.new.rut ? pl.new : null;
             if (fila) guCache.set(fila.rut, { g: fila, t: Date.now() }); else if (pl.old && pl.old.rut) guCache.delete(pl.old.rut);
@@ -1849,7 +1852,8 @@
       const memoria = new Map();   // clave -> { t, p (promesa), tags }
       const TODO = ["eventos", "asistencias", "puestos", "historial", "config"];
       const TABLA_TAGS = { eventos: ["eventos"], asistencias: ["asistencias"], guardias_central: ["asistencias"], puestos: ["puestos", "asistencias"], partidos_historial: ["historial"], partidos_historial_asist: ["historial"], config: ["config"] };
-      function invalidar(tags) { for (const [k, v] of memoria) if (v.tags.some(t => tags.includes(t))) memoria.delete(k); }
+      // evId (opcional): solo las lecturas de ese evento (la clave lleva sus argumentos).
+      function invalidar(tags, evId) { for (const [k, v] of memoria) if (v.tags.some(t => tags.includes(t)) && (!evId || k.includes(`"${evId}"`))) memoria.delete(k); }
       const LECTURAS = { listEventos: ["eventos"], listAsistencias: ["asistencias"], listAsistenciasConteo: ["asistencias"], listPuestos: ["puestos"], getConfig: ["config"], listHistorial: ["historial"], listHistorialAsist: ["historial"] };
       const ESCRITURAS = {
         createEvento: ["eventos"], updateEvento: ["eventos"], deleteEvento: TODO,
