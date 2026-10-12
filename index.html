@@ -1834,15 +1834,37 @@
       const conMinis = paths => paths.flatMap(p => [p, rutaMini(p)]);
       // Ruta de la foto de una asistencia: con "r2:" si está en Cloudflare R2.
       const rutaFotoAsis = (evId, asisId) => (fotosR2.has(asisId) ? "r2:" : "") + `${evId}/${asisId}.webp`;
+      // Borrar en R2 exige el PIN de administrador (lo comprueba la función en el servidor). Se
+      // guarda solo en esta pestaña al entrar al panel; sin él no se intenta (no gasta llamadas).
+      const pinAdmin = () => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } };
       // Borra fotos (y sus miniaturas) donde estén: R2 (vía la función) o Supabase Storage.
+      // Devuelve el Set de rutas (tal como se pasaron) que NO se pudieron borrar, para no olvidar
+      // su referencia y reintentar en la próxima limpieza.
       async function borrarFotos(rutas) {
-        const todas = conMinis(rutas.filter(Boolean));
+        const lista = [...new Set(rutas.filter(Boolean))];
+        const malas = new Set();   // rutas internas (sin "r2:") que fallaron
+        const todas = conMinis(lista);
         const r2 = todas.filter(esR2).map(p => p.slice(3)), sbp = todas.filter(p => !esR2(p));
-        for (let i = 0; i < r2.length; i += 500) { try { await apiFotos({ accion: "borrar", paths: r2.slice(i, i + 500) }); } catch (e) { console.warn("borrar fotos R2:", e && e.message); } }
-        for (let i = 0; i < sbp.length; i += 100) { try { const r = await sb.storage.from("ingresos").remove(sbp.slice(i, i + 100)); if (r.error) console.warn("borrar fotos:", r.error.message); } catch (e) { console.warn("borrar fotos:", e && e.message); } }
+        const pin = pinAdmin();
+        for (let i = 0; i < r2.length; i += 500) {
+          const lote = r2.slice(i, i + 500);
+          if (!pin) { lote.forEach(p => malas.add(p)); continue; }
+          try { const d = await apiFotos({ accion: "borrar", pin, paths: lote }); (d.fallidas || []).forEach(p => malas.add(p)); }
+          catch (e) { console.warn("borrar fotos R2:", e && e.message); lote.forEach(p => malas.add(p)); }
+        }
+        for (let i = 0; i < sbp.length; i += 100) {
+          const lote = sbp.slice(i, i + 100);
+          try { const r = await sb.storage.from("ingresos").remove(lote); if (r.error) { console.warn("borrar fotos:", r.error.message); lote.forEach(p => malas.add(p)); } }
+          catch (e) { console.warn("borrar fotos:", e && e.message); lote.forEach(p => malas.add(p)); }
+        }
+        const interna = p => (esR2(p) ? p.slice(3) : p);
+        return new Set(lista.filter(p => malas.has(interna(p)) || malas.has(interna(rutaMini(p)))));
       }
       // Borra la carpeta completa de un evento en R2 (si R2 no está configurado, no hace nada).
-      const borrarCarpetaR2 = async evId => { try { await apiFotos({ accion: "borrar", prefijo: evId }); } catch (e) { console.warn("borrar carpeta R2:", e && e.message); } };
+      const borrarCarpetaR2 = async evId => {
+        const pin = pinAdmin(); if (!pin) { console.warn("borrar carpeta R2: falta el PIN (vuelve a entrar al panel)"); return; }
+        try { await apiFotos({ accion: "borrar", pin, prefijo: evId }); } catch (e) { console.warn("borrar carpeta R2:", e && e.message); }
+      };
       // MEMORIA CORTA de lecturas (ahorro de datos): la misma consulta (eventos, asistencias, puestos,
       // config, historial) se reutiliza hasta 2 min, en vez de pedirla en cada clic o repintado.
       // Se borra AL INSTANTE cuando cambia algo: por una escritura de este equipo o por el tiempo
@@ -1918,7 +1940,8 @@
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
           // Fuera del panel admin la foto no se entrega (ni se firma su enlace), salvo a la
           // empresa durante 12 h desde el ingreso (sin descarga).
-          as.forEach(a => { if (esR2(a.foto_url)) fotosR2.add(a.id); if (!fotoVisible(a)) a.foto_url = null; });
+          // foto_path = lo que dice la BASE (sirve para archivar aunque falle el enlace para verla).
+          as.forEach(a => { a.foto_path = a.foto_url || null; if (esR2(a.foto_url)) fotosR2.add(a.id); if (!fotoVisible(a)) a.foto_url = null; });
           await ponerFotos(as, a => a.foto_url ? rutaFotoAsis(evId, a.id) : null, "foto_url");
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
         },
@@ -1958,14 +1981,19 @@
         async setAsistenciaSupervisor(id, esSup) { ok(await sb.from("asistencias").update({ es_supervisor: !!esSup }).eq("id", id)); },
         async setAsistenciaHora(id, iso) { ok(await sb.from("asistencias").update({ hora_ingreso: iso }).eq("id", id)); },
         async setAsistenciaRut(id, rut) { ok(await sb.from("asistencias").update({ rut }).eq("id", id)); },
-        async deleteAsistencia(id) { ok(await sb.from("asistencias").delete().eq("id", id)); },
+        async deleteAsistencia(id) {
+          // .select() devuelve la fila borrada en la MISMA consulta: así se sabe si tenía foto sin otra lectura.
+          const d = ok(await sb.from("asistencias").delete().eq("id", id).select("evento_id,foto_url"));
+          const a = d && d[0];
+          if (a && a.foto_url) borrarFotos([esR2(a.foto_url) ? a.foto_url : `${a.evento_id}/${id}.webp`]).catch(() => {});
+        },
         async cerrarPartido(ev, asist) {
           const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
           // Mapa puesto_id -> nombre para guardar la facción de cada guardia.
           const puMap = {}; try { (ok(await sb.from("puestos").select("id,nombre").eq("evento_id", ev.id)) || []).forEach(p => { puMap[p.id] = p.nombre; }); } catch (_) {}
           // La foto de ingreso se ARCHIVA con el partido: se guarda la ruta del bucket
           // (<evento_id>/<asistencia_id>.webp) y el archivo se conserva FOTO_RETENCION_DIAS días.
-          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: a.foto_url ? rutaFotoAsis(ev.id, a.id) : null }; });
+          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: (a.foto_path || a.foto_url) ? (esR2(a.foto_path) ? a.foto_path : rutaFotoAsis(ev.id, a.id)) : null }; });
           let fotosArchivadas = !rows.length;
           if (rows.length) {
             try { ok(await sb.from("partidos_historial_asist").insert(rows)); fotosArchivadas = true; }
@@ -2031,15 +2059,25 @@
           } catch (e) { console.warn("miniatura:", e && e.message); }
           // 1) Cloudflare R2: la función entrega enlaces de subida firmados y el navegador sube directo.
           //    Si R2 aún no está configurado o falla, se usa Supabase Storage como antes.
+          let enR2 = false;
           try {
             const chica = mini || blob;
             const d = await apiFotos({ accion: "subir", evento_id: evId, asistencia_id: asisId, tipo: blob.type || "image/webp", tipoMini: chica.type || "image/webp" });
             const put = async (e, b) => { const r = await fetch(e.url, { method: "PUT", headers: e.headers, body: b }); if (!r.ok) throw new Error("PUT " + r.status); };
             await Promise.all([put(d.foto, blob), put(d.mini, chica)]);
-            fotosR2.add(asisId);
-            ok(await sb.from("asistencias").update({ foto_url: "r2:" + path }).eq("id", asisId));
-            return "r2:" + path;
+            enR2 = true;
           } catch (e) { console.warn("foto en R2 (se usa Supabase):", e && e.message); }
+          if (enR2) {
+            // La foto YA está en R2: si falla guardar la referencia se reintenta SOLO ese paso
+            // (no se vuelve a subir a Supabase, que duplicaría archivos y transferencia).
+            fotosR2.add(asisId);
+            let err = null;
+            for (let i = 0; i < 3; i++) {
+              try { ok(await sb.from("asistencias").update({ foto_url: "r2:" + path }).eq("id", asisId)); return "r2:" + path; }
+              catch (e) { err = e; if (i < 2) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
+            }
+            throw err;
+          }
           // 2) Supabase Storage (respaldo).
           const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true, cacheControl: "86400" });
           if (up.error) throw up.error;
@@ -2058,10 +2096,19 @@
           let n = 0;
           let viejas = [];
           try { viejas = ok(await sb.from("asistencias").select("id,evento_id,hora_ingreso,foto_url").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { console.warn("purga (select):", e && e.message); }
-          if (viejas.length) { await borrarFotos(viejas.map(a => esR2(a.foto_url) ? a.foto_url : `${a.evento_id}/${a.id}.webp`)); await limpiar("asistencias", viejas.map(a => a.id)); n += viejas.length; }
+          if (viejas.length) {
+            const ruta = a => esR2(a.foto_url) ? a.foto_url : `${a.evento_id}/${a.id}.webp`;
+            const fallo = await borrarFotos(viejas.map(ruta));
+            const listas = viejas.filter(a => !fallo.has(ruta(a)));   // las que fallaron quedan para la próxima limpieza
+            await limpiar("asistencias", listas.map(a => a.id)); n += listas.length;
+          }
           let viejasH = [];
           try { viejasH = ok(await sb.from("partidos_historial_asist").select("id,foto_url").not("foto_url", "is", null).lt("hora_ingreso", corte)); } catch (e) { /* columna foto_url aún no creada */ }
-          if (viejasH.length) { await borrarFotos(viejasH.map(r => r.foto_url)); await limpiar("partidos_historial_asist", viejasH.map(r => r.id)); n += viejasH.length; }
+          if (viejasH.length) {
+            const fallo = await borrarFotos(viejasH.map(r => r.foto_url));
+            const listas = viejasH.filter(r => !fallo.has(r.foto_url));
+            await limpiar("partidos_historial_asist", listas.map(r => r.id)); n += listas.length;
+          }
           return n;
         },
       };
@@ -2935,7 +2982,7 @@
         if (btn) { btn.disabled = true; btn.textContent = "Verificando…"; }
         try {
           const ok = await Data.verificarClave("admin", inp ? inp.value : "");
-          if (ok) { sessionStorage.setItem("os10_admin", "1"); renderAdmin(); return; }
+          if (ok) { sessionStorage.setItem("os10_admin", "1"); try { sessionStorage.setItem("os10_admin_pin", inp ? inp.value : ""); } catch (_) { } renderAdmin(); return; }
           toast("PIN incorrecto", false);
         } catch (e) {
           toast("No se pudo verificar (sin conexión). Intenta nuevamente.", "danger", 4000);
@@ -3053,7 +3100,7 @@
         renderSidebarList(); renderMain();
       });
       $("#importar").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalImportar(); });
-      $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); route(); });
+      $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); sessionStorage.removeItem("os10_admin_pin"); route(); });
       const hamb = $("#hamb"), sidebar = $("#sidebar"), drawerBk = $("#drawerBk"), cerrarMenu = $("#cerrarMenu");
       const abrirMenu = () => { sidebar.classList.remove("-translate-x-full"); if (drawerBk) drawerBk.classList.remove("hidden"); };
       window.cerrarDrawer = () => { sidebar.classList.add("-translate-x-full"); if (drawerBk) drawerBk.classList.add("hidden"); };

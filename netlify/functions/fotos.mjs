@@ -8,7 +8,8 @@
 // directo desde R2 (sin costo de descarga). Acciones (POST JSON a /.netlify/functions/fotos):
 //   { accion: "subir",  evento_id, asistencia_id, tipo, tipoMini } -> enlaces PUT (foto + miniatura)
 //   { accion: "ver",    paths: ["<evento>/<asistencia>.webp", ...] } -> { urls: {path: url}, vence }
-//   { accion: "borrar", paths: [...] } | { accion: "borrar", prefijo: "<evento_id>" }
+//   { accion: "borrar", pin, paths: [...] } | { accion: "borrar", pin, prefijo: "<evento_id>" }
+//      -> { borradas, fallidas: [...] }   (pin = PIN de administrador; sin él responde 401)
 //
 // CACHÉ: los enlaces de lectura se firman con una fecha FIJA por ventana de 6 días y duran 7 días.
 // Así el mismo archivo tiene el MISMO enlace en cada recarga y en todos los equipos, y el navegador
@@ -89,16 +90,40 @@ async function asistenciaExiste(evId, asisId) {
   return Array.isArray(d) && d.length > 0;
 }
 
+// Devuelve cuántas se borraron y cuáles fallaron (para que el panel no olvide su referencia).
 async function borrarClaves(cfg, claves) {
   let n = 0;
+  const fallidas = [];
   for (let i = 0; i < claves.length; i += 10) {
     await Promise.all(claves.slice(i, i + 10).map(async clave => {
-      const url = prefirmar(cfg, { metodo: "DELETE", clave, fecha: new Date(), expira: 300 });
-      const r = await fetch(url, { method: "DELETE" });
-      if (r.ok || r.status === 404) n++;
+      try {
+        const url = prefirmar(cfg, { metodo: "DELETE", clave, fecha: new Date(), expira: 300 });
+        const r = await fetch(url, { method: "DELETE" });
+        if (r.ok || r.status === 404) n++; else fallidas.push(clave);
+      } catch { fallidas.push(clave); }
     }));
   }
-  return n;
+  return { n, fallidas };
+}
+
+// BORRAR exige el PIN de administrador, comprobado en Supabase (función verificar_clave: el PIN
+// nunca se guarda aquí). Un PIN correcto se recuerda unos minutos en esta instancia para no
+// consultar a Supabase en cada lote de borrado.
+const PIN_OK_MS = 10 * 60 * 1000;
+const pinesOk = new Map();   // sha256(pin) -> vence
+async function pinAdminValido(pin) {
+  if (typeof pin !== "string" || !pin || pin.length > 64) return false;
+  const h = sha256("os10|" + pin), ahora = Date.now();
+  if ((pinesOk.get(h) || 0) > ahora) return true;
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verificar_clave`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify({ p_nombre: "admin", p_clave: pin }),
+  });
+  if (!r.ok) throw new Error("supabase " + r.status);
+  const ok = (await r.json()) === true;
+  if (ok) pinesOk.set(h, ahora + PIN_OK_MS);
+  return ok;
 }
 
 async function listarPrefijo(cfg, prefijo) {
@@ -167,6 +192,7 @@ export default async (req) => {
     }
 
     if (b.accion === "borrar") {
+      if (!(await pinAdminValido(b.pin))) return json({ error: "no autorizado" }, 401);
       let claves = [];
       if (b.prefijo) {
         const pre = String(b.prefijo);
@@ -175,7 +201,8 @@ export default async (req) => {
       } else if (Array.isArray(b.paths)) {
         claves = b.paths.slice(0, 1000).filter(p => typeof p === "string" && RE_RUTA.test(p));
       }
-      return json({ borradas: await borrarClaves(cfg, claves) });
+      const { n, fallidas } = await borrarClaves(cfg, claves);
+      return json({ borradas: n, fallidas });
     }
 
     return json({ error: "acción desconocida" }, 400);
