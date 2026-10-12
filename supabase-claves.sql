@@ -31,8 +31,8 @@ revoke all on public.secretos from anon, authenticated;
 --         'admin'    = PIN para entrar al panel.
 --         'eliminar' = clave para borrar un evento (dásela solo a quien confíes).
 insert into public.secretos (nombre, hash) values
-  ('admin',    extensions.crypt('8979',   extensions.gen_salt('bf'))),
-  ('eliminar', extensions.crypt('4040', extensions.gen_salt('bf')))
+  ('admin',    extensions.crypt('CAMBIA_ESTE_PIN_ADMIN',   extensions.gen_salt('bf'))),
+  ('eliminar', extensions.crypt('CAMBIA_ESTA_CLAVE_BORRAR', extensions.gen_salt('bf')))
 on conflict (nombre) do update set hash = excluded.hash;
 
 -- PASO 3b) (opcional) Para cambiar SOLO una clave más adelante, usa una de estas:
