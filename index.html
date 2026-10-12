@@ -1709,7 +1709,13 @@
       let rtTimer = null;
       const avisar = () => { if (pausaApp.activa()) { pausaApp.pendiente = true; return; } listeners.forEach(f => f()); };
       pausaApp.alReanudar = () => listeners.forEach(f => f());
-      sb.channel("os10-rt")
+      // TIEMPO REAL solo donde se usa (panel admin / empresa): la página de registro de guardias no
+      // abre la conexión, así sus celulares no reciben cada cambio del sistema. Además la conexión se
+      // cierra si la pestaña queda oculta más de 2 min, y al volver se reabre y se pone al día.
+      let canal = null, conectadoAntes = false, ocultaTimer = null;
+      const conectarRT = () => {
+        if (canal || !listeners.length) return;
+        canal = sb.channel("os10-rt")
         .on("postgres_changes", { event: "*", schema: "public" }, (pl) => {
           // La ficha de un guardia que cambió en otro equipo se actualiza en la caché con la fila que llega.
           // Lo que cambió en otro equipo deja de servir en la memoria corta (se vuelve a pedir).
@@ -1720,7 +1726,19 @@
           }
           clearTimeout(rtTimer); rtTimer = setTimeout(avisar, 2500);
         })
-        .subscribe();
+        .subscribe((estado) => {
+          // Al (re)conectarse se pudieron perder cambios: se olvida la memoria corta y se recarga una vez.
+          if (estado !== "SUBSCRIBED") return;
+          if (conectadoAntes) { invalidar(TODO); avisar(); }
+          conectadoAntes = true;
+        });
+      };
+      const desconectarRT = () => { if (!canal) return; const c = canal; canal = null; sb.removeChannel(c).catch(() => { }); };
+      document.addEventListener("visibilitychange", () => {
+        clearTimeout(ocultaTimer);
+        if (document.hidden) ocultaTimer = setTimeout(desconectarRT, 2 * 60 * 1000);
+        else conectarRT();
+      });
       // Fichas de guardias guardadas en el equipo: antes se descargaban TODAS en cada recarga.
       // Ahora solo se piden las que faltan (o con más de 15 min), y los cambios llegan por tiempo real.
       const guCache = new Map();   // rut -> { g, t }
@@ -1814,7 +1832,8 @@
       // config, historial) se reutiliza hasta 2 min, en vez de pedirla en cada clic o repintado.
       // Se borra AL INSTANTE cuando cambia algo: por una escritura de este equipo o por el tiempo
       // real (cambio en otro equipo). Así se ahorra sin mostrar datos viejos.
-      const MEM_TTL = 2 * 60 * 1000;
+      // 10 min: los cambios de otros equipos llegan por tiempo real y borran la memoria al instante.
+      const MEM_TTL = 10 * 60 * 1000;
       const memoria = new Map();   // clave -> { t, p (promesa), tags }
       const TODO = ["eventos", "asistencias", "puestos", "historial", "config"];
       const TABLA_TAGS = { eventos: ["eventos"], asistencias: ["asistencias"], guardias_central: ["asistencias"], puestos: ["puestos", "asistencias"], partidos_historial: ["historial"], partidos_historial_asist: ["historial"], config: ["config"] };
@@ -1851,7 +1870,9 @@
         return obj;
       }
       const api = {
-        onChange(f) { listeners.push(f); return () => { listeners = listeners.filter(x => x !== f) }; },
+        onChange(f) { listeners.push(f); conectarRT(); return () => { listeners = listeners.filter(x => x !== f) }; },
+        // Olvida la memoria corta (p. ej. cuando vence la foto de 3 h de la vista empresa).
+        refrescar() { invalidar(TODO); },
         // Verifica la clave EN EL SERVIDOR (función RPC). La contraseña real vive en Supabase, no en este código.
         async verificarClave(nombre, clave) { const { data, error } = await sb.rpc("verificar_clave", { p_nombre: nombre, p_clave: clave }); if (error) throw error; return data === true; },
         async listEventos() { return ordenarEventos(ok(await sb.from("eventos").select("*").order("created_at", { ascending: true }))); },
@@ -8179,7 +8200,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           if (tn) tiempos.push(tn.fin.getTime() + GRACIA_TURNO_MS);
         });
         const prox = Math.min(...tiempos.filter(t => t > ahora));
-        if (isFinite(prox)) EMPRESA_STATE._vence = setTimeout(() => { if (!pausaApp.saltar()) repintar(); }, Math.min(prox - ahora + 1000, 2 ** 31 - 1));
+        if (isFinite(prox)) EMPRESA_STATE._vence = setTimeout(() => { if (Data.refrescar) Data.refrescar(); if (!pausaApp.saltar()) repintar(); }, Math.min(prox - ahora + 1000, 2 ** 31 - 1));
       };
       const repintar = async () => { await paint(); programarVencimiento(); };
       Data.onChange(repintar);
