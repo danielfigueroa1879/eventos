@@ -1262,10 +1262,11 @@
          según la hora de ingreso.
        ========================================================================= */
     // FOTOS DE INGRESO: se archivan FOTO_RETENCION_DIAS días (también las de partidos archivados).
-    // El administrador las recibe todas. La vista EMPRESA también las ve todas (sin límite de tiempo),
-    // pero sin poder descargarlas; en el historial no se le entregan.
+    // El administrador las recibe todas. La vista EMPRESA las ve solo durante FOTO_EMPRESA_MS (3 h)
+    // desde cada ingreso, sin poder descargarlas; en el historial no se le entregan.
     // La distribución pública nunca recibe fotos.
     const FOTO_RETENCION_DIAS = 30;
+    const FOTO_EMPRESA_MS = 3 * 3600 * 1000;
     let VER_FOTOS = false;              // true solo dentro del panel del administrador (renderAdmin)
     let VER_FOTOS_EMPRESA = false;      // true solo en la vista empresa (renderEmpresa)
     // HISTORIAL DE PARTIDOS: la tabla partidos_historial_asist no tiene columnas para "supervisor"
@@ -1293,7 +1294,9 @@
       return { ...r, es_supervisor: m === "GUARDIA" ? false : (!!(r && r.es_supervisor) || m === "SUPERVISOR"), spd: !!(r && r.spd) || m === "SPD" || m === "SPD_OK", spd_verificado: !!(r && r.spd_verificado) || m === "SPD_OK" };
     }
     // ¿Quien mira recibe las fotos de ingreso? (admin y empresa: sí; vista pública: no)
-    function fotoVisible() { return VER_FOTOS || VER_FOTOS_EMPRESA; }
+    function fotoEmpresaEnPlazo(a) { return !!a && Date.now() - new Date(a.hora_ingreso || 0).getTime() < FOTO_EMPRESA_MS; }
+    // ¿Quien mira recibe la foto de esta asistencia? (admin: siempre; empresa: 3 h; público: no)
+    function fotoVisible(a) { return VER_FOTOS || (VER_FOTOS_EMPRESA && fotoEmpresaEnPlazo(a)); }
     const TURNO_HORAS_DEFAULT = 12;      // turno de 12 horas (día/noche)
     const TURNO_INICIO_DEFAULT = "08:00"; // inicio del primer turno
     // Margen tras el fin de un turno antes de considerarlo FINALIZADO (historial/archivo).
@@ -1613,7 +1616,7 @@
         async listAsistencias(evId) {
           const as = get(K.as).filter(x => x.evento_id === evId);
           const gu = get(K.gu);
-          return as.map(a => ({ ...a, foto_url: fotoVisible() ? a.foto_url : null, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
+          return as.map(a => ({ ...a, foto_url: fotoVisible(a) ? a.foto_url : null, guardia: gu.find(g => g.rut === a.rut) || null })).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? -1 : 1));
         },
         async listAsistenciasConteo(evId) { return get(K.as).filter(x => x.evento_id === evId); },
         async yaRegistrado(evId, rut) { return get(K.as).filter(x => x.evento_id === evId && x.rut === rut).sort((a, b) => (a.hora_ingreso < b.hora_ingreso ? 1 : -1))[0] || null; },
@@ -1660,10 +1663,10 @@
     })();
 
     /* ---- Pausa de la app (ahorro de datos) ----
-       Mientras la pestaña está oculta, o si nadie la toca en 8 h, la app no se recarga sola.
+       Mientras la pestaña está oculta, o si nadie la toca en 1 h, la app no se recarga sola.
        Al volver a mostrarla (o al tocar "Continuar") se pone al día una sola vez. */
     const pausaApp = (() => {
-      const INACTIVO_MS = 8 * 3600 * 1000;
+      const INACTIVO_MS = 1 * 3600 * 1000;
       let ultimo = Date.now();
       const api = {
         pendiente: false, alReanudar: null, aviso: null,
@@ -1680,7 +1683,7 @@
           if (!document.hidden && api.inactiva() && !api.aviso) {
             const d = document.createElement("div");
             d.className = "fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4";
-            d.innerHTML = `<div class="card p-6 text-center max-w-sm"><div class="text-4xl mb-2">⏸</div><h2 class="font-bold text-slate-800">Vista en pausa</h2><p class="text-sm text-slate-500 mt-1 mb-4">No se usó en las últimas 8 horas, así que dejó de actualizarse para ahorrar datos.</p><button class="btn btn-p w-full">Continuar</button></div>`;
+            d.innerHTML = `<div class="card p-6 text-center max-w-sm"><div class="text-4xl mb-2">⏸</div><h2 class="font-bold text-slate-800">Vista en pausa</h2><p class="text-sm text-slate-500 mt-1 mb-4">No se usó en la última hora, así que dejó de actualizarse para ahorrar datos.</p><button class="btn btn-p w-full">Continuar</button></div>`;
             d.querySelector("button").addEventListener("click", () => { ultimo = Date.now(); api.reanudar(); });
             document.body.appendChild(d); api.aviso = d;
           }
@@ -1689,6 +1692,8 @@
       };
       ["pointerdown", "keydown", "touchstart", "wheel"].forEach(t => window.addEventListener(t, () => { ultimo = Date.now(); }, { passive: true, capture: true }));
       document.addEventListener("visibilitychange", () => { if (!document.hidden) { if (api.inactiva()) api.saltar(); else api.reanudar(); } });
+      // Revisión local cada minuto (sin consultar nada): al cumplirse 1 h sin uso aparece el aviso.
+      setInterval(() => { if (!document.hidden && api.inactiva() && !api.aviso) api.saltar(); }, 60 * 1000);
       return api;
     })();
 
@@ -1700,7 +1705,7 @@
       // AHORRO DE DATOS (cuota de descarga de Supabase): una ráfaga de cambios (p. ej. varios
       // ingresos seguidos) dispara UNA sola recarga, no una por cada cambio.
       // Además: si la pestaña está oculta (segundo plano, pantalla apagada) o nadie la usa hace
-      // 8 h, NO se recarga; queda pendiente y se pone al día al volver (ver pausaApp).
+      // 1 h, NO se recarga; queda pendiente y se pone al día al volver (ver pausaApp).
       let rtTimer = null;
       const avisar = () => { if (pausaApp.activa()) { pausaApp.pendiente = true; return; } listeners.forEach(f => f()); };
       pausaApp.alReanudar = () => listeners.forEach(f => f());
@@ -1835,8 +1840,8 @@
           // Para VER/DESCARGAR una foto ampliada, el admin pide un enlace NUEVO al hacer clic
           // (ver signFoto + verFotoIngresoModal), de modo que la descarga nunca falla por caducidad.
           // Fuera del panel admin la foto no se entrega (ni se firma su enlace), salvo a la
-          // empresa (sin descarga).
-          if (!fotoVisible()) as.forEach(a => { a.foto_url = null; });
+          // empresa durante 3 h desde el ingreso (sin descarga).
+          as.forEach(a => { if (!fotoVisible(a)) a.foto_url = null; });
           await ponerFotos(as, a => a.foto_url ? `${evId}/${a.id}.webp` : null, "foto_url");
           return as.map(a => ({ ...a, guardia: gu.find(g => g.rut === a.rut) || null }));
         },
@@ -4103,7 +4108,7 @@
     // (no se puede guardar con clic derecho, arrastrar ni mantener presionado en iOS).
     const FOTO_EMPRESA_ATTR = 'oncontextmenu="return false" ondragstart="return false"';
     const FOTO_EMPRESA_CSS = "background-size:cover;background-position:center;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none";
-    function fotoEmpresaVigente(a) { return !!(a && a.foto_url); }
+    function fotoEmpresaVigente(a) { return !!(a && a.foto_url) && fotoVisible(a); }
     // Fila de tabla para la vista empresa (solo lectura). Sirve para guardias y supervisores.
     function filaEmpresa(a, i, ev) {
       const g = a.guardia || {};
@@ -6011,7 +6016,7 @@
         return state.asist.filter(a => a.puesto_id === pid).map(a => {
           const g = a.guardia || {};
           const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim();
-          return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M", hombre: sexoGuardia(g) === "H", rut: a.rut, foto: a.foto_url || null };
+          return { nombre: nom || a.rut, mujer: sexoGuardia(g) === "M", hombre: sexoGuardia(g) === "H", rut: a.rut, foto: (a.foto_url && fotoVisible(a)) ? a.foto_url : null };
         });
       }
       function iconFor(p) {
@@ -6278,7 +6283,7 @@
       // --- Detalle/acciones de un puesto ---
       function modalPuesto(p) {
         const asig = state.asist.filter(a => a.puesto_id === p.id);
-        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div ${VER_FOTOS && a.foto_url ? `data-pp-foto="${a.id}" role="button" title="Ver foto de ingreso" style="cursor:pointer"` : ""} class="flex items-center gap-2 text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}">${miniFoto({ mujer, hombre, rut: a.rut, foto: a.foto_url || null }, 28)}<span class="min-w-0"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</span></div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
+        const lista = asig.length ? asig.map((a, i) => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—"; const mujer = sexoGuardia(g) === "M"; const hombre = sexoGuardia(g) === "H"; return `<div ${VER_FOTOS && a.foto_url ? `data-pp-foto="${a.id}" role="button" title="Ver foto de ingreso" style="cursor:pointer"` : ""} class="flex items-center gap-2 text-sm py-1 border-b border-slate-50 ${mujer ? "text-red-800 font-semibold" : (hombre ? "text-blue-900 font-semibold" : "text-slate-700")}">${miniFoto({ mujer, hombre, rut: a.rut, foto: (a.foto_url && fotoVisible(a)) ? a.foto_url : null }, 28)}<span class="min-w-0"><span class="${mujer ? "text-red-400" : (hombre ? "text-blue-400" : "text-slate-400")} mr-1">${i + 1}.</span>${esc(nom)}</span></div>`; }).join("") : `<div class="text-slate-400 text-sm py-2">Sin guardias asignados.</div>`;
         const acciones = (readonly && !puedeAsignar) ? "" : `<div class="grid grid-cols-2 gap-2 mt-3">
             ${puedeAsignar ? `<button id="pp_asig" class="btn btn-p col-span-2">👥 Asignar guardias</button>` : ""}
             ${!readonly ? `<button id="pp_edit" class="btn btn-ghost">✎ Editar</button>
@@ -8111,11 +8116,25 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         if ($("#empHist")) $("#empHist").addEventListener("click", () => modalHistorialTurnos(ev));
       };
       await paint();
-      Data.onChange(paint);
-      // Re-pinta cada 5 min aunque no haya novedades (los cambios llegan solos en tiempo real);
-      // los enlaces de las fotos duran 1 h y se renuevan solos antes de vencer.
+      // Sin refresco periódico: la vista se actualiza SOLO cuando llega un cambio en tiempo real.
+      // Además se programa un repintado justo cuando vence algo por hora: la foto de un ingreso
+      // (3 h) o el fin de un turno (pasa al historial), para no mostrar nada fuera de plazo.
       if (EMPRESA_STATE._tick) clearInterval(EMPRESA_STATE._tick);
-      EMPRESA_STATE._tick = setInterval(() => { if (!pausaApp.saltar()) paint(); }, 5 * 60 * 1000);
+      const programarVencimiento = async () => {
+        clearTimeout(EMPRESA_STATE._vence);
+        let as = []; try { as = await Data.listAsistencias(ev.id); } catch (_) { return; }
+        const ahora = Date.now(), tiempos = [];
+        as.forEach(a => {
+          if (a.foto_url) tiempos.push(new Date(a.hora_ingreso).getTime() + FOTO_EMPRESA_MS);
+          const tn = eventoUsaTurnos(ev) ? calcularTurno(a.hora_ingreso, ev) : null;
+          if (tn) tiempos.push(tn.fin.getTime() + GRACIA_TURNO_MS);
+        });
+        const prox = Math.min(...tiempos.filter(t => t > ahora));
+        if (isFinite(prox)) EMPRESA_STATE._vence = setTimeout(() => { if (!pausaApp.saltar()) repintar(); }, Math.min(prox - ahora + 1000, 2 ** 31 - 1));
+      };
+      const repintar = async () => { await paint(); programarVencimiento(); };
+      Data.onChange(repintar);
+      programarVencimiento();
     }
 
     /* =========================================================================
