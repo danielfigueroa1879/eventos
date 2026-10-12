@@ -1693,7 +1693,7 @@
         const out = new Map(); paths.forEach(p => { const c = firmas.get(p); out.set(p, c ? c.url : null); });
         return out;
       }
-      // Miniatura liviana (120x160, ~5 KB) que se sube junto a cada foto: las listas, el mapa y los
+      // Miniatura liviana (120x160, ~4 KB) que se sube junto a cada foto: las listas, el mapa y los
       // PDF/Excel usan la miniatura; la foto completa solo se baja al ampliarla.
       const rutaMini = path => String(path).replace(/\.webp$/, "_t.webp");
       // Firma miniatura (o la foto completa si no hay miniatura) y la deja en obj[campo].
@@ -1827,7 +1827,7 @@
             const c = document.createElement("canvas"); c.width = 120; c.height = 160;
             const k = Math.max(120 / bmp.width, 160 / bmp.height), w = bmp.width * k, h = bmp.height * k;
             c.getContext("2d").drawImage(bmp, (120 - w) / 2, (160 - h) / 2, w, h);
-            const mini = await new Promise(r => c.toBlob(r, "image/webp", 0.7));
+            const mini = await new Promise(r => c.toBlob(r, "image/webp", 0.55));
             if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" });
           } catch (e) { console.warn("miniatura:", e && e.message); }
           // Bucket PRIVADO: se guarda la RUTA (no una URL pública). El panel genera un enlace firmado
@@ -1937,13 +1937,13 @@
        FOTO DE VERIFICACIÓN (ingreso) — captura con guía ovalada + conversión a WebP HD
        ---------------------------------------------------------------------------
        - La foto NO se guarda en Full HD: se recorta a retrato 3:4 y se limita a HD
-         (alto máx. 800 px) y se comprime a WebP (calidad 0.6). Pesa poco (~50–100 KB). Además se
-         sube una miniatura de 120x160 (~5 KB) que es la que usan las listas y el mapa.
+         (alto máx. 480 px) y se comprime a WebP (calidad 0.5): ~30 KB. Además se sube una
+         miniatura de 120x160 (~4 KB) que es la que usan las listas, el mapa y los PDF/Excel.
        - Sirve para dejar registro de QUIÉN ingresó realmente los datos en el QR.
        ========================================================================= */
     function blobToDataURL(blob) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); }); }
 
-    // Dibuja la fuente (video o <img>) recortada a retrato 3:4, escalada a HD, y devuelve un Blob WebP.
+    // Dibuja la fuente (video o <img>) recortada a retrato 3:4, a 480 px de alto como máximo, y devuelve un Blob WebP.
     function _fotoWebpDesde(source, sw, sh) {
       return new Promise((resolve, reject) => {
         try {
@@ -1952,7 +1952,7 @@
           let cropW = sw, cropH = sw / ratio;  // recorte centrado con proporción 3:4
           if (cropH > sh) { cropH = sh; cropW = sh * ratio; }
           const sx = (sw - cropW) / 2, sy = (sh - cropH) / 2;
-          const maxH = 800;                    // alto máx. (antes 1000): archivo más liviano, menos descarga
+          const maxH = 480;                    // alto máx. 480 px (480x640): alcanza para reconocer la cara y pesa ~30 KB
           const outH = Math.min(maxH, cropH), outW = outH * ratio;
           const c = document.createElement("canvas");
           c.width = Math.round(outW); c.height = Math.round(outH);
@@ -1961,8 +1961,8 @@
           // La cámara frontal se ve en espejo en pantalla, pero se guarda la imagen REAL (sin espejo).
           ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, outW, outH);
           const done = (blob) => { if (blob) resolve(blob); else reject(new Error("No se pudo convertir la foto")); };
-          if (c.toBlob) c.toBlob(done, "image/webp", 0.6);
-          else { const u = c.toDataURL("image/webp", 0.6); fetch(u).then(r => r.blob()).then(resolve).catch(reject); }
+          if (c.toBlob) c.toBlob(done, "image/webp", 0.5);
+          else { const u = c.toDataURL("image/webp", 0.5); fetch(u).then(r => r.blob()).then(resolve).catch(reject); }
         } catch (e) { reject(e); }
       });
     }
