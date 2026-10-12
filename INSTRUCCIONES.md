@@ -70,3 +70,53 @@ El PIN del panel es una barrera básica del lado del navegador. La `anon key` de
 - `index.html` — la aplicación completa (panel + formulario del guardia).
 - `supabase.sql` — estructura de la base de datos.
 - `INSTRUCCIONES.md` — este archivo.
+
+## 📷 Fotos en Cloudflare R2 (bucket privado)
+
+Las fotos de ingreso **nuevas** se guardan en Cloudflare R2. Supabase sigue con la base de datos y
+solo guarda la referencia de la foto (`r2:<evento_id>/<asistencia_id>.webp`). Las fotos antiguas
+(sin `r2:`) se siguen mostrando desde Supabase Storage, sin cambios.
+
+Las claves de R2 **nunca** van en `index.html` ni en GitHub: las usa solo la función de Netlify
+`netlify/functions/fotos.mjs`, que entrega enlaces firmados. Las fotos van directo entre el
+navegador y R2.
+
+Si R2 aún no está configurado (o falla), la app sube la foto a Supabase como antes: no se rompe nada.
+
+### 1) Variables de entorno en Netlify
+Netlify → tu sitio → **Site configuration → Environment variables → Add a variable**:
+
+| Variable | Valor |
+|---|---|
+| `R2_ACCESS_KEY_ID` | Access Key ID del token de R2 |
+| `R2_SECRET_ACCESS_KEY` | Secret Access Key del token de R2 |
+| `R2_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (el "S3 API endpoint") |
+| `R2_BUCKET_NAME` | `guardias` |
+
+Luego **Deploys → Trigger deploy → Deploy site** para que la función tome las variables.
+
+### 2) CORS del bucket en Cloudflare
+Cloudflare → R2 → bucket `guardias` → **Settings → CORS Policy → Add/Edit** y pega:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://os10eventos.netlify.app"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["content-type", "cache-control"],
+    "MaxAgeSeconds": 86400
+  }
+]
+```
+
+### 3) Comprobar
+1. Registra un ingreso de prueba con foto.
+2. En Supabase → tabla `asistencias`, la columna `foto_url` de ese registro debe empezar con `r2:`.
+3. En Cloudflare → R2 → `guardias` deben aparecer `<asistencia>.webp` y `<asistencia>_t.webp`.
+4. En el panel admin la miniatura y la foto ampliada deben verse. Al recargar la página, en
+   DevTools → Network la miniatura debe salir "(disk cache)" o "(memory cache)".
+
+Si `foto_url` no empieza con `r2:`, revisa en Netlify → **Logs → Functions → fotos** el error.
+
+Caché: los enlaces de lectura se firman con una fecha fija por semana (duran 7 días), así el
+enlace no cambia en cada recarga y el navegador reutiliza la foto ya descargada.
