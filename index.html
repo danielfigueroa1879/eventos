@@ -1265,7 +1265,7 @@
     // El administrador las recibe todas. La vista EMPRESA también las ve todas (sin límite de tiempo),
     // pero sin poder descargarlas; en el historial no se le entregan.
     // La distribución pública nunca recibe fotos.
-    const FOTO_RETENCION_DIAS = 90;
+    const FOTO_RETENCION_DIAS = 30;
     let VER_FOTOS = false;              // true solo dentro del panel del administrador (renderAdmin)
     let VER_FOTOS_EMPRESA = false;      // true solo en la vista empresa (renderEmpresa)
     // HISTORIAL DE PARTIDOS: la tabla partidos_historial_asist no tiene columnas para "supervisor"
@@ -1659,6 +1659,39 @@
       };
     })();
 
+    /* ---- Pausa de la app (ahorro de datos) ----
+       Mientras la pestaña está oculta, o si nadie la toca en 12 h, la app no se recarga sola.
+       Al volver a mostrarla (o al tocar "Continuar") se pone al día una sola vez. */
+    const pausaApp = (() => {
+      const INACTIVO_MS = 12 * 3600 * 1000;
+      let ultimo = Date.now();
+      const api = {
+        pendiente: false, alReanudar: null, aviso: null,
+        inactiva: () => Date.now() - ultimo > INACTIVO_MS,
+        activa: () => document.hidden || api.inactiva(),
+        reanudar() {
+          if (api.aviso) { api.aviso.remove(); api.aviso = null; }
+          if (api.pendiente && !api.activa()) { api.pendiente = false; if (api.alReanudar) api.alReanudar(); }
+        },
+        // Para los refrescos periódicos: true = saltarse esta vuelta (queda pendiente).
+        saltar() {
+          if (!api.activa()) return false;
+          api.pendiente = true;
+          if (!document.hidden && api.inactiva() && !api.aviso) {
+            const d = document.createElement("div");
+            d.className = "fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4";
+            d.innerHTML = `<div class="card p-6 text-center max-w-sm"><div class="text-4xl mb-2">⏸</div><h2 class="font-bold text-slate-800">Vista en pausa</h2><p class="text-sm text-slate-500 mt-1 mb-4">No se usó en las últimas 12 horas, así que dejó de actualizarse para ahorrar datos.</p><button class="btn btn-p w-full">Continuar</button></div>`;
+            d.querySelector("button").addEventListener("click", () => { ultimo = Date.now(); api.reanudar(); });
+            document.body.appendChild(d); api.aviso = d;
+          }
+          return true;
+        },
+      };
+      ["pointerdown", "keydown", "touchstart", "wheel"].forEach(t => window.addEventListener(t, () => { ultimo = Date.now(); }, { passive: true, capture: true }));
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) { if (api.inactiva()) api.saltar(); else api.reanudar(); } });
+      return api;
+    })();
+
     /* ---- Adaptador Supabase (PRODUCCIÓN) ---- */
     const Remote = (() => {
       if (!USING_SUPABASE) return null;
@@ -1666,10 +1699,36 @@
       let listeners = [];
       // AHORRO DE DATOS (cuota de descarga de Supabase): una ráfaga de cambios (p. ej. varios
       // ingresos seguidos) dispara UNA sola recarga, no una por cada cambio.
+      // Además: si la pestaña está oculta (segundo plano, pantalla apagada) o nadie la usa hace
+      // 12 h, NO se recarga; queda pendiente y se pone al día al volver (ver pausaApp).
       let rtTimer = null;
+      const avisar = () => { if (pausaApp.activa()) { pausaApp.pendiente = true; return; } listeners.forEach(f => f()); };
+      pausaApp.alReanudar = () => listeners.forEach(f => f());
       sb.channel("os10-rt")
-        .on("postgres_changes", { event: "*", schema: "public" }, () => { clearTimeout(rtTimer); rtTimer = setTimeout(() => listeners.forEach(f => f()), 2500); })
+        .on("postgres_changes", { event: "*", schema: "public" }, (pl) => {
+          // La ficha de un guardia que cambió en otro equipo se actualiza en la caché con la fila que llega.
+          if (pl && pl.table === "guardias_central") {
+            const fila = pl.new && pl.new.rut ? pl.new : null;
+            if (fila) guCache.set(fila.rut, { g: fila, t: Date.now() }); else if (pl.old && pl.old.rut) guCache.delete(pl.old.rut);
+          }
+          clearTimeout(rtTimer); rtTimer = setTimeout(avisar, 2500);
+        })
         .subscribe();
+      // Fichas de guardias guardadas en el equipo: antes se descargaban TODAS en cada recarga.
+      // Ahora solo se piden las que faltan (o con más de 15 min), y los cambios llegan por tiempo real.
+      const guCache = new Map();   // rut -> { g, t }
+      const GU_TTL = 15 * 60 * 1000;
+      async function guardiasDe(ruts) {
+        const ahora = Date.now();
+        const faltan = ruts.filter(r => { const c = guCache.get(r); return !c || ahora - c.t > GU_TTL; });
+        for (let i = 0; i < faltan.length; i += 200) {
+          const lote = faltan.slice(i, i + 200);
+          const d = ok(await sb.from("guardias_central").select("*").in("rut", lote));
+          lote.forEach(r => guCache.delete(r));
+          d.forEach(g => guCache.set(g.rut, { g, t: ahora }));
+        }
+        return ruts.map(r => guCache.get(r)).filter(Boolean).map(c => c.g);
+      }
       const ok = (r) => { if (r.error) throw r.error; return r.data; };
       // Enlaces firmados de las fotos, REUTILIZADOS mientras les quede vigencia. Antes se pedía un
       // enlace nuevo en cada recarga y el navegador volvía a descargar todas las fotos cada vez
@@ -1722,12 +1781,12 @@
         async getEventoBySlug(slug) { const d = ok(await sb.from("eventos").select("*").eq("slug", slug).limit(1)); return d[0] || null; },
         async getGuardia(rut) { const d = ok(await sb.from("guardias_central").select("*").eq("rut", rut).limit(1)); return d[0] || null; },
         async listGuardias() { return ok(await sb.from("guardias_central").select("*")); },
-        async upsertGuardia(g) { return ok(await sb.from("guardias_central").upsert({ ...g, updated_at: nowISO() }).select().single()); },
-        async bulkUpsertGuardias(arr) { let n = 0; for (let i = 0; i < arr.length; i += 150) { const chunk = arr.slice(i, i + 150).map(g => ({ ...g, updated_at: nowISO() })); const r = await sb.from("guardias_central").upsert(chunk); if (r.error) throw r.error; n += chunk.length; } return n; },
+        async upsertGuardia(g) { const r = ok(await sb.from("guardias_central").upsert({ ...g, updated_at: nowISO() }).select().single()); if (r && r.rut) guCache.set(r.rut, { g: r, t: Date.now() }); return r; },
+        async bulkUpsertGuardias(arr) { arr.forEach(g => g && g.rut && guCache.delete(g.rut)); let n = 0; for (let i = 0; i < arr.length; i += 150) { const chunk = arr.slice(i, i + 150).map(g => ({ ...g, updated_at: nowISO() })); const r = await sb.from("guardias_central").upsert(chunk); if (r.error) throw r.error; n += chunk.length; } return n; },
         async listAsistencias(evId) {
           const as = ok(await sb.from("asistencias").select("*").eq("evento_id", evId).order("hora_ingreso", { ascending: true }));
           const ruts = [...new Set(as.map(a => a.rut))];
-          let gu = []; if (ruts.length) gu = ok(await sb.from("guardias_central").select("*").in("rut", ruts));
+          const gu = ruts.length ? await guardiasDe(ruts) : [];
           // Bucket PRIVADO: las fotos no tienen URL pública. Se genera un enlace FIRMADO temporal
           // (1 h, reutilizado mientras dure: ver firmarRutas) para las miniaturas. La ruta es siempre
           // <evento_id>/<asistencia_id>.webp (sirve también para fotos antiguas del bucket).
@@ -2850,7 +2909,7 @@
       ADMIN_STATE.unsub = Data.onChange(() => refreshAdmin());
       // Re-render periódico para que los turnos finalizados hace +2 h dejen de mostrarse solos.
       if (ADMIN_STATE._tick) clearInterval(ADMIN_STATE._tick);
-      ADMIN_STATE._tick = setInterval(() => { if (ADMIN_STATE.selected) renderMain(); }, 5 * 60 * 1000);
+      ADMIN_STATE._tick = setInterval(() => { if (pausaApp.saltar()) return; if (ADMIN_STATE.selected) renderMain(); }, 5 * 60 * 1000);
       // Cargar el estado del interruptor "Foto de ingreso" ANTES del primer render (columna + botón).
       ADMIN_STATE.fotoIngreso = await cargarFotoIngresoConfig();
       // RETENCIÓN de fotos: al entrar al panel se borran las fotos con más de FOTO_RETENCION_DIAS días (máx. 1 vez cada 6 h por dispositivo).
@@ -8013,7 +8072,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       // Re-pinta cada 5 min aunque no haya novedades (los cambios llegan solos en tiempo real);
       // los enlaces de las fotos duran 1 h y se renuevan solos antes de vencer.
       if (EMPRESA_STATE._tick) clearInterval(EMPRESA_STATE._tick);
-      EMPRESA_STATE._tick = setInterval(paint, 5 * 60 * 1000);
+      EMPRESA_STATE._tick = setInterval(() => { if (!pausaApp.saltar()) paint(); }, 5 * 60 * 1000);
     }
 
     /* =========================================================================
