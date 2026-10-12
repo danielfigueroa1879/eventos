@@ -3729,10 +3729,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0f5323"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Examen</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
+            ${filas.length ? filas.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${nTurnosHist ? "No hay guardias en el turno vigente. Revisa 📁 Historial de turnos." : (asistGuardias.length ? "No hay guardias en este turno." : "Aún no hay guardias registrados en este evento.")}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -3753,10 +3753,10 @@
       <div class="hidden md:block p-3 overflow-x-auto">
         <table class="resp w-full text-sm">
           <thead class="text-left">
-            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th>${FOTO_INGRESO_ON ? '<th class="px-2 text-center">Foto</th>' : ""}<th class="rounded-tr-lg"></th></tr>
+            <tr class="text-white" style="background:#0369a1"><th class="py-2 px-2 rounded-tl-lg">#</th><th class="px-2">RUT</th><th class="px-2">Nombre completo</th><th class="px-2" style="width:1%;white-space:nowrap">Distribución</th><th class="px-2">Teléfono</th><th class="px-2">Autorización</th><th class="px-2 text-center">Vigencia</th><th class="px-2">SIGES</th>${usaT ? '<th class="px-2">Turno</th>' : ""}<th class="px-2">Ingreso</th><th class="rounded-tr-lg"></th></tr>
           </thead>
           <tbody>
-            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${(usaT ? 11 : 10) + (FOTO_INGRESO_ON ? 1 : 0)}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
+            ${filasSup.length ? filasSup.map((a, i) => fila(a, i, ev, rutCount, nomCount, usaT)).join("") : `<tr><td colspan="${usaT ? 11 : 10}" class="text-center text-slate-400 py-6">${asistSupervisores.length ? "No hay supervisores en este turno." : "Aún no hay supervisores registrados en este evento."}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -4083,7 +4083,7 @@
       return `<tr data-search="${esc((a.rut + " " + nom).toLowerCase())}" class="${dup ? 'row-dup' : ''}${claseSexo} border-b border-slate-50"${rowStyle}>
     <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
     <td data-label="RUT" class="pr-2 font-mono ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span>${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
-    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}"><span class="nomWrap"><span class="nomTxt" title="${esc(nom || "")}">${esc(nom || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
+    <td data-label="Nombre" class="pr-2 font-medium ${nomCls}"><span class="nomWrap">${FOTO_INGRESO_ON && a.foto_url ? `<button data-foto="${a.id}" class="inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 hover:ring-2 mr-1.5 flex-shrink-0" style="width:24px;height:24px;line-height:0" title="Ver foto de ingreso (ampliar)"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" style="display:block" loading="lazy"></button>` : ``}<span class="nomTxt" title="${esc(nom || "")}">${esc(nom || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
     <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>
     <td data-label="${esSup ? 'Autorización' : 'Examen'}" class="pr-2">${esc(fechaFmt(g.fecha_ultimo_examen))}</td>
@@ -4091,9 +4091,6 @@
     <td data-label="SIGES" class="pr-2 text-xs font-semibold ${esSup ? 'text-slate-400' : (v.siges === 'OK' ? 'text-green-700' : v.siges ? 'text-amber-700' : 'text-slate-400')}">${esSup ? "—" : esc(v.siges || "—")}</td>
     ${usaT ? `<td data-label="Turno" class="pr-2">${tn ? `<span class="badge b-gris" style="background:#e0e7ff;color:#3730a3" title="${esc(tn.rango)}">${esc(tn.etiqueta)}</span>` : "—"}</td>` : ""}
     <td data-label="Ingreso" class="pr-2 text-slate-500">${horaFmt(a.hora_ingreso)}</td>
-    ${FOTO_INGRESO_ON ? `<td data-label="Foto" class="pr-2 text-center" style="width:1%">${a.foto_url
-      ? `<button data-foto="${a.id}" class="inline-block rounded overflow-hidden ring-1 ring-slate-200 align-middle hover:ring-emerald-400 transition" style="width:22px;height:22px;line-height:0" title="Ver foto de ingreso (ampliar)"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" style="display:block" loading="lazy"></button>`
-      : `<span class="text-slate-300" title="Sin foto">—</span>`}</td>` : ""}
     <td class="acciones whitespace-nowrap">
       ${g.aprobado === false ? `<button data-approve="${a.id}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:${esNuevoG ? '#dc2626' : '#ca8a04'};background:${esNuevoG ? '#fef2f2' : '#fefce8'};border-color:${esNuevoG ? '#f87171' : '#facc15'}" title="Aprobar ${esNuevoG ? 'nuevo guardia' : 'datos editados'}">✔ Aprobar</button>` : ''}
       ${esSPD(g, a) && !spdVerificado(ev, a, g) ? `<button data-spdok="${esc(a.rut)}" data-spdev="${esc(ev.id)}" class="font-bold px-2 py-0.5 rounded border mr-2" style="color:#1b3a8f;background:#eef2ff;border-color:#c7d2fe" title="Aprobar resolución SPD">✔ Aprobar</button>` : ''}
