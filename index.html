@@ -1791,7 +1791,7 @@
       async function apiFotos(cuerpo) {
         const r = await conTimeout(fetch(FOTOS_API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) }), 15000, "Sin respuesta de la función de fotos");
         const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+        if (!r.ok) { const e = new Error(d.error || ("HTTP " + r.status)); e.status = r.status; throw e; }
         return d;
       }
       async function firmarRutas(paths) {
@@ -1861,6 +1861,18 @@
         }
         const interna = p => (esR2(p) ? p.slice(3) : p);
         return new Set(lista.filter(p => malas.has(interna(p)) || malas.has(interna(rutaMini(p)))));
+      }
+      // Guarda la ruta de la foto en la asistencia y COMPRUEBA que se actualizó la fila. Si la
+      // asistencia ya no existe (el partido se archivó mientras subía la foto), la enlaza en su fila
+      // del historial (mismo RUT y hora de ingreso, aún sin foto). Si no hay dónde, es un error.
+      async function guardarRefFoto(asisId, ruta, ref) {
+        const d = ok(await sb.from("asistencias").update({ foto_url: ruta }).eq("id", asisId).select("id"));
+        if (d && d.length) return;
+        if (ref && ref.rut && ref.hora_ingreso) {
+          const h = ok(await sb.from("partidos_historial_asist").update({ foto_url: ruta }).eq("rut", ref.rut).eq("hora_ingreso", ref.hora_ingreso).is("foto_url", null).select("id"));
+          if (h && h.length) return;
+        }
+        throw new Error("La asistencia ya no existe: la foto quedó sin enlazar.");
       }
       // Borra la carpeta completa de un evento en R2 (si R2 no está configurado, no hace nada).
       const borrarCarpetaR2 = async evId => {
@@ -1991,39 +2003,48 @@
           if (a && a.foto_url) borrarFotos([esR2(a.foto_url) ? a.foto_url : `${a.evento_id}/${id}.webp`]).catch(() => {});
         },
         async cerrarPartido(ev, asist) {
-          const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: asist.length }).select().single());
+          const porId = new Map(asist.filter(a => a && a.id).map(a => [a.id, a]));
+          const ids = [...porId.keys()];
+          const hp = ok(await sb.from("partidos_historial").insert({ evento_id: ev.id, partido: ev.partido || ev.nombre_evento, fecha: ev.fecha_evento || nowISO().slice(0, 10), total: ids.length }).select().single());
+          const deshacerCabecera = async () => { try { await sb.from("partidos_historial").delete().eq("id", hp.id); } catch (_) { } };
           // Mapa puesto_id -> nombre para guardar la facción de cada guardia.
           const puMap = {}; try { (ok(await sb.from("puestos").select("id,nombre").eq("evento_id", ev.id)) || []).forEach(p => { puMap[p.id] = p.nombre; }); } catch (_) {}
+          // RECLAMO: se borran las asistencias y la base devuelve las filas que ESTE cierre borró
+          // (con su foto_url real y al día). Si dos administradores cierran a la vez, cada fila la
+          // borra uno solo, así ningún guardia ni foto queda en dos historiales.
+          let tomadas = [];
+          try {
+            for (let k = 0; k < ids.length; k += 100) tomadas = tomadas.concat(ok(await sb.from("asistencias").delete().in("id", ids.slice(k, k + 100)).select("*")) || []);
+          } catch (e) {
+            if (tomadas.length) { try { ok(await sb.from("asistencias").insert(tomadas)); } catch (e2) { console.error("restaurar asistencias:", e2); } }
+            await deshacerCabecera(); throw e;
+          }
+          if (!tomadas.length) { await deshacerCabecera(); throw new Error("Este partido ya fue archivado (por otro administrador o en otra pestaña)."); }
+          if (tomadas.length !== ids.length) { try { await sb.from("partidos_historial").update({ total: tomadas.length }).eq("id", hp.id); } catch (_) { } }
           // La foto de ingreso se ARCHIVA con el partido: se guarda la ruta del bucket
           // (<evento_id>/<asistencia_id>.webp) y el archivo se conserva FOTO_RETENCION_DIAS días.
-          const rows = asist.map(a => { const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: (a.foto_path || a.foto_url) ? (esR2(a.foto_path) ? a.foto_path : rutaFotoAsis(ev.id, a.id)) : null }; });
+          const rows = tomadas.map(t => { const a = { ...(porId.get(t.id) || {}), ...t }; const g = a.guardia || {}; return { historial_id: hp.id, rut: a.rut, nombres: g.nombres || "", apellidos: g.apellidos || "", telefono: g.telefono || "", fecha_ultimo_examen: g.fecha_ultimo_examen || null, vigencia: vigenciaHistMarca(a, g), hora_ingreso: a.hora_ingreso, puesto: (a.puesto_id && puMap[a.puesto_id]) || null, foto_url: t.foto_url ? (esR2(t.foto_url) ? t.foto_url : `${ev.id}/${t.id}.webp`) : null }; });
           // Solo se reintenta sin una columna si el error dice que ESA columna no existe (base antigua).
-          // Cualquier otro error (red, permisos…) detiene el cierre sin borrar nada.
+          // Cualquier otro error (red, permisos…) deshace el cierre: se devuelven las asistencias.
           const faltaColumna = (e, col) => { const c = e && e.code, m = String((e && (e.message || "")) + " " + (e && (e.details || "") || "")).toLowerCase(); return (c === "PGRST204" || c === "42703" || m.includes("does not exist") || m.includes("could not find")) && m.includes(col); };
           let fotosArchivadas = true;
-          if (rows.length) {
-            try {
-              try { ok(await sb.from("partidos_historial_asist").insert(rows)); }
-              catch (e) {
-                if (!faltaColumna(e, "foto_url")) throw e;
-                fotosArchivadas = false;
-                const rowsSinFoto = rows.map(({ foto_url, ...r }) => r);
-                try { ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto)); }
-                catch (e2) { if (!faltaColumna(e2, "puesto")) throw e2; ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto.map(({ puesto, ...r }) => r))); }
-              }
-            } catch (e) {
-              // No quedó archivado: se deshace la cabecera del historial y la lista del panel queda intacta.
-              try { await sb.from("partidos_historial").delete().eq("id", hp.id); } catch (_) { }
-              throw e;
+          try {
+            try { ok(await sb.from("partidos_historial_asist").insert(rows)); }
+            catch (e) {
+              if (!faltaColumna(e, "foto_url")) throw e;
+              fotosArchivadas = false;
+              const rowsSinFoto = rows.map(({ foto_url, ...r }) => r);
+              try { ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto)); }
+              catch (e2) { if (!faltaColumna(e2, "puesto")) throw e2; ok(await sb.from("partidos_historial_asist").insert(rowsSinFoto.map(({ puesto, ...r }) => r))); }
             }
+          } catch (e) {
+            // No quedó archivado: se devuelven las asistencias tal cual y se deshace la cabecera.
+            try { ok(await sb.from("asistencias").insert(tomadas)); } catch (e2) { console.error("restaurar asistencias:", e2); }
+            await deshacerCabecera(); throw e;
           }
           // Base sin columna foto_url en el historial: esas fotos no se pueden archivar y se borran,
           // pero SOLO las de los guardias de este cierre (nunca la carpeta completa del evento).
           if (!fotosArchivadas) { try { await borrarFotos(rows.map(r => r.foto_url)); } catch (e) { console.warn("borrar fotos partido:", e && e.message); } }
-          // Se borran SOLO las asistencias archivadas: si alguien ingresó durante el cierre, su
-          // registro sigue en la lista y entra en el próximo cierre.
-          const ids = asist.map(a => a.id).filter(Boolean);
-          for (let k = 0; k < ids.length; k += 100) ok(await sb.from("asistencias").delete().in("id", ids.slice(k, k + 100)));
           return hp.id;
         },
         async listHistorial(evId) { return ok(await sb.from("partidos_historial").select("*").eq("evento_id", evId).order("cerrado_at", { ascending: false })); },
@@ -2064,7 +2085,9 @@
         async getConfig(clave) { try { const d = ok(await sb.from("config").select("valor").eq("clave", clave).limit(1)); return d && d[0] ? d[0].valor : null; } catch (e) { console.warn("getConfig:", e && e.message); return null; } },
         async setConfig(clave, valor) { ok(await sb.from("config").upsert({ clave, valor, updated_at: nowISO() })); },
         // Sube la foto de verificación (WebP HD) al bucket privado "ingresos".
-        async subirFotoIngreso(evId, asisId, blob) {
+        // ref (opcional) = { rut, hora_ingreso } de la asistencia: sirve para enlazar la foto en el
+        // historial si el partido se archivó mientras la foto subía.
+        async subirFotoIngreso(evId, asisId, blob, ref) {
           const path = `${evId}/${asisId}.webp`;
           // Miniatura 120x160 para listas/mapa (ahorra descarga). Si falla, se usa la foto completa.
           let mini = null;
@@ -2084,14 +2107,19 @@
             const put = async (e, b) => { const r = await fetch(e.url, { method: "PUT", headers: e.headers, body: b }); if (!r.ok) throw new Error("PUT " + r.status); };
             await Promise.all([put(d.foto, blob), put(d.mini, chica)]);
             enR2 = true;
-          } catch (e) { console.warn("foto en R2 (se usa Supabase):", e && e.message); }
+          } catch (e) {
+            // Rechazo DEFINITIVO de la función (400/401/404/409: ids inválidos, asistencia inexistente o
+            // que YA tiene foto): se detiene aquí. Solo un fallo técnico (red, 5xx, R2 caído) usa el respaldo.
+            if (e && e.status >= 400 && e.status < 500) throw e;
+            console.warn("foto en R2 (se usa Supabase):", e && e.message);
+          }
           if (enR2) {
             // La foto YA está en R2: si falla guardar la referencia se reintenta SOLO ese paso
             // (no se vuelve a subir a Supabase, que duplicaría archivos y transferencia).
             fotosR2.add(asisId);
             let err = null;
             for (let i = 0; i < 3; i++) {
-              try { ok(await sb.from("asistencias").update({ foto_url: "r2:" + path }).eq("id", asisId)); return "r2:" + path; }
+              try { await guardarRefFoto(asisId, "r2:" + path, ref); return "r2:" + path; }
               catch (e) { err = e; if (i < 2) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
             }
             throw err;
@@ -2102,7 +2130,7 @@
           try { if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" }); } catch (e) { console.warn("miniatura:", e && e.message); }
           // Bucket PRIVADO: se guarda la RUTA (no una URL pública). El panel genera un enlace firmado
           // temporal al mostrar la foto, así no queda ningún enlace abierto/permanente a la imagen.
-          ok(await sb.from("asistencias").update({ foto_url: path }).eq("id", asisId));
+          await guardarRefFoto(asisId, path, ref);
           return path;
         },
         // RETENCIÓN: borra del bucket las fotos con más de N días (por defecto FOTO_RETENCION_DIAS)
@@ -2957,7 +2985,7 @@
           //     Es "mejor esfuerzo": si fallara la subida NO se pierde el ingreso ya registrado.
           if (fotoBlob) {
             submit.textContent = "Guardando foto…";
-            try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fotoBlob), TIMEOUT_MS); if (u) asis.foto_url = u; fotoBlob = null; }
+            try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fotoBlob, { rut: asis.rut, hora_ingreso: asis.hora_ingreso }), TIMEOUT_MS); if (u) asis.foto_url = u; fotoBlob = null; }
             catch (e) { console.error("foto:", e); toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500); }
           }
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
