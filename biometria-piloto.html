@@ -29,6 +29,17 @@
     #capa { position: fixed; inset: 0; z-index: 2147483647; background: #000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); gap: 12px; }
     #capa.on { display: flex; }
     #escena { position: relative; width: 100%; max-width: 420px; max-height: 70vh; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; background: #0f172a; }
+    /* Flecha de giro: la vista previa es un espejo (como un selfie), así que "tu izquierda" se ve a la
+       izquierda de la pantalla: la flecha apunta hacia donde la persona debe mirar. */
+    #flecha { position: absolute; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: center; gap: 4px; color: #fde047; text-shadow: 0 2px 10px #000; pointer-events: none; }
+    #flecha .f { font-size: 92px; line-height: 1; font-weight: 900; }
+    #flecha .t { font-size: 14px; font-weight: 800; background: rgba(0,0,0,.6); padding: 4px 8px; border-radius: 8px; color: #fff; white-space: nowrap; }
+    #flecha.izq { display: flex; left: 6px; } #flecha.izq .f { animation: izq .9s ease-in-out infinite; }
+    #flecha.der { display: flex; right: 6px; } #flecha.der .f { animation: der .9s ease-in-out infinite; }
+    @keyframes izq { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-14px); } }
+    @keyframes der { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(14px); } }
+    #mira { position: absolute; left: 0; right: 0; top: 46%; text-align: center; display: none; pointer-events: none; }
+    #mira span { font-size: 15px; font-weight: 800; background: rgba(0,0,0,.6); color: #fff; padding: 5px 10px; border-radius: 8px; }
     #capaMsg { color: #e2e8f0; font-size: 15px; text-align: center; min-height: 20px; max-width: 420px; }
     #capaBtns { display: flex; gap: 10px; width: 100%; max-width: 420px; }
     #capaBtns button { flex: 1; padding: 14px; font-size: 16px; color: #fff; border-color: #475569; }
@@ -74,6 +85,8 @@
       <rect width="300" height="400" fill="rgba(15,23,42,.5)" mask="url(#m)"/>
       <ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="7 7"/>
     </svg>
+    <div id="flecha"><div class="f"></div><div class="t">Mira hacia este lado</div></div>
+    <div id="mira"><span>🎯 Mira directo a la cámara</span></div>
     <div id="cuenta"></div>
     <div id="instr"></div>
   </div>
@@ -91,7 +104,14 @@
   const msg = (t, c) => { $("msg").textContent = t || ""; $("msg").style.color = c || ""; };
   const esperar = n => new Promise(r => setTimeout(r, n));
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const INSTR = { frente: "Mira al frente, dentro del óvalo", giro_izquierda: "Gira la cabeza hacia TU izquierda ⟵", giro_derecha: "Gira la cabeza hacia TU derecha ⟶" };
+  const INSTR = { frente: "Mira al frente", giro_izquierda: "Gira la cabeza hacia la flecha ⬅", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
+  // Muestra la flecha del lado a girar (o "mira a la cámara" en los pasos de frente).
+  function indicar(paso) {
+    const f = $("flecha"); f.className = ""; $("mira").style.display = "none";
+    if (paso === "giro_izquierda") { f.className = "izq"; f.querySelector(".f").textContent = "⬅"; }
+    else if (paso === "giro_derecha") { f.className = "der"; f.querySelector(".f").textContent = "➡"; }
+    else if (paso === "frente") $("mira").style.display = "block";
+  }
   let stream = null, ocupado = false, cancelado = false, rechazarListo = null;
   const revisar = () => { if (cancelado) throw new Error("Cancelado."); };
 
@@ -114,7 +134,7 @@
   }
   function cerrarCamara() {
     try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) { }
-    stream = null; $("capa").classList.remove("on"); $("instr").textContent = ""; $("cuenta").textContent = ""; $("capaMsg").textContent = "";
+    stream = null; indicar(null); $("capa").classList.remove("on"); $("instr").textContent = ""; $("cuenta").textContent = ""; $("capaMsg").textContent = "";
   }
   // Captura del video en vivo, SIN espejo, a máximo 480 px de ancho, JPEG.
   function capturar() {
@@ -136,13 +156,13 @@
   async function guiar(pasos) {
     const imgs = [];
     for (let i = 0; i < pasos.length; i++) {
-      $("instr").textContent = INSTR[pasos[i]] || pasos[i];
-      $("capaMsg").textContent = i === 0 ? "Quédate quieto mirando la cámara" : "Gira la cabeza y mantén la posición";
+      $("instr").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
+      $("capaMsg").textContent = pasos[i].startsWith("giro_") ? "Gira la cabeza (unos 30°, como mirando hacia tu hombro) y mantén la posición hasta la foto" : "Quédate quieto mirando la cámara";
       for (let s = 3; s > 0; s--) { revisar(); $("cuenta").textContent = s; await esperar(1000); }
       revisar();
       $("cuenta").textContent = "📸"; imgs.push(capturar()); await esperar(250);
     }
-    $("cuenta").textContent = ""; $("instr").textContent = "Procesando…"; $("capaMsg").textContent = "Comparando, espera unos segundos…";
+    indicar(null); $("cuenta").textContent = ""; $("instr").textContent = "Procesando…"; $("capaMsg").textContent = "Comparando, espera unos segundos…";
     return imgs;
   }
 
