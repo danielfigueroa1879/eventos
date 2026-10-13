@@ -26,6 +26,10 @@ Interruptor en Supabase, tabla `config`, clave `biometria_piloto`:
 insert into config (clave, valor) values ('biometria_piloto', 'todos') on conflict (clave) do update set valor = excluded.valor;  -- encender
 update config set valor = '' where clave = 'biometria_piloto';                                                                    -- apagar
 ```
+**Botón en el panel**: dentro de "🔳 QR y estado del evento", junto a "Foto de ingreso", el botón
+**🧬 Biometría** cambia entre `todos` (Activada) y `''` (Desactivada = solo foto). Pide confirmación y no borra
+plantillas: al reactivarla los guardias ya enrolados se siguen verificando. Solo aparece si la foto está activada.
+
 Para usar `todos`, en Netlify `BIOMETRIA_PILOTO_RUTS` debe ser `*` (el interruptor de la app decide a quién aplica).
 
 Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
@@ -45,6 +49,14 @@ Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
 ## Qué se guarda
 - `guardias_biometria`: plantilla **cifrada** (AES-256-GCM, ligada al RUT), modelo, versión, fecha, consentimiento.
 - `biometria_intentos`: tipo, estado, score, resultado de la prueba de vida, medidas y tiempos. **Sin imágenes.**
+
+### Limpieza automática (cada 2 meses / 60 días)
+Al abrir el panel admin (como máximo cada 6 h, junto con la purga de fotos) se llama a la función con
+`accion: "purgar"` y el PIN de admin. La función borra:
+- los `biometria_intentos` con más de 60 días;
+- las plantillas de `guardias_biometria` enroladas hace más de 60 días **sin ningún intento en los últimos 60 días**
+  (guardias que dejaron de venir). Esos guardias se vuelven a enrolar solos en su próximo ingreso.
+Los guardias activos conservan su plantilla. Si no hay PIN en la pestaña o falla, se reintenta la próxima vez.
 
 ## Límites conocidos (no es antifraude)
 **El resultado es ORIENTATIVO** (apoyo al supervisor). La prueba de vida (2 giros en orden aleatorio, captura en momento
