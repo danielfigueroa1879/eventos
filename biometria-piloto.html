@@ -157,10 +157,18 @@
     const imgs = [];
     for (let i = 0; i < pasos.length; i++) {
       $("instr").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
-      $("capaMsg").textContent = pasos[i].startsWith("giro_") ? "Gira la cabeza (unos 30°, como mirando hacia tu hombro) y mantén la posición hasta la foto" : "Quédate quieto mirando la cámara";
-      for (let s = 3; s > 0; s--) { revisar(); $("cuenta").textContent = s; await esperar(1000); }
+      $("capaMsg").textContent = pasos[i].startsWith("giro_") ? "Gira la cabeza (unos 30°, como mirando hacia tu hombro) y mantenla hasta ver 📸" : "Quédate quieto mirando la cámara";
+      if (pasos[i].startsWith("giro_")) {
+        // Giro: SIN cuenta regresiva y con un momento de captura aleatorio (1,5 a 3 s), para que un
+        // video grabado no pueda adivinar cuándo se toma la foto. Se avisa con un flash.
+        $("cuenta").textContent = "";
+        const t = 1500 + Math.floor(Math.random() * 1500);
+        for (let w = 0; w < t; w += 250) { revisar(); await esperar(250); }
+      } else {
+        for (let s = 3; s > 0; s--) { revisar(); $("cuenta").textContent = s; await esperar(1000); }
+      }
       revisar();
-      $("cuenta").textContent = "📸"; imgs.push(capturar()); await esperar(250);
+      $("cuenta").textContent = "📸"; imgs.push(capturar()); await esperar(350);
     }
     indicar(null); $("cuenta").textContent = ""; $("instr").textContent = "Procesando…"; $("capaMsg").textContent = "Comparando, espera unos segundos…";
     return imgs;

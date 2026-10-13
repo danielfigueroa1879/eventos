@@ -14,8 +14,8 @@ No toca `index.html`, el registro de ingreso, `asistencias`, R2 ni las fotos de 
 3. Volver a publicar la vista previa y abrir `/biometria-piloto.html` en el celular.
 
 ## Uso
-- **Enrolar** (requiere PIN de admin + consentimiento): frente → giro indicado → frente.
-- **Verificar** (requiere PIN): frente → giro indicado. Resultado: VERIFICADO / REVISIÓN MANUAL / NO COINCIDE + score.
+- **Enrolar** (requiere PIN de admin + consentimiento): frente → 2 giros (uno a cada lado, orden aleatorio) → frente.
+- **Verificar** (requiere PIN): frente → 2 giros (uno a cada lado, orden aleatorio; la foto de cada giro se toma en un momento aleatorio). Resultado: VERIFICADO / REVISIÓN MANUAL / NO COINCIDE + score.
 - **Ver estado**: últimos 20 intentos (sin plantilla). **Borrar plantilla**: elimina la del RUT.
 
 ## Qué se guarda
@@ -23,7 +23,9 @@ No toca `index.html`, el registro de ingreso, `asistencias`, R2 ni las fotos de 
 - `biometria_intentos`: tipo, estado, score, resultado de la prueba de vida, medidas y tiempos. **Sin imágenes.**
 
 ## Límites conocidos (no es antifraude)
-La prueba de vida (giro aleatorio + consistencia entre frames) frena una **foto fija**. **No** frena un video
+**El resultado es ORIENTATIVO** (apoyo al supervisor). La prueba de vida (2 giros en orden aleatorio, captura en momento
+aleatorio, consistencia entre frames) frena una **foto fija** y dificulta un video; en el piloto un video logró pasar
+1 de 4 intentos con un solo giro. **No** frena de forma confiable un video
 de la persona, cámaras virtuales, máscaras ni un navegador modificado. Para eso se requiere un proveedor
 certificado (Etapa 3).
 

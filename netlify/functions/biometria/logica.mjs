@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 
 export const MODELO = "yunet-2023mar+sface-2021dec-fp32";
-export const METODO = "desafio-giro-v1";
+export const METODO = "desafio-2giros-v2";
 // Umbrales iniciales (coseno SFace). OpenCV documenta 0.363 como "misma persona".
 // Se recalibran con los datos del piloto.
 export const UMBRAL_VERIFICADO = 0.45;
@@ -62,8 +62,9 @@ export function descifrarPlantilla(k, rut, txt) {
 // Desafío firmado (sin estado): qué pasos pedir, para qué RUT y acción, con vencimiento y nonce.
 const b64u = b => Buffer.from(b).toString("base64url");
 export function crearDesafio(k, rut, tipo, ahora = Date.now()) {
-  const dir = crypto.randomInt(2) ? "izquierda" : "derecha";
-  const pasos = tipo === "enrolamiento" ? ["frente", "giro_" + dir, "frente"] : ["frente", "giro_" + dir];
+  // 2 giros, uno hacia cada lado, en ORDEN ALEATORIO: un video tendría que acertar el orden.
+  const giros = crypto.randomInt(2) ? ["giro_izquierda", "giro_derecha"] : ["giro_derecha", "giro_izquierda"];
+  const pasos = tipo === "enrolamiento" ? ["frente", ...giros, "frente"] : ["frente", ...giros];
   const datos = { rut, tipo, pasos, nonce: crypto.randomBytes(16).toString("hex"), vence: ahora + DESAFIO_MS };
   const cuerpo = b64u(JSON.stringify(datos));
   return { token: cuerpo + "." + b64u(crypto.createHmac("sha256", k.firma).update(cuerpo).digest()), pasos, vence: datos.vence };
