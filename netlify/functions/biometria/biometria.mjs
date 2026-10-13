@@ -26,7 +26,7 @@ const MODELOS = {
 };
 const WASM = "ort-wasm-simd-threaded.wasm", WASM_MJS = "ort-wasm-simd-threaded.mjs";
 const MAX_IMG_BYTES = 400 * 1024, MAX_IMG_LADO = 1280;
-const LIMITE_INTENTOS = 15, VENTANA_LIMITE_MS = 10 * 60 * 1000;
+const LIMITE_INTENTOS = 30, VENTANA_LIMITE_MS = 10 * 60 * 1000;   // piloto: holgado para calibrar
 
 const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },

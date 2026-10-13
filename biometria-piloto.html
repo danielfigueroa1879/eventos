@@ -186,7 +186,13 @@
     bloquear(true); msg("Consultando…");
     try {
       const d = await api({ accion: "estado", rut, pin }); msg("");
-      const filas = (d.intentos || []).map(i => `<tr><td>${esc(new Date(i.fecha).toLocaleString("es-CL"))}</td><td>${esc(i.tipo)}</td><td>${esc(i.estado)}</td><td>${i.score == null ? "—" : Number(i.score).toFixed(3)}</td><td>${i.liveness_ok ? "sí" : "no"}</td></tr>`).join("");
+      // Motivo y medidas de cada intento (giro de la cabeza, tamaño del rostro) para entender los rechazos.
+      const detalle = i => {
+        const det = i.detalle || {}, mot = (det.motivos || []).concat(det.motivo ? [det.motivo] : []);
+        const med = (det.medidas || []).map(m => `${m.paso}: ${m.caras === 0 ? "sin rostro" : `giro ${m.giro}, rostro ${Math.round((m.cara_frac || 0) * 100)}%`}`).join(" · ");
+        return esc(mot.length ? mot.join("; ") : "—") + (med ? `<br><span style="color:var(--mut)">${esc(med)}</span>` : "");
+      };
+      const filas = (d.intentos || []).map(i => `<tr><td>${esc(new Date(i.fecha).toLocaleString("es-CL"))}</td><td>${esc(i.tipo)}</td><td>${esc(i.estado)}</td><td>${i.score == null ? "—" : Number(i.score).toFixed(3)}</td><td>${i.liveness_ok ? "sí" : "no"}</td></tr><tr><td colspan="5" style="font-size:11.5px">${detalle(i)}</td></tr>`).join("");
       $("salida").innerHTML = `<div class="card"><b>${d.enrolado ? "✅ Enrolado" : "Sin plantilla activa"}</b>${d.plantilla ? `<div class="aviso" style="margin:4px 0 0">Versión ${d.plantilla.version} · ${esc(d.plantilla.modelo)} · ${d.plantilla.muestras} muestras · ${esc(new Date(d.plantilla.fecha).toLocaleString("es-CL"))}</div>` : ""}
         <table><tr><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Score</th><th>Vida</th></tr>${filas || `<tr><td colspan="5">Sin intentos</td></tr>`}</table></div>`;
     } catch (e) { msg(e.message, "var(--no)"); } finally { bloquear(false); }
