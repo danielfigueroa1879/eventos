@@ -175,6 +175,23 @@ export default async (req) => {
       return json({ ok: true, resultados });
     }
 
+    // ----- Vista empresa -> SOLO el estado (sin score, RUT ni detalle) de ingresos de SU evento -----
+    // La empresa accede por el slug del evento (igual que a la lista de asistencias). Solo se responden
+    // los ids que pertenecen a ese evento, y nada si el evento tiene la biometría desactivada.
+    if (b.accion === "resultados_empresa") {
+      const slug = String(b.slug || "");
+      if (!/^[A-Za-z0-9_-]{1,80}$/.test(slug)) throw new ErrorCliente("Evento inválido");
+      const ids = (Array.isArray(b.asistencia_ids) ? b.asistencia_ids : []).filter(x => /^[0-9a-f-]{36}$/i.test(String(x))).slice(0, 300);
+      const ev = (await sbFetch(cfg, `/rest/v1/eventos?select=id,biometria&slug=eq.${enc(slug)}&limit=1`))[0];
+      if (!ev || ev.biometria === false || !ids.length) return json({ ok: true, resultados: {} });
+      const propias = (await sbFetch(cfg, `/rest/v1/asistencias?select=id&evento_id=eq.${enc(ev.id)}&id=in.(${ids.map(enc).join(",")})`)).map(f => f.id);
+      if (!propias.length) return json({ ok: true, resultados: {} });
+      const filas = await sbFetch(cfg, `/rest/v1/biometria_intentos?select=asistencia_id,estado,fecha&asistencia_id=in.(${propias.map(enc).join(",")})&order=fecha.desc`);
+      const resultados = {};
+      filas.forEach(f => { if (!resultados[f.asistencia_id]) resultados[f.asistencia_id] = { estado: f.estado }; });
+      return json({ ok: true, resultados });
+    }
+
     // ----- Panel admin -> retención de 60 días (solo PIN) -----
     if (b.accion === "purgar") {
       await exigirPin(cfg, b.pin);

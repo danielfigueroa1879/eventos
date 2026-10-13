@@ -44,7 +44,10 @@ Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
    siguientes = **verificación 1:1**. Si la biometría falla o no hay señal, el ingreso y la foto quedan igual.
 5. Panel admin, junto a la foto: **✔✔ azul** verificado · **✔ azul** enrolado (primer ingreso) · **⚠** revisión ·
    **✖** no coincide. Clic = detalle y **Restablecer plantilla** (se vuelve a enrolar en el próximo ingreso).
-   Solo admin; la vista empresa no lo ve. Resultado ORIENTATIVO.
+   Resultado ORIENTATIVO. Detalle con score y "Restablecer" solo admin.
+   **Vista empresa**: ve las mismas señales (✔✔ ✔ ⚠ ✖) junto a la foto, **solo el estado** (sin score, RUT ni
+   detalle), vía `accion: "resultados_empresa"` con el slug del evento: la función responde únicamente ingresos de
+   ese evento y nada si el evento tiene la biometría desactivada.
 - Sin cámara o sin permiso, se usa la foto normal de siempre.
 - La vista previa usa la MISMA base de datos que producción: para probar, usa un evento de prueba y el QR
   generado desde el panel de la vista previa.

@@ -4292,6 +4292,32 @@
         clearTimeout(memo.tmr); memo.tmr = setTimeout(() => { if (root.isConnected) pintarBioPiloto(root); }, 10000);
       } else if (!ids.some(id => memo.r[id] === null)) memo.reint = 0;
     }
+    // VISTA EMPRESA: mismas señales que el admin (✔✔ ✔ ⚠ ✖), pero solo el estado: sin score, RUT ni
+    // restablecer. La función responde únicamente ingresos del evento del slug. Memo 60 s; reintenta
+    // (máx. 12 × 10 s) los ingresos recientes cuya biometría aún no termina.
+    const BIO_EMP = { t: 0, r: {}, reint: 0, tmr: null };
+    async function pintarBioEmpresa(root, ev) {
+      const marcas = [...root.querySelectorAll("[data-bio-e]")]; if (!marcas.length || !USING_SUPABASE) return;
+      const ids = [...new Set(marcas.map(m => m.dataset.bioE))];
+      const pendientes = ids.some(id => BIO_EMP.r[id] === null);
+      if (Date.now() - BIO_EMP.t > 60000 || ids.some(id => !(id in BIO_EMP.r)) || (pendientes && Date.now() - BIO_EMP.t > 8000)) {
+        try {
+          const resp = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "resultados_empresa", slug: ev.slug, asistencia_ids: ids }) });
+          if (!resp.ok) return;
+          const d = await resp.json(); ids.forEach(id => { BIO_EMP.r[id] = (d.resultados || {})[id] || null; }); BIO_EMP.t = Date.now();
+        } catch (_) { return; }
+      }
+      const ICON = { "VERIFICADO": ["✔✔", "#2563eb", "Identidad verificada"], "ENROLADO": ["✔", "#2563eb", "Primer ingreso: rostro registrado"], "REVISIÓN MANUAL": ["⚠", "#d97706", "Revisión manual"], "NO COINCIDE": ["✖", "#dc2626", "El rostro no coincide"] };
+      marcas.forEach(m => {
+        const r = BIO_EMP.r[m.dataset.bioE], x = r && ICON[r.estado];
+        m.innerHTML = x ? `<span style="margin-left:4px;font-weight:900;color:${x[1]};font-size:13px;letter-spacing:-2px;vertical-align:middle" title="Biometría (orientativa): ${esc(x[2])}">${x[0]}</span>` : "";
+      });
+      // Ingresos de los últimos 3 min sin resultado: la biometría puede terminar unos segundos después.
+      const recientes = marcas.filter(m => BIO_EMP.r[m.dataset.bioE] === null && Date.now() - new Date(m.dataset.bioH).getTime() < 180000);
+      if (recientes.length && BIO_EMP.reint < 12) {
+        BIO_EMP.reint++; clearTimeout(BIO_EMP.tmr); BIO_EMP.tmr = setTimeout(() => { if (root.isConnected && root.querySelector("[data-bio-e]")) pintarBioEmpresa(root, ev); }, 10000);
+      } else if (!recientes.length) BIO_EMP.reint = 0;
+    }
     // RETENCIÓN BIOMÉTRICA (60 días): la función borra los intentos con más de 60 días y las plantillas de
     // guardias sin ingresos en 60 días. Requiere el PIN de esta pestaña; si falla, se reintenta la próxima vez.
     function purgarBioPin() { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } }
@@ -4441,6 +4467,10 @@
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const _dtSet = modo === "empresa" ? EMPRESA_STATE._dobleTurno : ADMIN_STATE._dobleTurno;
+      // Señal de biometría junto al nombre (celular). La rellenan pintarBioEmpresa / pintarBioPiloto.
+      const bioM = modo === "empresa"
+        ? ((a.foto_path || a.foto_url) && ev.biometria !== false ? `<span data-bio-e="${esc(a.id)}" data-bio-h="${esc(a.hora_ingreso || "")}" class="flex-shrink-0" style="white-space:nowrap"></span>` : "")
+        : (bioAplica(ADMIN_STATE.bioRuts, a.rut) ? `<span data-bio="${esc(a.id)}" class="flex-shrink-0" style="white-space:nowrap"></span>` : "");
       const dobleT = (_dtSet && _dtSet.has(a.rut)) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
@@ -4471,7 +4501,7 @@
           : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`)
         : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
       <span class="flex-1 min-w-0">
-        <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
+        <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${bioM}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
@@ -4514,7 +4544,7 @@
       return `<tr class="border-b border-slate-50${claseSexo}"${rowStyle}>
         <td data-label="#" class="py-1.5 pr-2 ${nCls}">${i + 1}</td>
         <td data-label="RUT" class="pr-2 font-mono whitespace-nowrap ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span></td>
-        <td data-label="Img" class="pr-2 text-center" style="width:1%">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"></span>` : `<span class="text-slate-300">—</span>`}</td>
+        <td data-label="Img" class="pr-2 text-center" style="width:1%">${fotoEmpresaVigente(a) ? `<span class="relative inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400" ${FOTO_EMPRESA_ATTR} style="width:24px;height:24px;background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}" title="Foto de ingreso"></span>` : `<span class="text-slate-300">—</span>`}${(a.foto_path || a.foto_url) && ev.biometria !== false ? `<span data-bio-e="${esc(a.id)}" data-bio-h="${esc(a.hora_ingreso || "")}" style="white-space:nowrap"></span>` : ""}</td>
         <td data-label="Nombre" class="pr-2 font-medium ${nomClsE}"><span class="nomWrap"><span class="nomTxt" title="${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim())}">${esc(((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
         <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && EMPRESA_STATE._puestosMap && EMPRESA_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}">📍 ${esc(EMPRESA_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
         <td data-label="Teléfono" class="pr-2 whitespace-nowrap">${telCell}</td>
@@ -8525,6 +8555,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         bindThemeToggle($("#themeBtnEmp")); // botón día/noche junto a los chips H/M (vista empresa)
         // Carpeta Historial (dentro del QR): abre los turnos anteriores para ver/descargar.
         if ($("#empHist")) $("#empHist").addEventListener("click", () => modalHistorialTurnos(ev));
+        pintarBioEmpresa(app, ev);   // palomas de biometría (solo estado, sin puntaje)
       };
       await paint();
       // Sin refresco periódico: la vista se actualiza SOLO cuando llega un cambio en tiempo real.
