@@ -4217,7 +4217,10 @@
       const pin = (() => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } })(); if (!pin) return;
       const memo = ADMIN_STATE._bio || (ADMIN_STATE._bio = { t: 0, r: {} });
       const ids = [...new Set(marcas.map(m => m.dataset.bio))];
-      if (Date.now() - memo.t > 60000 || ids.some(id => !(id in memo.r))) {
+      // Se vuelve a preguntar si hay ids nuevos, si pasó 1 min, o si alguno aún no tiene resultado (la
+      // biometría puede terminar unos segundos después del ingreso) y pasaron 8 s desde la última consulta.
+      const pendientes = ids.some(id => memo.r[id] === null);
+      if (Date.now() - memo.t > 60000 || ids.some(id => !(id in memo.r)) || (pendientes && Date.now() - memo.t > 8000)) {
         try {
           const resp = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "resultados", pin, asistencia_ids: ids }) });
           if (!resp.ok) return;
@@ -4232,6 +4235,10 @@
         m.innerHTML = `<button data-bio-ver="${esc(m.dataset.bio)}" style="margin-left:4px;font-weight:900;color:${col};font-size:13px;letter-spacing:-2px;vertical-align:middle" title="Biometría ORIENTATIVA: ${esc(txt)}. Clic para ver o restablecer.">${ic}</button>`;
         m.querySelector("button").onclick = (e) => { e.stopPropagation(); detalleBio(r); };
       });
+      // Si quedan ingresos sin resultado, reintenta en 10 s (máx. 12 veces, ~2 min) mientras el panel siga visible.
+      if (ids.some(id => memo.r[id] === null) && (memo.reint = (memo.reint || 0) + 1) <= 12) {
+        clearTimeout(memo.tmr); memo.tmr = setTimeout(() => { if (root.isConnected) pintarBioPiloto(root); }, 10000);
+      } else if (!ids.some(id => memo.r[id] === null)) memo.reint = 0;
     }
     // Detalle de la biometría de un ingreso y opción de RESTABLECER la plantilla del guardia (el próximo
     // ingreso vuelve a enrolar automáticamente). Resultado orientativo: no cambia la asistencia.
