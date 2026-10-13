@@ -18,17 +18,28 @@ No toca `index.html`, el registro de ingreso, `asistencias`, R2 ni las fotos de 
 - **Verificar** (requiere PIN): frente → 2 giros (uno a cada lado, orden aleatorio; la foto de cada giro se toma en un momento aleatorio). Resultado: VERIFICADO / REVISIÓN MANUAL / NO COINCIDE + score.
 - **Ver estado**: últimos 20 intentos (sin plantilla). **Borrar plantilla**: elimina la del RUT.
 
-## Etapa 2: verificación opcional al registrar el ingreso (APAGADA por defecto)
-- Interruptor en Supabase (tabla `config`), clave `biometria_piloto` = RUT del piloto separados por coma.
-  Encender: `insert into config (clave, valor) values ('biometria_piloto', '13637254-8') on conflict (clave) do update set valor = excluded.valor;`
-  Apagar: `update config set valor = '' where clave = 'biometria_piloto';`
-- Solo esos RUT ven, **después** de que su ingreso quedó registrado (asistencia + foto normal), la pantalla opcional
-  de 2 giros. Pueden **Omitir**. Si falla o no hay señal, el ingreso sigue registrado igual.
-- La función solo acepta una asistencia de ese RUT creada hace menos de 15 min, máximo 2 intentos por asistencia.
-- Al guardia no se le muestra el score. En el panel admin aparece una insignia "🧬 … · orientativo" en la fila del
-  piloto (se consulta a la función con el PIN de admin). La vista empresa no la ve.
-- **No se escribe en `asistencias`**: el resultado va a `biometria_intentos` con `asistencia_id`.
-- Ojo: la vista previa usa la MISMA base de datos que producción. Para probar, registra el ingreso en un evento de prueba.
+## Biometría en el ingreso (APAGADA por defecto)
+Interruptor en Supabase, tabla `config`, clave `biometria_piloto`:
+- `''` (vacío) o sin fila = **apagado**: el ingreso es exactamente el de siempre.
+- `todos` = todos los guardias. · Una lista de RUT (`13637254-8,11111111-1`) = solo esos.
+```sql
+insert into config (clave, valor) values ('biometria_piloto', 'todos') on conflict (clave) do update set valor = excluded.valor;  -- encender
+update config set valor = '' where clave = 'biometria_piloto';                                                                    -- apagar
+```
+Para usar `todos`, en Netlify `BIOMETRIA_PILOTO_RUTS` debe ser `*` (el interruptor de la app decide a quién aplica).
+
+Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
+1. **Consentimiento obligatorio** ("Acepto y continuar"). Si no acepta, no se registra el ingreso.
+2. Cámara: **frente** (cuenta regresiva) + **1 giro** (flecha, momento de captura aleatorio).
+3. La captura de **frente es la foto de ingreso**: se registra la asistencia y la foto se sube a **R2 como siempre**.
+4. Después se envían las capturas a la función: **primer ingreso del RUT = enrolamiento automático**;
+   siguientes = **verificación 1:1**. Si la biometría falla o no hay señal, el ingreso y la foto quedan igual.
+5. Panel admin, junto a la foto: **✔✔ azul** verificado · **✔ azul** enrolado (primer ingreso) · **⚠** revisión ·
+   **✖** no coincide. Clic = detalle y **Restablecer plantilla** (se vuelve a enrolar en el próximo ingreso).
+   Solo admin; la vista empresa no lo ve. Resultado ORIENTATIVO.
+- Sin cámara o sin permiso, se usa la foto normal de siempre.
+- La vista previa usa la MISMA base de datos que producción: para probar, usa un evento de prueba y el QR
+  generado desde el panel de la vista previa.
 
 ## Qué se guarda
 - `guardias_biometria`: plantilla **cifrada** (AES-256-GCM, ligada al RUT), modelo, versión, fecha, consentimiento.

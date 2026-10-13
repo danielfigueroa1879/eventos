@@ -64,7 +64,8 @@ const b64u = b => Buffer.from(b).toString("base64url");
 export function crearDesafio(k, rut, tipo, ahora = Date.now(), extra = {}) {
   // 2 giros, uno hacia cada lado, en ORDEN ALEATORIO: un video tendría que acertar el orden.
   const giros = crypto.randomInt(2) ? ["giro_izquierda", "giro_derecha"] : ["giro_derecha", "giro_izquierda"];
-  const pasos = tipo === "enrolamiento" ? ["frente", ...giros, "frente"] : ["frente", ...giros];   // "verificacion" e "ingreso": 3 pasos
+  // "auto" (ingreso con interruptor encendido): frente + UN solo giro, más simple para los guardias.
+  const pasos = tipo === "enrolamiento" ? ["frente", ...giros, "frente"] : tipo === "auto" ? ["frente", giros[0]] : ["frente", ...giros];
   const datos = { rut, tipo, pasos, nonce: crypto.randomBytes(16).toString("hex"), vence: ahora + DESAFIO_MS, ...extra };
   const cuerpo = b64u(JSON.stringify(datos));
   return { token: cuerpo + "." + b64u(crypto.createHmac("sha256", k.firma).update(cuerpo).digest()), pasos, vence: datos.vence };

@@ -9,10 +9,12 @@
 //   { accion: "verificar", pin, rut, token, imagenes: [jpeg base64 x2] }
 //   { accion: "estado", pin, rut }                                   -> enrolado / últimos intentos (sin plantilla)
 //   { accion: "borrar", pin, rut }                                   -> elimina la plantilla de ese RUT
-// ETAPA 2 (desde el formulario de ingreso, SIN PIN, limitado a la asistencia recién creada del mismo RUT):
-//   { accion: "desafio_ingreso", rut, asistencia_id }                -> pasos + token (o { omitir: true })
-//   { accion: "verificar_ingreso", rut, asistencia_id, token, imagenes: [jpeg base64 x3] }
-// ETAPA 2 (panel admin, con PIN): { accion: "resultados", pin, asistencia_ids: [...] } -> último resultado por asistencia
+// INGRESO con interruptor encendido (SIN PIN). La MISMA captura de frente es la foto de ingreso y la
+// imagen biométrica. Primer ingreso de un RUT = enrolamiento automático; los siguientes = verificación.
+//   { accion: "desafio_auto", rut }                                  -> { modo, pasos: [frente, 1 giro], token }
+//   { accion: "procesar_auto", rut, asistencia_id, token, consentimiento: true, imagenes: [jpeg base64 x2] }
+//      (asistencia de ese RUT creada hace < 15 min; nunca se escribe en "asistencias")
+// PANEL ADMIN (con PIN): { accion: "resultados", pin, asistencia_ids: [...] } -> último resultado por asistencia
 // El resultado es ORIENTATIVO: nunca bloquea, modifica ni borra la asistencia (no se escribe en "asistencias").
 //
 // Variables de entorno (SOLO en Netlify; sin ellas la función responde 503 y no hace nada):
@@ -43,9 +45,11 @@ class ErrorCliente extends Error { constructor(msg, status = 400) { super(msg); 
 function config() {
   const k = L.claves(process.env.BIOMETRIA_KEY);
   const srk = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const ruts = String(process.env.BIOMETRIA_PILOTO_RUTS || "").split(",").map(L.normRut).filter(Boolean);
-  if (!k || !srk || !ruts.length) return null;
-  return { k, srk, ruts: new Set(ruts), url: (process.env.SUPABASE_URL || SUPABASE_URL_DEF).replace(/\/+$/, "") };
+  const crudo = String(process.env.BIOMETRIA_PILOTO_RUTS || "");
+  const todos = crudo.split(",").some(x => x.trim() === "*");   // "*" = cualquier RUT
+  const ruts = crudo.split(",").map(L.normRut).filter(Boolean);
+  if (!k || !srk || (!todos && !ruts.length)) return null;
+  return { k, srk, todos, ruts: new Set(ruts), url: (process.env.SUPABASE_URL || SUPABASE_URL_DEF).replace(/\/+$/, "") };
 }
 
 // ---------- Modelos (se cargan una vez por instancia) ----------
@@ -157,48 +161,69 @@ export default async (req) => {
   let b;
   try { b = await req.json(); } catch { return json({ error: "JSON inválido" }, 400); }
   try {
-    if (b.accion === "resultados") b.rut = [...cfg.ruts][0];   // el panel no envía RUT: se valida solo con el PIN
+    // ----- Panel admin -> último resultado por asistencia (solo PIN; sin plantillas ni imágenes) -----
+    if (b.accion === "resultados") {
+      await exigirPin(cfg, b.pin);
+      const ids = (Array.isArray(b.asistencia_ids) ? b.asistencia_ids : []).filter(x => /^[0-9a-f-]{36}$/i.test(String(x))).slice(0, 300);
+      if (!ids.length) return json({ ok: true, resultados: {} });
+      const filas = await sbFetch(cfg, `/rest/v1/biometria_intentos?select=asistencia_id,rut,tipo,estado,score,liveness_ok,fecha&asistencia_id=in.(${ids.map(enc).join(",")})&order=fecha.desc`);
+      const resultados = {};
+      filas.forEach(f => { if (!resultados[f.asistencia_id]) resultados[f.asistencia_id] = { tipo: f.tipo, estado: f.estado, score: f.score, liveness_ok: f.liveness_ok, fecha: f.fecha, rut: f.rut }; });
+      return json({ ok: true, resultados });
+    }
+
     const rut = L.normRut(b.rut);
     if (!rut) throw new ErrorCliente("RUT inválido");
-    if (!cfg.ruts.has(rut)) throw new ErrorCliente("Este RUT no participa en el piloto.", 403);
+    if (!cfg.todos && !cfg.ruts.has(rut)) throw new ErrorCliente("Este RUT no participa en el piloto.", 403);
 
     if (b.accion === "precalentar") {
       const m = await cargarModelos();
       return json({ ok: true, frio: m.frio, carga_ms: m.frio ? m.carga_ms : 0, total_ms: ms(performance.now() - t0) });
     }
 
-    // ----- Etapa 2: desde el formulario de ingreso (sin PIN, ligado a la asistencia recién creada) -----
-    if (b.accion === "desafio_ingreso") {
-      await exigirAsistenciaReciente(cfg, rut, b.asistencia_id);
-      const p = await leerPlantilla(cfg, rut);
-      if (!p || !p.activo) return json({ ok: true, omitir: true, motivo: "sin plantilla" });
+    // ----- Ingreso con interruptor encendido (sin PIN) -----
+    if (b.accion === "desafio_auto") {
       await exigirLimite(cfg, rut);
-      const d = L.crearDesafio(cfg.k, rut, "ingreso", Date.now(), { asistencia_id: b.asistencia_id });
-      return json({ ok: true, pasos: d.pasos, token: d.token, vence: d.vence });
+      const p = await leerPlantilla(cfg, rut);
+      const d = L.crearDesafio(cfg.k, rut, "auto");
+      return json({ ok: true, modo: p && p.activo ? "verificacion" : "enrolamiento", pasos: d.pasos, token: d.token, vence: d.vence });
     }
-    if (b.accion === "verificar_ingreso") {
+    if (b.accion === "procesar_auto") {
       let d;
       try { d = L.leerDesafio(cfg.k, b.token); } catch (e) { throw new ErrorCliente(e.message); }
-      if (d.rut !== rut || d.tipo !== "ingreso" || d.asistencia_id !== b.asistencia_id) throw new ErrorCliente("El desafío no corresponde a esta asistencia.");
+      if (d.rut !== rut || d.tipo !== "auto") throw new ErrorCliente("El desafío no corresponde a este RUT.");
+      if (b.consentimiento !== true) throw new ErrorCliente("Falta el consentimiento.");
       await exigirAsistenciaReciente(cfg, rut, b.asistencia_id);
       if (await nonceUsado(cfg, d.nonce)) throw new ErrorCliente("Este desafío ya fue usado.", 409);
-      const r = await verificarFrames(cfg, rut, d, b.imagenes, t0);
-      await registrarIntento(cfg, { rut, tipo: "verificacion", estado: r.estado, score: r.score, liveness_ok: r.vida.ok, modelo: L.MODELO, metodo: L.METODO + "+ingreso", nonce: d.nonce, asistencia_id: b.asistencia_id, detalle: { motivo: r.motivo, motivos: r.vida.motivos, medidas: r.vida.medidas, version_plantilla: r.version }, duracion_ms: ms(performance.now() - t0) });
-      // Al guardia no se le muestra el score (resultado orientativo, solo para el supervisor).
-      return json({ ok: true, registrado: true, tiempos: r.tiempos });
+      const m = await cargarModelos();
+      const tA = performance.now();
+      const frames = await analizar(m, d.pasos, b.imagenes);
+      const vida = L.evaluarVida(frames);
+      const frente = frames.find(f => f.paso === "frente" && f.emb);
+      const p = await leerPlantilla(cfg, rut);
+      const base = { rut, liveness_ok: vida.ok, modelo: L.MODELO, metodo: L.METODO + "+auto", nonce: d.nonce, asistencia_id: b.asistencia_id };
+      const tiempos = () => ({ frio: m.frio, analisis_ms: ms(performance.now() - tA), total_ms: ms(performance.now() - t0) });
+      if (!p || !p.activo) {
+        // Primer ingreso: ENROLAMIENTO AUTOMÁTICO con la captura de frente (solo si superó la prueba de vida).
+        if (!vida.ok || !frente) {
+          await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "RECHAZADO", detalle: { motivos: vida.motivos, medidas: vida.medidas }, duracion_ms: ms(performance.now() - t0) });
+          return json({ ok: true, resultado: "sin_enrolar", tiempos: tiempos() });
+        }
+        const ahora = new Date().toISOString();
+        const fila = { rut, plantilla: L.cifrarPlantilla(cfg.k, rut, frente.emb), modelo: L.MODELO, version: p ? p.version + 1 : 1, muestras: 1, fecha_enrolamiento: ahora, consentimiento_fecha: ahora, enrolado_por: "auto-ingreso", activo: true };
+        await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "ENROLADO", detalle: { medidas: vida.medidas, version: fila.version }, duracion_ms: ms(performance.now() - t0) });
+        await sbFetch(cfg, "/rest/v1/guardias_biometria?on_conflict=rut", { method: "POST", headers: { prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(fila) });
+        return json({ ok: true, resultado: "enrolado", tiempos: tiempos() });
+      }
+      // Ingresos siguientes: VERIFICACIÓN 1:1 contra la plantilla del RUT.
+      const score = frente ? +L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb).toFixed(4) : null;
+      const r = L.decidir(score, vida);
+      await registrarIntento(cfg, { ...base, tipo: "verificacion", estado: r.estado, score, detalle: { motivo: r.motivo, motivos: vida.motivos, medidas: vida.medidas, version_plantilla: p.version }, duracion_ms: ms(performance.now() - t0) });
+      // Al guardia no se le muestra el estado ni el score (resultado orientativo, solo para el supervisor).
+      return json({ ok: true, resultado: "registrado", tiempos: tiempos() });
     }
 
     await exigirPin(cfg, b.pin);
-
-    // ----- Etapa 2: panel admin -> último resultado por asistencia (sin plantillas ni imágenes) -----
-    if (b.accion === "resultados") {
-      const ids = (Array.isArray(b.asistencia_ids) ? b.asistencia_ids : []).filter(x => /^[0-9a-f-]{36}$/i.test(String(x))).slice(0, 300);
-      if (!ids.length) return json({ ok: true, resultados: {} });
-      const filas = await sbFetch(cfg, `/rest/v1/biometria_intentos?select=asistencia_id,estado,score,liveness_ok,fecha&asistencia_id=in.(${ids.map(enc).join(",")})&order=fecha.desc`);
-      const resultados = {};
-      filas.forEach(f => { if (!resultados[f.asistencia_id]) resultados[f.asistencia_id] = { estado: f.estado, score: f.score, liveness_ok: f.liveness_ok, fecha: f.fecha }; });
-      return json({ ok: true, resultados });
-    }
 
     if (b.accion === "desafio") {
       const tipo = b.tipo === "enrolamiento" ? "enrolamiento" : "verificacion";
@@ -269,17 +294,3 @@ export default async (req) => {
     return json({ error: "Error del servidor" }, 502);
   }
 };
-
-// Verificación 1:1 de un desafío ya validado (la usa el ingreso). Devuelve estado, score y prueba de vida.
-async function verificarFrames(cfg, rut, d, imagenes, t0) {
-  const m = await cargarModelos();
-  const tA = performance.now();
-  const frames = await analizar(m, d.pasos, imagenes);
-  const vida = L.evaluarVida(frames);
-  const p = await leerPlantilla(cfg, rut);
-  let score = null;
-  const frente = frames.find(f => f.paso === "frente" && f.emb);
-  if (p && p.activo && frente) score = +L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb).toFixed(4);
-  const r = L.decidir(score, vida);
-  return { ...r, score, vida, version: p ? p.version : null, tiempos: { frio: m.frio, analisis_ms: ms(performance.now() - tA), total_ms: ms(performance.now() - t0) } };
-}
