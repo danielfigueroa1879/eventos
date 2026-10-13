@@ -18,6 +18,18 @@ No toca `index.html`, el registro de ingreso, `asistencias`, R2 ni las fotos de 
 - **Verificar** (requiere PIN): frente → 2 giros (uno a cada lado, orden aleatorio; la foto de cada giro se toma en un momento aleatorio). Resultado: VERIFICADO / REVISIÓN MANUAL / NO COINCIDE + score.
 - **Ver estado**: últimos 20 intentos (sin plantilla). **Borrar plantilla**: elimina la del RUT.
 
+## Etapa 2: verificación opcional al registrar el ingreso (APAGADA por defecto)
+- Interruptor en Supabase (tabla `config`), clave `biometria_piloto` = RUT del piloto separados por coma.
+  Encender: `insert into config (clave, valor) values ('biometria_piloto', '13637254-8') on conflict (clave) do update set valor = excluded.valor;`
+  Apagar: `update config set valor = '' where clave = 'biometria_piloto';`
+- Solo esos RUT ven, **después** de que su ingreso quedó registrado (asistencia + foto normal), la pantalla opcional
+  de 2 giros. Pueden **Omitir**. Si falla o no hay señal, el ingreso sigue registrado igual.
+- La función solo acepta una asistencia de ese RUT creada hace menos de 15 min, máximo 2 intentos por asistencia.
+- Al guardia no se le muestra el score. En el panel admin aparece una insignia "🧬 … · orientativo" en la fila del
+  piloto (se consulta a la función con el PIN de admin). La vista empresa no la ve.
+- **No se escribe en `asistencias`**: el resultado va a `biometria_intentos` con `asistencia_id`.
+- Ojo: la vista previa usa la MISMA base de datos que producción. Para probar, registra el ingreso en un evento de prueba.
+
 ## Qué se guarda
 - `guardias_biometria`: plantilla **cifrada** (AES-256-GCM, ligada al RUT), modelo, versión, fecha, consentimiento.
 - `biometria_intentos`: tipo, estado, score, resultado de la prueba de vida, medidas y tiempos. **Sin imágenes.**
