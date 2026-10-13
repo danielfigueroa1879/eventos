@@ -4,7 +4,6 @@
   node_bundler = "esbuild"
   included_files = [
     "netlify/functions/biometria/modelos/*.onnx",
-    "netlify/functions/biometria/prueba/*.jpg",
     "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
     "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs",
   ]

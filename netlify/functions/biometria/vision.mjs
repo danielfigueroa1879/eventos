@@ -79,3 +79,13 @@ export async function embedding(rec, im, cara) {
 }
 
 export const coseno = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+
+// Orientación aproximada de la cabeza a partir de los 5 puntos de YuNet (imagen SIN espejo).
+// giro = desplazamiento horizontal de la nariz respecto del centro de los ojos, dividido por la
+// distancia entre ojos: ~0 de frente; positivo/negativo al girar (ver CONVENCION_GIRO en logica.mjs).
+export function pose(cara) {
+  const [ojoA, ojoB, nariz] = cara.kps;
+  const cx = (ojoA[0] + ojoB[0]) / 2, cy = (ojoA[1] + ojoB[1]) / 2;
+  const dOjos = Math.hypot(ojoB[0] - ojoA[0], ojoB[1] - ojoA[1]) || 1;
+  return { giro: (nariz[0] - cx) / dOjos, inclinacion: (nariz[1] - cy) / dOjos, dist_ojos: dOjos };
+}
