@@ -1,0 +1,9 @@
+# Solo configura la función del PILOTO BIOMÉTRICO. No define [build]: la configuración del
+# sitio (publicación, rama, etc.) sigue siendo la del panel de Netlify, igual que antes.
+[functions.biometria]
+  node_bundler = "esbuild"
+  included_files = [
+    "netlify/functions/biometria/modelos/*.onnx",
+    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
+    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs",
+  ]

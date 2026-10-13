@@ -2300,6 +2300,24 @@
       });
     }
 
+    // BIOMETRÍA EN EL INGRESO — APAGADA por defecto. Interruptor: config "biometria_piloto" =
+    // "todos" (todos los guardias) o una lista de RUT separados por coma (vacío o ausente = apagado).
+    // Si aplica, la "Foto de verificación" se reemplaza por la captura biométrica (frente + 1 giro): la
+    // MISMA foto de frente se sube a R2 como siempre y sirve para enrolar (primer ingreso) o verificar.
+    // Nunca bloquea ni modifica la asistencia. El código de la cámara está en biometria-cliente.js.
+    const bioRutsDe = v => new Set(String(v || "").split(",").map(x => /^\s*todos\s*$/i.test(x) ? "*" : limpiaRut(x)).filter(r => r === "*" || r.length > 1));
+    const bioAplica = (set, rut) => !!set && (set.has("*") || set.has(limpiaRut(rut)));
+    async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
+    function cargarBioCliente() {
+      if (window.BioIngreso) return Promise.resolve();
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+    }
+    // Captura biométrica en lugar de la foto normal. null = no aplica o falló -> se usa la foto normal.
+    async function capturaBiometrica(rut) {
+      try { await cargarBioCliente(); return await window.BioIngreso.capturar({ rut, fotoDesde: v => _fotoWebpDesde(v, v.videoWidth, v.videoHeight) }); }
+      catch (e) { console.warn("biometría:", e && e.message); return null; }
+    }
+
     // Abre el modal de captura. Resuelve con el Blob WebP (usar foto) o null (cancelar).
     function capturarFotoIngreso() {
       return new Promise((resolve) => {
@@ -2703,6 +2721,8 @@
       let fotoRequerida = false;
       try { fotoRequerida = (await Data.getConfig("foto_ingreso")) === "1"; } catch (_) { fotoRequerida = false; }
       let fotoBlob = null; // foto capturada (WebP HD) pendiente de subir tras crear la asistencia
+      const bioRutsP = leerBioRuts();   // biometría (en segundo plano; vacío = apagado)
+      let bioPend = null;               // capturas biométricas pendientes de enviar tras registrar
       app.innerHTML = `
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
@@ -2970,6 +2990,15 @@
         // FOTO DE VERIFICACIÓN: si está activada, se exige tomar la foto ANTES de registrar.
         // Deja constancia de quién ingresó realmente los datos. Si cancela, no se registra.
         if (fotoRequerida && !fotoBlob) {
+          // BIOMETRÍA (solo con el interruptor encendido para este RUT): la captura de frente es la foto.
+          let aplicaBio = false; try { aplicaBio = bioAplica(await bioRutsP, rut.value); } catch (_) { }
+          if (aplicaBio) {
+            const bio = await capturaBiometrica(formatRut(rut.value));
+            if (bio && bio.cancelado) { toast("Necesitas tomar la foto para completar tu ingreso.", false, 3500); return; }
+            if (bio && bio.fotoBlob) { fotoBlob = bio.fotoBlob; bioPend = bio.token ? bio : null; }
+          }
+        }
+        if (fotoRequerida && !fotoBlob) {
           const blob = await capturarFotoIngreso();
           if (!blob) { toast("Necesitas tomar la foto para completar tu ingreso.", false, 3500); return; }
           fotoBlob = blob;
@@ -3013,6 +3042,12 @@
             submit.textContent = "Guardando foto…";
             try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fotoBlob), TIMEOUT_MS); if (u) asis.foto_url = u; fotoBlob = null; }
             catch (e) { console.error("foto:", e); toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500); }
+          }
+          // 2c) BIOMETRÍA: la foto YA se subió (paso 2b, R2 como siempre). Ahora se enrola o verifica con
+          //     las mismas capturas. Si falla o no hay señal, el ingreso y la foto quedan igual.
+          if (bioPend) {
+            const b = bioPend; bioPend = null; submit.textContent = "Verificando…";
+            try { await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 35000); } catch (_) { }
           }
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
           mostrarIngresoExitoso(asis);
@@ -3186,7 +3221,7 @@
       if (ADMIN_STATE._tick) clearInterval(ADMIN_STATE._tick);
       ADMIN_STATE._tick = setInterval(() => { if (pausaApp.saltar()) return; if (ADMIN_STATE.selected) renderMain(); }, 5 * 60 * 1000);
       // Cargar el estado del interruptor "Foto de ingreso" ANTES del primer render (columna + botón).
-      ADMIN_STATE.fotoIngreso = await cargarFotoIngresoConfig();
+      [ADMIN_STATE.fotoIngreso, ADMIN_STATE.bioRuts] = await Promise.all([cargarFotoIngresoConfig(), leerBioRuts()]);
       // RETENCIÓN de fotos: al entrar al panel se borran las fotos con más de FOTO_RETENCION_DIAS días (máx. 1 vez cada 6 h por dispositivo).
       try {
         const ultimaPurga = +(localStorage.getItem("os10_purga_fotos") || 0);
@@ -4025,6 +4060,7 @@
       filtrarLista();
       main.querySelectorAll(".turnoChip").forEach(c => c.addEventListener("click", () => { ADMIN_STATE.turnoFiltro = c.dataset.turno; renderMain(); }));
       main.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev)));
+      if (ADMIN_STATE.bioRuts && ADMIN_STATE.bioRuts.size) pintarBioPiloto(main);
       main.querySelectorAll("[data-foto]").forEach(x => x.addEventListener("click", (e) => { e.stopPropagation(); const a = asist.find(a => a.id === x.dataset.foto); if (a && a.foto_url) { const nom = ((a.guardia && a.guardia.nombres || "") + " " + (a.guardia && a.guardia.apellidos || "")).trim(); verFotoIngresoModal(a.foto_url, nom, a); } }));
       main.querySelectorAll("[data-edit]").forEach(x => x.addEventListener("click", () => modalEditarGuardia(asist.find(a => a.id === x.dataset.edit), ev)));
       main.querySelectorAll("[data-approve]").forEach(x => x.addEventListener("click", async () => {
@@ -4174,6 +4210,72 @@
     // Rojo sólido si hay alguna detención; rojo claro si solo infracciones.
     function fichaColor(g) { return fichaTieneDetenido(g) ? { bg: "#dc2626", fg: "#ffffff" } : { bg: "#fee2e2", fg: "#b91c1c" }; }
     function fichaTitle(g) { return getInfracciones(g).map(r => { const d = recDetalle(r); return recFrase(r) + (d ? ` (${d})` : ""); }).join(" | "); }
+    // PILOTO BIOMÉTRICO: insignia orientativa en el panel (solo filas de RUT del piloto). Pide los
+    // resultados a la función con el PIN de esta pestaña; los recuerda 60 s para no repetir consultas.
+    async function pintarBioPiloto(root) {
+      const marcas = [...root.querySelectorAll("[data-bio]")]; if (!marcas.length) return;
+      // Si no hay PIN en esta pestaña o la consulta falla, se muestra un 🧬 gris que explica el problema
+      // (clic = ingresar el PIN y reintentar), en vez de dejar la celda en blanco sin avisar.
+      const aviso = (txt, pedirPin) => marcas.forEach(m => {
+        m.innerHTML = `<button style="margin-left:4px;font-size:12px;opacity:.55;vertical-align:middle" title="Biometría: ${esc(txt)}">🧬</button>`;
+        m.querySelector("button").onclick = async (e) => {
+          e.stopPropagation();
+          if (!pedirPin) { toast("Biometría: " + txt, false, 5000); return; }
+          const v = prompt("Biometría: ingresa el PIN de administrador para ver los resultados");
+          if (v) { try { sessionStorage.setItem("os10_admin_pin", v); } catch (_) { } if (ADMIN_STATE._bio) ADMIN_STATE._bio.t = 0; pintarBioPiloto(root); }
+        };
+      });
+      const pin = (() => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } })();
+      if (!pin) { aviso("falta el PIN en esta pestaña (clic para ingresarlo)", true); return; }
+      const memo = ADMIN_STATE._bio || (ADMIN_STATE._bio = { t: 0, r: {} });
+      const ids = [...new Set(marcas.map(m => m.dataset.bio))];
+      // Se vuelve a preguntar si hay ids nuevos, si pasó 1 min, o si alguno aún no tiene resultado (la
+      // biometría puede terminar unos segundos después del ingreso) y pasaron 8 s desde la última consulta.
+      const pendientes = ids.some(id => memo.r[id] === null);
+      if (Date.now() - memo.t > 60000 || ids.some(id => !(id in memo.r)) || (pendientes && Date.now() - memo.t > 8000)) {
+        try {
+          const resp = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "resultados", pin, asistencia_ids: ids }) });
+          if (!resp.ok) {
+            const err = (await resp.json().catch(() => ({}))).error || ("HTTP " + resp.status);
+            if (resp.status === 401) { try { sessionStorage.removeItem("os10_admin_pin"); } catch (_) { } aviso("PIN incorrecto (clic para ingresarlo)", true); }
+            else aviso("no se pudo consultar: " + err, false);
+            return;
+          }
+          const d = await resp.json(); ids.forEach(id => { memo.r[id] = (d.resultados || {})[id] || null; }); memo.t = Date.now();
+        } catch (e) { aviso("sin conexión con la función", false); return; }
+      }
+      const ICON = { "VERIFICADO": ["✔✔", "#2563eb"], "ENROLADO": ["✔", "#2563eb"], "REVISIÓN MANUAL": ["⚠", "#d97706"], "NO COINCIDE": ["✖", "#dc2626"], "RECHAZADO": ["–", "#94a3b8"] };
+      marcas.forEach(m => {
+        const r = memo.r[m.dataset.bio]; if (!r) { m.innerHTML = ""; return; }
+        const [ic, col] = ICON[r.estado] || ["?", "#94a3b8"];
+        const txt = r.estado === "ENROLADO" ? "Enrolado (primer ingreso: foto de referencia)" : r.estado === "RECHAZADO" ? "No se pudo enrolar (prueba de vida no superada)" : `${r.estado}${r.score != null ? " · score " + Number(r.score).toFixed(2) : ""}`;
+        m.innerHTML = `<button data-bio-ver="${esc(m.dataset.bio)}" style="margin-left:4px;font-weight:900;color:${col};font-size:13px;letter-spacing:-2px;vertical-align:middle" title="Biometría ORIENTATIVA: ${esc(txt)}. Clic para ver o restablecer.">${ic}</button>`;
+        m.querySelector("button").onclick = (e) => { e.stopPropagation(); detalleBio(r); };
+      });
+      // Si quedan ingresos sin resultado, reintenta en 10 s (máx. 12 veces, ~2 min) mientras el panel siga visible.
+      if (ids.some(id => memo.r[id] === null) && (memo.reint = (memo.reint || 0) + 1) <= 12) {
+        clearTimeout(memo.tmr); memo.tmr = setTimeout(() => { if (root.isConnected) pintarBioPiloto(root); }, 10000);
+      } else if (!ids.some(id => memo.r[id] === null)) memo.reint = 0;
+    }
+    // Detalle de la biometría de un ingreso y opción de RESTABLECER la plantilla del guardia (el próximo
+    // ingreso vuelve a enrolar automáticamente). Resultado orientativo: no cambia la asistencia.
+    function detalleBio(r) {
+      const fecha = r.fecha ? new Date(r.fecha).toLocaleString("es-CL") : "—";
+      openModal(`<h2 class="font-bold text-slate-800 mb-1">🧬 Verificación facial (orientativa)</h2>
+        <p class="text-sm text-slate-600 mb-1"><b>${esc(r.estado)}</b>${r.score != null ? " · score " + Number(r.score).toFixed(3) : ""} · prueba de vida: ${r.liveness_ok ? "superada" : "no superada"}</p>
+        <p class="text-xs text-slate-400 mb-3">${esc(r.tipo === "enrolamiento" ? "Primer ingreso (enrolamiento)" : "Verificación")} · ${esc(fecha)} · RUT ${esc(r.rut || "")}</p>
+        <p class="text-xs text-slate-500 mb-3">Es solo un apoyo para el supervisor: no bloquea ni modifica la asistencia.</p>
+        <div class="flex gap-2"><button id="bio_reset" class="btn btn-ghost text-sm text-red-600 flex-1">Restablecer plantilla</button><button id="bio_cerrar" class="btn btn-p text-sm flex-1">Cerrar</button></div>`);
+      $("#bio_cerrar").addEventListener("click", closeModal);
+      $("#bio_reset").addEventListener("click", () => confirmar(`¿Restablecer la plantilla facial del RUT ${r.rut}? En su próximo ingreso se volverá a enrolar automáticamente.`, async () => {
+        const pin = (() => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } })();
+        try {
+          const resp = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "borrar", pin, rut: r.rut }) });
+          if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).error || "HTTP " + resp.status);
+          toast("Plantilla restablecida. Se enrolará en su próximo ingreso."); closeModal();
+        } catch (e) { toast("No se pudo restablecer: " + (e.message || e), false); }
+      }));
+    }
     function fila(a, i, ev, rutCount, nomCount, usaT) {
       const g = a.guardia || {};
       const esSup = !!a.es_supervisor;
@@ -4204,7 +4306,7 @@
     <td data-label="RUT" class="pr-2 font-mono ${rCls}"><span data-copyrut="${esc(a.rut)}" role="button" class="cursor-pointer hover:underline" title="Tocar para copiar el RUT">${esc(a.rut)}</span>${dup ? ' <span class="text-red-600" title="Duplicado">⚠</span>' : ''}</td>
     ${FOTO_INGRESO_ON ? `<td data-label="Img" class="pr-2 text-center" style="width:1%">${a.foto_url
       ? `<button data-foto="${a.id}" class="inline-block align-middle rounded-full overflow-hidden ring-1 ring-emerald-400 hover:ring-2" style="width:24px;height:24px;line-height:0" title="Ver foto de ingreso (ampliar)"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" style="display:block" loading="lazy"></button>`
-      : `<span class="text-slate-300" title="Sin foto">—</span>`}</td>` : ""}
+      : `<span class="text-slate-300" title="Sin foto">—</span>`}${bioAplica(ADMIN_STATE.bioRuts, a.rut) ? `<span data-bio="${esc(a.id)}" style="white-space:nowrap"></span>` : ""}</td>` : ""}
     <td data-label="Nombre" class="pr-2 font-medium ${nomCls}"><span class="nomWrap"><span class="nomTxt" title="${esc(nom || "")}">${esc(nom || "—")}</span>${sup}${spd}${inf}${dobleT}${pend}</span></td>
     <td data-label="Distribución" class="pr-2" style="width:1%;white-space:nowrap">${(a.puesto_id && ADMIN_STATE._puestosMap && ADMIN_STATE._puestosMap[a.puesto_id]) ? `<button data-goto-puesto="${esc(a.puesto_id)}" class="badge hover:brightness-95 cursor-pointer inline-block align-middle overflow-hidden text-ellipsis whitespace-nowrap" style="background:#e0e7ff;color:#3730a3;max-width:110px" title="Ver en el mapa: ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}">📍 ${esc(ADMIN_STATE._puestosMap[a.puesto_id])}</button>` : `<span class="text-slate-300">—</span>`}</td>
     <td data-label="Teléfono" class="pr-2">${esc(g.telefono || "—")}</td>

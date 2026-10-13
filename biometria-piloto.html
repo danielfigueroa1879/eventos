@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Piloto biométrico</title>
+  <!-- PILOTO BIOMÉTRICO (Etapa 1). Página aislada: NO forma parte del registro de ingreso, no usa
+       index.html, R2 ni las fotos de asistencia. Solo cámara en vivo (no se aceptan archivos). -->
+  <style>
+    :root { --bg: #f1f5f9; --card: #ffffff; --tx: #0f172a; --mut: #64748b; --bd: #e2e8f0; --pri: #0f5323; --ok: #15803d; --rev: #b45309; --no: #b91c1c; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0b1220; --card: #111a2e; --tx: #e2e8f0; --mut: #94a3b8; --bd: #1e293b; --pri: #22a05a; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--tx); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 480px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 18px; margin: 4px 0 2px; }
+    .aviso { font-size: 12px; color: var(--mut); margin: 0 0 12px; }
+    .card { background: var(--card); border: 1px solid var(--bd); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    label { display: block; font-size: 12px; color: var(--mut); margin: 8px 0 4px; }
+    input[type=text], input[type=password] { width: 100%; padding: 10px 12px; border: 1px solid var(--bd); border-radius: 10px; background: transparent; color: var(--tx); font-size: 16px; }
+    .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    button { padding: 11px 10px; border-radius: 10px; border: 1px solid var(--bd); background: transparent; color: var(--tx); font-size: 14px; font-weight: 600; cursor: pointer; }
+    button.pri { background: var(--pri); border-color: var(--pri); color: #fff; }
+    button.peligro { color: var(--no); }
+    button:disabled { opacity: .5; cursor: default; }
+    .consent { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; margin-top: 10px; }
+    .consent input { margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; }
+    #capa { position: fixed; inset: 0; z-index: 2147483647; background: #000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); gap: 12px; }
+    #capa.on { display: flex; }
+    #escena { position: relative; width: 100%; max-width: 420px; max-height: 70vh; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; background: #0f172a; }
+    /* Flecha de giro: la vista previa es un espejo (como un selfie), así que "tu izquierda" se ve a la
+       izquierda de la pantalla: la flecha apunta hacia donde la persona debe mirar. */
+    #flecha { position: absolute; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: center; gap: 4px; color: #fde047; text-shadow: 0 2px 10px #000; pointer-events: none; }
+    #flecha .f { font-size: 92px; line-height: 1; font-weight: 900; }
+    #flecha .t { font-size: 14px; font-weight: 800; background: rgba(0,0,0,.6); padding: 4px 8px; border-radius: 8px; color: #fff; white-space: nowrap; }
+    #flecha.izq { display: flex; left: 6px; } #flecha.izq .f { animation: izq .9s ease-in-out infinite; }
+    #flecha.der { display: flex; right: 6px; } #flecha.der .f { animation: der .9s ease-in-out infinite; }
+    @keyframes izq { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-14px); } }
+    @keyframes der { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(14px); } }
+    #mira { position: absolute; left: 0; right: 0; top: 46%; text-align: center; display: none; pointer-events: none; }
+    #mira span { font-size: 15px; font-weight: 800; background: rgba(0,0,0,.6); color: #fff; padding: 5px 10px; border-radius: 8px; }
+    #capaMsg { color: #e2e8f0; font-size: 15px; text-align: center; min-height: 20px; max-width: 420px; }
+    #capaBtns { display: flex; gap: 10px; width: 100%; max-width: 420px; }
+    #capaBtns button { flex: 1; padding: 14px; font-size: 16px; color: #fff; border-color: #475569; }
+    #escena video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    #escena svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    #instr { position: absolute; left: 0; right: 0; top: 0; padding: 12px 10px 18px; text-align: center; color: #fff; font-weight: 800; font-size: 19px; background: linear-gradient(rgba(0,0,0,.75), transparent); }
+    #cuenta { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; color: #fff; font-size: 54px; font-weight: 900; text-shadow: 0 2px 8px #000; }
+    #msg { font-size: 13px; color: var(--mut); min-height: 18px; margin-top: 8px; text-align: center; }
+    .res { border-radius: 12px; padding: 12px; color: #fff; font-weight: 800; font-size: 18px; text-align: center; }
+    .res small { display: block; font-weight: 500; font-size: 13px; opacity: .95; margin-top: 4px; }
+    pre { white-space: pre-wrap; word-break: break-word; font-size: 11.5px; color: var(--mut); margin: 8px 0 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+    td, th { border-bottom: 1px solid var(--bd); padding: 5px 4px; text-align: left; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🧪 Piloto biométrico (1:1)</h1>
+  <p class="aviso">Solo para pruebas internas autorizadas. No afecta el registro de ingreso ni las asistencias. Requiere PIN de administrador.</p>
+
+  <div class="card">
+    <label for="rut">RUT del participante</label>
+    <input id="rut" type="text" inputmode="text" autocomplete="off" placeholder="12.345.678-9">
+    <label for="pin">PIN de administrador</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off">
+    <div class="consent">
+      <input id="consent" type="checkbox">
+      <label for="consent" style="margin:0;color:inherit;font-size:12.5px">Doy mi consentimiento explícito para que se genere y guarde, cifrada, una plantilla biométrica de mi rostro, solo para este piloto de verificación 1:1. No se guardan fotografías. Puedo pedir su eliminación en cualquier momento (Ley N° 19.628 y Ley N° 21.719).</label>
+    </div>
+    <div class="fila">
+      <button id="bEnrolar" class="pri">Enrolar</button>
+      <button id="bVerificar" class="pri">Verificar</button>
+      <button id="bEstado">Ver estado</button>
+      <button id="bBorrar" class="peligro">Borrar plantilla</button>
+    </div>
+  </div>
+
+  <div id="capa" role="dialog" aria-modal="true">
+  <div id="escena">
+    <video id="video" playsinline autoplay muted></video>
+    <svg viewBox="0 0 300 400" aria-hidden="true">
+      <defs><mask id="m"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="black"/></mask></defs>
+      <rect width="300" height="400" fill="rgba(15,23,42,.5)" mask="url(#m)"/>
+      <ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="7 7"/>
+    </svg>
+    <div id="flecha"><div class="f"></div><div class="t">Mira hacia este lado</div></div>
+    <div id="mira"><span>🎯 Mira directo a la cámara</span></div>
+    <div id="cuenta"></div>
+    <div id="instr"></div>
+  </div>
+  <div id="capaMsg"></div>
+  <div id="capaBtns"><button id="bCancelar">Cancelar</button><button id="bListo" class="pri" disabled>Estoy listo</button></div>
+  </div>
+  <div id="msg"></div>
+  <div id="salida"></div>
+</main>
+<script>
+(() => {
+  "use strict";
+  const API = "/.netlify/functions/biometria";
+  const $ = id => document.getElementById(id);
+  const msg = (t, c) => { $("msg").textContent = t || ""; $("msg").style.color = c || ""; };
+  const esperar = n => new Promise(r => setTimeout(r, n));
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const INSTR = { frente: "Mira al frente", giro_izquierda: "Gira la cabeza hacia la flecha ⬅", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
+  // Muestra la flecha del lado a girar (o "mira a la cámara" en los pasos de frente).
+  function indicar(paso) {
+    const f = $("flecha"); f.className = ""; $("mira").style.display = "none";
+    if (paso === "giro_izquierda") { f.className = "izq"; f.querySelector(".f").textContent = "⬅"; }
+    else if (paso === "giro_derecha") { f.className = "der"; f.querySelector(".f").textContent = "➡"; }
+    else if (paso === "frente") $("mira").style.display = "block";
+  }
+  let stream = null, ocupado = false, cancelado = false, rechazarListo = null;
+  const revisar = () => { if (cancelado) throw new Error("Cancelado."); };
+
+  async function api(cuerpo) {
+    const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    return d;
+  }
+  const datos = () => ({ rut: $("rut").value.trim(), pin: $("pin").value });
+  function bloquear(b) { ocupado = b; ["bEnrolar", "bVerificar", "bEstado", "bBorrar"].forEach(id => $(id).disabled = b); }
+
+  async function abrirCamara() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("Este navegador no permite usar la cámara.");
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
+    if (cancelado) { cerrarCamara(); throw new Error("Cancelado."); }
+    const v = $("video"); v.srcObject = stream; $("capa").classList.add("on");
+    await new Promise(res => { if (v.readyState >= 2) res(); else v.onloadeddata = () => res(); });
+    await esperar(400);
+  }
+  function cerrarCamara() {
+    try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) { }
+    stream = null; indicar(null); $("capa").classList.remove("on"); $("instr").textContent = ""; $("cuenta").textContent = ""; $("capaMsg").textContent = "";
+  }
+  // Captura del video en vivo, SIN espejo, a máximo 480 px de ancho, JPEG.
+  function capturar() {
+    const v = $("video"), k = Math.min(1, 480 / v.videoWidth);
+    const c = document.createElement("canvas"); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+    c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+  }
+  // La cámara queda abierta hasta que la persona se encuadra y pulsa "Estoy listo".
+  function esperarListo() {
+    return new Promise((ok, no) => {
+      $("instr").textContent = "Encuadra tu rostro dentro del óvalo";
+      $("capaMsg").textContent = "Con buena luz y de frente. Cuando estés listo, pulsa el botón.";
+      const bl = $("bListo"); bl.disabled = false;
+      rechazarListo = no;
+      bl.onclick = () => { bl.onclick = null; bl.disabled = true; rechazarListo = null; ok(); };
+    });
+  }
+  async function guiar(pasos) {
+    const imgs = [];
+    for (let i = 0; i < pasos.length; i++) {
+      $("instr").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
+      $("capaMsg").textContent = pasos[i].startsWith("giro_") ? "Gira la cabeza (unos 30°, como mirando hacia tu hombro) y mantenla hasta ver 📸" : "Quédate quieto mirando la cámara";
+      if (pasos[i].startsWith("giro_")) {
+        // Giro: SIN cuenta regresiva y con un momento de captura aleatorio (1,5 a 3 s), para que un
+        // video grabado no pueda adivinar cuándo se toma la foto. Se avisa con un flash.
+        $("cuenta").textContent = "";
+        const t = 1500 + Math.floor(Math.random() * 1500);
+        for (let w = 0; w < t; w += 250) { revisar(); await esperar(250); }
+      } else {
+        for (let s = 3; s > 0; s--) { revisar(); $("cuenta").textContent = s; await esperar(1000); }
+      }
+      revisar();
+      $("cuenta").textContent = "📸"; imgs.push(capturar()); await esperar(350);
+    }
+    indicar(null); $("cuenta").textContent = ""; $("instr").textContent = "Procesando…"; $("capaMsg").textContent = "Comparando, espera unos segundos…";
+    return imgs;
+  }
+
+  function pintarResultado(d, tipo) {
+    const color = { "VERIFICADO": "var(--ok)", "ENROLADO": "var(--ok)", "REVISIÓN MANUAL": "var(--rev)", "NO COINCIDE": "var(--no)", "RECHAZADO": "var(--no)" }[d.estado] || "var(--mut)";
+    const det = [];
+    if (d.score != null) det.push("Score: " + d.score.toFixed(3));
+    if (d.version) det.push("Plantilla versión " + d.version);
+    if (d.motivo) det.push(d.motivo);
+    $("salida").innerHTML = `<div class="card"><div class="res" style="background:${color}">${esc(d.estado)}<small>${esc(det.join(" · "))}</small></div>
+      ${(d.motivos && d.motivos.length) ? `<pre>Motivos:\n- ${d.motivos.map(esc).join("\n- ")}</pre>` : ""}
+      <pre>${esc(JSON.stringify({ liveness_ok: d.liveness_ok, medidas: d.medidas, umbrales: d.umbrales, tiempos: d.tiempos }, null, 1))}</pre></div>`;
+  }
+
+  async function flujo(tipo) {
+    if (ocupado) return;
+    const { rut, pin } = datos();
+    if (!rut || !pin) { msg("Ingresa RUT y PIN.", "var(--no)"); return; }
+    if (tipo === "enrolamiento" && !$("consent").checked) { msg("Para enrolar debes marcar el consentimiento.", "var(--no)"); return; }
+    bloquear(true); cancelado = false; $("salida").innerHTML = ""; msg("Abriendo cámara…");
+    try {
+      // Precarga: los modelos se cargan en el servidor mientras se abre la cámara y se hacen los pasos.
+      const pre = api({ accion: "precalentar", rut }).catch(() => null);
+      await abrirCamara(); revisar();
+      msg("");
+      await esperarListo(); revisar();
+      $("capaMsg").textContent = "Preparando…";
+      const d = await api({ accion: "desafio", rut, pin, tipo }); revisar();
+      const imagenes = await guiar(d.pasos);
+      await pre; revisar();
+      msg("Comparando…");
+      const r = await api({ accion: tipo === "enrolamiento" ? "enrolar" : "verificar", rut, pin, token: d.token, imagenes, consentimiento: tipo === "enrolamiento" ? true : undefined });
+      cerrarCamara(); msg(""); pintarResultado(r, tipo);
+    } catch (e) { cerrarCamara(); msg(e.message || String(e), "var(--no)"); }
+    finally { bloquear(false); }
+  }
+
+  async function estado() {
+    if (ocupado) return;
+    const { rut, pin } = datos(); if (!rut || !pin) { msg("Ingresa RUT y PIN.", "var(--no)"); return; }
+    bloquear(true); msg("Consultando…");
+    try {
+      const d = await api({ accion: "estado", rut, pin }); msg("");
+      // Motivo y medidas de cada intento (giro de la cabeza, tamaño del rostro) para entender los rechazos.
+      const detalle = i => {
+        const det = i.detalle || {}, mot = (det.motivos || []).concat(det.motivo ? [det.motivo] : []);
+        const med = (det.medidas || []).map(m => `${m.paso}: ${m.caras === 0 ? "sin rostro" : `giro ${m.giro}, rostro ${Math.round((m.cara_frac || 0) * 100)}%`}`).join(" · ");
+        return esc(mot.length ? mot.join("; ") : "—") + (med ? `<br><span style="color:var(--mut)">${esc(med)}</span>` : "");
+      };
+      const filas = (d.intentos || []).map(i => `<tr><td>${esc(new Date(i.fecha).toLocaleString("es-CL"))}</td><td>${esc(i.tipo)}</td><td>${esc(i.estado)}</td><td>${i.score == null ? "—" : Number(i.score).toFixed(3)}</td><td>${i.liveness_ok ? "sí" : "no"}</td></tr><tr><td colspan="5" style="font-size:11.5px">${detalle(i)}</td></tr>`).join("");
+      $("salida").innerHTML = `<div class="card"><b>${d.enrolado ? "✅ Enrolado" : "Sin plantilla activa"}</b>${d.plantilla ? `<div class="aviso" style="margin:4px 0 0">Versión ${d.plantilla.version} · ${esc(d.plantilla.modelo)} · ${d.plantilla.muestras} muestras · ${esc(new Date(d.plantilla.fecha).toLocaleString("es-CL"))}</div>` : ""}
+        <table><tr><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Score</th><th>Vida</th></tr>${filas || `<tr><td colspan="5">Sin intentos</td></tr>`}</table></div>`;
+    } catch (e) { msg(e.message, "var(--no)"); } finally { bloquear(false); }
+  }
+
+  async function borrar() {
+    if (ocupado) return;
+    const { rut, pin } = datos(); if (!rut || !pin) { msg("Ingresa RUT y PIN.", "var(--no)"); return; }
+    if (!confirm("¿Eliminar la plantilla biométrica de este RUT? No se puede deshacer.")) return;
+    bloquear(true);
+    try { await api({ accion: "borrar", rut, pin }); msg("Plantilla eliminada.", "var(--ok)"); $("salida").innerHTML = ""; }
+    catch (e) { msg(e.message, "var(--no)"); } finally { bloquear(false); }
+  }
+
+  $("bEnrolar").addEventListener("click", () => flujo("enrolamiento"));
+  $("bVerificar").addEventListener("click", () => flujo("verificacion"));
+  $("bEstado").addEventListener("click", estado);
+  $("bBorrar").addEventListener("click", borrar);
+  // Cancelar funciona en cualquier momento (también mientras se abre la cámara).
+  $("bCancelar").addEventListener("click", () => {
+    cancelado = true; $("bListo").disabled = true; $("bListo").onclick = null;
+    if (rechazarListo) { const r = rechazarListo; rechazarListo = null; r(new Error("Cancelado.")); }
+    cerrarCamara();
+  });
+  window.addEventListener("pagehide", cerrarCamara);
+})();
+</script>
+</body>
+</html>
