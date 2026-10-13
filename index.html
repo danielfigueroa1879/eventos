@@ -4467,6 +4467,10 @@
       const tieneInf = tieneFicha(g);
       const inf = tieneInf ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:${infC.bg};color:${infC.fg}" title="${esc(fichaTitle(g))}">${esc(fichaLabel(g))}</span>` : '';
       const _dtSet = modo === "empresa" ? EMPRESA_STATE._dobleTurno : ADMIN_STATE._dobleTurno;
+      // Señal de biometría junto al nombre (celular). La rellenan pintarBioEmpresa / pintarBioPiloto.
+      const bioM = modo === "empresa"
+        ? ((a.foto_path || a.foto_url) && ev.biometria !== false ? `<span data-bio-e="${esc(a.id)}" data-bio-h="${esc(a.hora_ingreso || "")}" class="flex-shrink-0" style="white-space:nowrap"></span>` : "")
+        : (bioAplica(ADMIN_STATE.bioRuts, a.rut) ? `<span data-bio="${esc(a.id)}" class="flex-shrink-0" style="white-space:nowrap"></span>` : "");
       const dobleT = (_dtSet && _dtSet.has(a.rut)) ? ` <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ml-1 whitespace-nowrap" style="background:#ede9fe;color:#6d28d9" title="Trabajó turno Día y turno Noche hoy">🔁 (Doble turno)</span>` : '';
       const esMujer = sexoGuardia(g) === "M";
       const esHombre = sexoGuardia(g) === "H";
@@ -4497,7 +4501,7 @@
           : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`)
         : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
       <span class="flex-1 min-w-0">
-        <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
+        <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${bioM}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
         ${puestoNom ? `<span data-goto-puesto="${esc(a.puesto_id)}" role="button" class="inline-block text-[11px] font-semibold text-indigo-600 truncate max-w-full cursor-pointer">📍 ${esc(puestoNom)}</span>` : ""}
       </span>
