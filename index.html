@@ -4214,7 +4214,19 @@
     // resultados a la función con el PIN de esta pestaña; los recuerda 60 s para no repetir consultas.
     async function pintarBioPiloto(root) {
       const marcas = [...root.querySelectorAll("[data-bio]")]; if (!marcas.length) return;
-      const pin = (() => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } })(); if (!pin) return;
+      // Si no hay PIN en esta pestaña o la consulta falla, se muestra un 🧬 gris que explica el problema
+      // (clic = ingresar el PIN y reintentar), en vez de dejar la celda en blanco sin avisar.
+      const aviso = (txt, pedirPin) => marcas.forEach(m => {
+        m.innerHTML = `<button style="margin-left:4px;font-size:12px;opacity:.55;vertical-align:middle" title="Biometría: ${esc(txt)}">🧬</button>`;
+        m.querySelector("button").onclick = async (e) => {
+          e.stopPropagation();
+          if (!pedirPin) { toast("Biometría: " + txt, false, 5000); return; }
+          const v = prompt("Biometría: ingresa el PIN de administrador para ver los resultados");
+          if (v) { try { sessionStorage.setItem("os10_admin_pin", v); } catch (_) { } if (ADMIN_STATE._bio) ADMIN_STATE._bio.t = 0; pintarBioPiloto(root); }
+        };
+      });
+      const pin = (() => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } })();
+      if (!pin) { aviso("falta el PIN en esta pestaña (clic para ingresarlo)", true); return; }
       const memo = ADMIN_STATE._bio || (ADMIN_STATE._bio = { t: 0, r: {} });
       const ids = [...new Set(marcas.map(m => m.dataset.bio))];
       // Se vuelve a preguntar si hay ids nuevos, si pasó 1 min, o si alguno aún no tiene resultado (la
@@ -4223,9 +4235,14 @@
       if (Date.now() - memo.t > 60000 || ids.some(id => !(id in memo.r)) || (pendientes && Date.now() - memo.t > 8000)) {
         try {
           const resp = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "resultados", pin, asistencia_ids: ids }) });
-          if (!resp.ok) return;
+          if (!resp.ok) {
+            const err = (await resp.json().catch(() => ({}))).error || ("HTTP " + resp.status);
+            if (resp.status === 401) { try { sessionStorage.removeItem("os10_admin_pin"); } catch (_) { } aviso("PIN incorrecto (clic para ingresarlo)", true); }
+            else aviso("no se pudo consultar: " + err, false);
+            return;
+          }
           const d = await resp.json(); ids.forEach(id => { memo.r[id] = (d.resultados || {})[id] || null; }); memo.t = Date.now();
-        } catch (_) { return; }
+        } catch (e) { aviso("sin conexión con la función", false); return; }
       }
       const ICON = { "VERIFICADO": ["✔✔", "#2563eb"], "ENROLADO": ["✔", "#2563eb"], "REVISIÓN MANUAL": ["⚠", "#d97706"], "NO COINCIDE": ["✖", "#dc2626"], "RECHAZADO": ["–", "#94a3b8"] };
       marcas.forEach(m => {
