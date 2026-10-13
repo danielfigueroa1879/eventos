@@ -26,11 +26,16 @@
     button:disabled { opacity: .5; cursor: default; }
     .consent { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; margin-top: 10px; }
     .consent input { margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; }
-    #escena { position: relative; width: 100%; max-width: 320px; margin: 0 auto; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; background: #0f172a; display: none; }
+    #capa { position: fixed; inset: 0; z-index: 2147483647; background: #000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); gap: 12px; }
+    #capa.on { display: flex; }
+    #escena { position: relative; width: 100%; max-width: 420px; max-height: 70vh; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; background: #0f172a; }
+    #capaMsg { color: #e2e8f0; font-size: 15px; text-align: center; min-height: 20px; max-width: 420px; }
+    #capaBtns { display: flex; gap: 10px; width: 100%; max-width: 420px; }
+    #capaBtns button { flex: 1; padding: 14px; font-size: 16px; color: #fff; border-color: #475569; }
     #escena video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
     #escena svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-    #instr { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px; text-align: center; color: #fff; font-weight: 700; font-size: 17px; background: linear-gradient(transparent, rgba(0,0,0,.75)); }
-    #cuenta { position: absolute; top: 10px; right: 12px; color: #fff; font-size: 30px; font-weight: 800; text-shadow: 0 1px 4px #000; }
+    #instr { position: absolute; left: 0; right: 0; top: 0; padding: 12px 10px 18px; text-align: center; color: #fff; font-weight: 800; font-size: 19px; background: linear-gradient(rgba(0,0,0,.75), transparent); }
+    #cuenta { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; color: #fff; font-size: 54px; font-weight: 900; text-shadow: 0 2px 8px #000; }
     #msg { font-size: 13px; color: var(--mut); min-height: 18px; margin-top: 8px; text-align: center; }
     .res { border-radius: 12px; padding: 12px; color: #fff; font-weight: 800; font-size: 18px; text-align: center; }
     .res small { display: block; font-weight: 500; font-size: 13px; opacity: .95; margin-top: 4px; }
@@ -61,6 +66,7 @@
     </div>
   </div>
 
+  <div id="capa" role="dialog" aria-modal="true">
   <div id="escena">
     <video id="video" playsinline autoplay muted></video>
     <svg viewBox="0 0 300 400" aria-hidden="true">
@@ -70,6 +76,9 @@
     </svg>
     <div id="cuenta"></div>
     <div id="instr"></div>
+  </div>
+  <div id="capaMsg"></div>
+  <div id="capaBtns"><button id="bCancelar">Cancelar</button><button id="bListo" class="pri" disabled>Estoy listo</button></div>
   </div>
   <div id="msg"></div>
   <div id="salida"></div>
@@ -83,7 +92,8 @@
   const esperar = n => new Promise(r => setTimeout(r, n));
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const INSTR = { frente: "Mira al frente, dentro del óvalo", giro_izquierda: "Gira la cabeza hacia TU izquierda ⟵", giro_derecha: "Gira la cabeza hacia TU derecha ⟶" };
-  let stream = null, ocupado = false;
+  let stream = null, ocupado = false, cancelado = false, rechazarListo = null;
+  const revisar = () => { if (cancelado) throw new Error("Cancelado."); };
 
   async function api(cuerpo) {
     const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) });
@@ -97,13 +107,14 @@
   async function abrirCamara() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("Este navegador no permite usar la cámara.");
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
-    const v = $("video"); v.srcObject = stream; $("escena").style.display = "block";
+    if (cancelado) { cerrarCamara(); throw new Error("Cancelado."); }
+    const v = $("video"); v.srcObject = stream; $("capa").classList.add("on");
     await new Promise(res => { if (v.readyState >= 2) res(); else v.onloadeddata = () => res(); });
     await esperar(400);
   }
   function cerrarCamara() {
     try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) { }
-    stream = null; $("escena").style.display = "none"; $("instr").textContent = ""; $("cuenta").textContent = "";
+    stream = null; $("capa").classList.remove("on"); $("instr").textContent = ""; $("cuenta").textContent = ""; $("capaMsg").textContent = "";
   }
   // Captura del video en vivo, SIN espejo, a máximo 480 px de ancho, JPEG.
   function capturar() {
@@ -112,14 +123,26 @@
     c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
     return c.toDataURL("image/jpeg", 0.85).split(",")[1];
   }
+  // La cámara queda abierta hasta que la persona se encuadra y pulsa "Estoy listo".
+  function esperarListo() {
+    return new Promise((ok, no) => {
+      $("instr").textContent = "Encuadra tu rostro dentro del óvalo";
+      $("capaMsg").textContent = "Con buena luz y de frente. Cuando estés listo, pulsa el botón.";
+      const bl = $("bListo"); bl.disabled = false;
+      rechazarListo = no;
+      bl.onclick = () => { bl.onclick = null; bl.disabled = true; rechazarListo = null; ok(); };
+    });
+  }
   async function guiar(pasos) {
     const imgs = [];
     for (let i = 0; i < pasos.length; i++) {
       $("instr").textContent = INSTR[pasos[i]] || pasos[i];
-      for (let s = i === 0 ? 3 : 2; s > 0; s--) { $("cuenta").textContent = s; await esperar(900); }
+      $("capaMsg").textContent = i === 0 ? "Quédate quieto mirando la cámara" : "Gira la cabeza y mantén la posición";
+      for (let s = 3; s > 0; s--) { revisar(); $("cuenta").textContent = s; await esperar(1000); }
+      revisar();
       $("cuenta").textContent = "📸"; imgs.push(capturar()); await esperar(250);
     }
-    $("cuenta").textContent = ""; $("instr").textContent = "Procesando…";
+    $("cuenta").textContent = ""; $("instr").textContent = "Procesando…"; $("capaMsg").textContent = "Comparando, espera unos segundos…";
     return imgs;
   }
 
@@ -139,15 +162,17 @@
     const { rut, pin } = datos();
     if (!rut || !pin) { msg("Ingresa RUT y PIN.", "var(--no)"); return; }
     if (tipo === "enrolamiento" && !$("consent").checked) { msg("Para enrolar debes marcar el consentimiento.", "var(--no)"); return; }
-    bloquear(true); $("salida").innerHTML = ""; msg("Abriendo cámara…");
+    bloquear(true); cancelado = false; $("salida").innerHTML = ""; msg("Abriendo cámara…");
     try {
       // Precarga: los modelos se cargan en el servidor mientras se abre la cámara y se hacen los pasos.
       const pre = api({ accion: "precalentar", rut }).catch(() => null);
-      await abrirCamara();
-      const d = await api({ accion: "desafio", rut, pin, tipo });
-      msg("Sigue las instrucciones dentro del óvalo.");
+      await abrirCamara(); revisar();
+      msg("");
+      await esperarListo(); revisar();
+      $("capaMsg").textContent = "Preparando…";
+      const d = await api({ accion: "desafio", rut, pin, tipo }); revisar();
       const imagenes = await guiar(d.pasos);
-      await pre;
+      await pre; revisar();
       msg("Comparando…");
       const r = await api({ accion: tipo === "enrolamiento" ? "enrolar" : "verificar", rut, pin, token: d.token, imagenes, consentimiento: tipo === "enrolamiento" ? true : undefined });
       cerrarCamara(); msg(""); pintarResultado(r, tipo);
@@ -180,6 +205,12 @@
   $("bVerificar").addEventListener("click", () => flujo("verificacion"));
   $("bEstado").addEventListener("click", estado);
   $("bBorrar").addEventListener("click", borrar);
+  // Cancelar funciona en cualquier momento (también mientras se abre la cámara).
+  $("bCancelar").addEventListener("click", () => {
+    cancelado = true; $("bListo").disabled = true; $("bListo").onclick = null;
+    if (rechazarListo) { const r = rechazarListo; rechazarListo = null; r(new Error("Cancelado.")); }
+    cerrarCamara();
+  });
   window.addEventListener("pagehide", cerrarCamara);
 })();
 </script>
