@@ -74,7 +74,11 @@ async function cargarTodo(errores, avisos) {
   return { v, det, rec, rutas, tamanos, tiempos: { importar_ms: ms(tImport), cargar_yunet_ms: ms(tDet), cargar_sface_ms: ms(tRec), total_carga_ms: ms(performance.now() - t0) } };
 }
 
+// DESACTIVADO tras las mediciones del paso 0 / 0b: responde 410 al instante, sin cargar modelos ni
+// gastar CPU. Solo vuelve a funcionar si se define BIOMETRIA_DIAGNOSTICO=1 en las variables de
+// entorno de Netlify (no está definida).
 export default async (req) => {
+  if (process.env.BIOMETRIA_DIAGNOSTICO !== "1") return json({ error: "Diagnóstico desactivado." }, 410);
   invocaciones++;
   const tInicio = performance.now();
   const frio = !cache;
