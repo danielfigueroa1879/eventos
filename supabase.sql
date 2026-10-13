@@ -41,6 +41,8 @@ alter table eventos add column if not exists resol_fecha  date;
 alter table eventos add column if not exists fecha_hasta date;
 -- Biometría por evento: false = en este evento el ingreso queda solo con foto (botón 🧬 del panel).
 alter table eventos add column if not exists biometria boolean default true;
+-- Foto de ingreso por evento: true/false = valor propio; null = sigue config 'foto_ingreso' (botón 📸 del panel).
+alter table eventos add column if not exists foto_ingreso boolean;
 -- Ubicación del evento:
 alter table eventos add column if not exists direccion text;
 alter table eventos add column if not exists comuna    text;

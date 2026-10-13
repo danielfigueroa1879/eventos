@@ -30,6 +30,8 @@ update config set valor = '' where clave = 'biometria_piloto';                  
 **🧬 Biometría** la activa/desactiva **solo en ese evento** (columna `eventos.biometria`; `false` = solo foto).
 Los demás eventos no cambian y no se borran plantillas. Aparece si la foto y el interruptor general están activos.
 Requiere una vez en Supabase: `alter table eventos add column if not exists biometria boolean default true;`
+El botón **📸 Foto de ingreso** también es **por evento** (columna `eventos.foto_ingreso`; vacío = sigue el valor
+general `config.foto_ingreso`). Requiere: `alter table eventos add column if not exists foto_ingreso boolean;`
 
 Para usar `todos`, en Netlify `BIOMETRIA_PILOTO_RUTS` debe ser `*` (el interruptor de la app decide a quién aplica).
 
