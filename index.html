@@ -2721,7 +2721,7 @@
       let fotoRequerida = false;
       try { fotoRequerida = (await Data.getConfig("foto_ingreso")) === "1"; } catch (_) { fotoRequerida = false; }
       let fotoBlob = null; // foto capturada (WebP HD) pendiente de subir tras crear la asistencia
-      const bioRutsP = leerBioRuts();   // biometría (en segundo plano; vacío = apagado)
+      const bioRutsP = ev.biometria === false ? Promise.resolve(new Set()) : leerBioRuts();   // biometría (en segundo plano; vacío = apagado; false = apagada en este evento)
       let bioPend = null;               // capturas biométricas pendientes de enviar tras registrar
       app.innerHTML = `
   <div class="min-h-screen flex flex-col items-center p-4">
@@ -3835,7 +3835,7 @@
           </span>
           <span class="text-xs font-semibold">${ADMIN_STATE.fotoIngreso ? 'Activada' : 'Desactivada'}</span>
         </button>
-        ${ADMIN_STATE.fotoIngreso ? (() => { const on = !!(ADMIN_STATE.bioRuts && ADMIN_STATE.bioRuts.size), todos = on && ADMIN_STATE.bioRuts.has("*"); return `<button id="toggleBioQR" type="button" role="switch" aria-checked="${on}" title="Verificación facial en el ingreso (usa la misma foto). Desactivada = solo foto, como antes."
+        ${ADMIN_STATE.fotoIngreso && ADMIN_STATE.bioRuts && ADMIN_STATE.bioRuts.size ? (() => { const on = ev.biometria !== false, todos = ADMIN_STATE.bioRuts.has("*"); return `<button id="toggleBioQR" type="button" role="switch" aria-checked="${on}" title="Verificación facial en el ingreso de ESTE evento (usa la misma foto). Desactivada = solo foto, como antes."
           class="btn text-sm px-4 py-2.5 font-bold shadow-md rounded-xl inline-flex items-center gap-2 border transition-colors ${on ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300'}">
           🧬 Biometría
           <span class="relative inline-flex h-5 w-9 items-center rounded-full flex-shrink-0 ${on ? 'bg-white/30' : 'bg-slate-300'}">
@@ -4027,21 +4027,25 @@
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#linkVista").addEventListener("click", () => modalLinkVista(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
-      // Interruptor global "Biometría": guarda config "biometria_piloto" ('todos' o '' = solo foto). Aplica a todos.
+      // Interruptor "Biometría" POR EVENTO: columna eventos.biometria (false = solo foto en este evento).
+      // Los demás eventos no cambian. El interruptor general sigue siendo config "biometria_piloto".
       const btnBioQR = $("#toggleBioQR");
       if (btnBioQR) btnBioQR.addEventListener("click", () => {
-        const on = !!(ADMIN_STATE.bioRuts && ADMIN_STATE.bioRuts.size);
+        const on = ev.biometria !== false;
         const aplicar = async () => {
           closeModal(); btnBioQR.disabled = true;
           try {
-            await Data.setConfig("biometria_piloto", on ? "" : "todos");
-            ADMIN_STATE.bioRuts = bioRutsDe(on ? "" : "todos");
-            toast(on ? "Biometría DESACTIVADA: el ingreso queda solo con foto" : "🧬 Biometría ACTIVADA para todos los guardias", true);
-            renderMain();
-          } catch (e) { console.error(e); toast("No se pudo guardar el cambio.", "danger", 5000); btnBioQR.disabled = false; }
+            await Data.updateEvento(ev.id, { biometria: !on });
+            ev.biometria = !on;
+            toast(on ? "Biometría DESACTIVADA en este evento: el ingreso queda solo con foto" : "🧬 Biometría ACTIVADA en este evento", true, 3500);
+            await refreshAdmin();
+          } catch (e) {
+            console.error(e); btnBioQR.disabled = false;
+            toast("No se pudo guardar. ¿Ejecutaste en Supabase: alter table eventos add column if not exists biometria boolean default true; ?", "danger", 6000);
+          }
         };
-        if (on) confirmar("¿Desactivar la biometría? Los guardias ingresarán solo con la foto, como antes. Las plantillas se conservan y puedes reactivarla cuando quieras.", aplicar);
-        else confirmar("¿Activar la biometría para TODOS los guardias? Verán el consentimiento y la verificación facial (frente + 1 giro) al registrar su ingreso.", aplicar);
+        if (on) confirmar("¿Desactivar la biometría SOLO en este evento? Aquí los guardias ingresarán solo con la foto, como antes. Los demás eventos no cambian y las plantillas se conservan.", aplicar);
+        else confirmar("¿Activar la biometría en este evento? Los guardias verán el consentimiento y la verificación facial (frente + 1 giro) al registrar su ingreso.", aplicar);
       });
       // Interruptor global "Foto de ingreso" (dentro del menú del QR). Aplica a todos los eventos y dispositivos.
       const btnFotoQR = $("#toggleFotoQR");

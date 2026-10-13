@@ -26,9 +26,10 @@ Interruptor en Supabase, tabla `config`, clave `biometria_piloto`:
 insert into config (clave, valor) values ('biometria_piloto', 'todos') on conflict (clave) do update set valor = excluded.valor;  -- encender
 update config set valor = '' where clave = 'biometria_piloto';                                                                    -- apagar
 ```
-**Botón en el panel**: dentro de "🔳 QR y estado del evento", junto a "Foto de ingreso", el botón
-**🧬 Biometría** cambia entre `todos` (Activada) y `''` (Desactivada = solo foto). Pide confirmación y no borra
-plantillas: al reactivarla los guardias ya enrolados se siguen verificando. Solo aparece si la foto está activada.
+**Botón por evento**: dentro de "🔳 QR y estado del evento", junto a "Foto de ingreso", el botón
+**🧬 Biometría** la activa/desactiva **solo en ese evento** (columna `eventos.biometria`; `false` = solo foto).
+Los demás eventos no cambian y no se borran plantillas. Aparece si la foto y el interruptor general están activos.
+Requiere una vez en Supabase: `alter table eventos add column if not exists biometria boolean default true;`
 
 Para usar `todos`, en Netlify `BIOMETRIA_PILOTO_RUTS` debe ser `*` (el interruptor de la app decide a quién aplica).
 

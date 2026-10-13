@@ -39,6 +39,8 @@ alter table eventos add column if not exists resol_numero text;
 alter table eventos add column if not exists resol_fecha  date;
 -- Rango de fechas del evento: fecha_evento = "desde"; fecha_hasta = "hasta" (opcional).
 alter table eventos add column if not exists fecha_hasta date;
+-- Biometría por evento: false = en este evento el ingreso queda solo con foto (botón 🧬 del panel).
+alter table eventos add column if not exists biometria boolean default true;
 -- Ubicación del evento:
 alter table eventos add column if not exists direccion text;
 alter table eventos add column if not exists comuna    text;
