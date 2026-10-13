@@ -3228,6 +3228,7 @@
         if (Date.now() - ultimaPurga > 6 * 3600 * 1000) {
           localStorage.setItem("os10_purga_fotos", String(Date.now()));
           Data.purgarFotosAntiguas(FOTO_RETENCION_DIAS).then(n => { if (n) console.log(`Fotos de ingreso borradas por antigüedad (>${FOTO_RETENCION_DIAS} días):`, n); }).catch(() => {});
+          purgarBiometria();   // intentos con más de 60 días y plantillas sin uso en 60 días (en el servidor)
         }
       } catch (_) {}
       await refreshAdmin(true);
@@ -3834,6 +3835,14 @@
           </span>
           <span class="text-xs font-semibold">${ADMIN_STATE.fotoIngreso ? 'Activada' : 'Desactivada'}</span>
         </button>
+        ${ADMIN_STATE.fotoIngreso ? (() => { const on = !!(ADMIN_STATE.bioRuts && ADMIN_STATE.bioRuts.size), todos = on && ADMIN_STATE.bioRuts.has("*"); return `<button id="toggleBioQR" type="button" role="switch" aria-checked="${on}" title="Verificación facial en el ingreso (usa la misma foto). Desactivada = solo foto, como antes."
+          class="btn text-sm px-4 py-2.5 font-bold shadow-md rounded-xl inline-flex items-center gap-2 border transition-colors ${on ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300'}">
+          🧬 Biometría
+          <span class="relative inline-flex h-5 w-9 items-center rounded-full flex-shrink-0 ${on ? 'bg-white/30' : 'bg-slate-300'}">
+            <span class="inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}"></span>
+          </span>
+          <span class="text-xs font-semibold">${on ? (todos ? 'Activada' : `Solo ${ADMIN_STATE.bioRuts.size} RUT`) : 'Desactivada (solo foto)'}</span>
+        </button>`; })() : ""}
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
         <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel (.xlsx) o PDF (hoja oficio horizontal)">⬇ Descargar eventos</button>
         <button id="expInfractores" class="btn text-sm px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold shadow-md rounded-xl" title="Descargar en Excel el registro de todos los guardias infractores / detenidos">🚩 Infractores</button>
@@ -4018,6 +4027,22 @@
       $("#linkEmpresa").addEventListener("click", () => modalLinkEmpresa(ev));
       $("#linkVista").addEventListener("click", () => modalLinkVista(ev));
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
+      // Interruptor global "Biometría": guarda config "biometria_piloto" ('todos' o '' = solo foto). Aplica a todos.
+      const btnBioQR = $("#toggleBioQR");
+      if (btnBioQR) btnBioQR.addEventListener("click", () => {
+        const on = !!(ADMIN_STATE.bioRuts && ADMIN_STATE.bioRuts.size);
+        const aplicar = async () => {
+          closeModal(); btnBioQR.disabled = true;
+          try {
+            await Data.setConfig("biometria_piloto", on ? "" : "todos");
+            ADMIN_STATE.bioRuts = bioRutsDe(on ? "" : "todos");
+            toast(on ? "Biometría DESACTIVADA: el ingreso queda solo con foto" : "🧬 Biometría ACTIVADA para todos los guardias", true);
+            renderMain();
+          } catch (e) { console.error(e); toast("No se pudo guardar el cambio.", "danger", 5000); btnBioQR.disabled = false; }
+        };
+        if (on) confirmar("¿Desactivar la biometría? Los guardias ingresarán solo con la foto, como antes. Las plantillas se conservan y puedes reactivarla cuando quieras.", aplicar);
+        else confirmar("¿Activar la biometría para TODOS los guardias? Verán el consentimiento y la verificación facial (frente + 1 giro) al registrar su ingreso.", aplicar);
+      });
       // Interruptor global "Foto de ingreso" (dentro del menú del QR). Aplica a todos los eventos y dispositivos.
       const btnFotoQR = $("#toggleFotoQR");
       if (btnFotoQR) btnFotoQR.addEventListener("click", async () => {
@@ -4256,6 +4281,17 @@
       if (ids.some(id => memo.r[id] === null) && (memo.reint = (memo.reint || 0) + 1) <= 12) {
         clearTimeout(memo.tmr); memo.tmr = setTimeout(() => { if (root.isConnected) pintarBioPiloto(root); }, 10000);
       } else if (!ids.some(id => memo.r[id] === null)) memo.reint = 0;
+    }
+    // RETENCIÓN BIOMÉTRICA (60 días): la función borra los intentos con más de 60 días y las plantillas de
+    // guardias sin ingresos en 60 días. Requiere el PIN de esta pestaña; si falla, se reintenta la próxima vez.
+    function purgarBioPin() { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } }
+    async function purgarBiometria() {
+      const pin = purgarBioPin(); if (!pin || !USING_SUPABASE) return;
+      try {
+        const r = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "purgar", pin }) });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && (d.intentos || d.plantillas)) console.log(`Biometría: borrados ${d.intentos || 0} intentos y ${d.plantillas || 0} plantillas (>60 días)`);
+      } catch (_) { }
     }
     // Detalle de la biometría de un ingreso y opción de RESTABLECER la plantilla del guardia (el próximo
     // ingreso vuelve a enrolar automáticamente). Resultado orientativo: no cambia la asistencia.

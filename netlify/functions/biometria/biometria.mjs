@@ -15,6 +15,8 @@
 //   { accion: "procesar_auto", rut, asistencia_id, token, consentimiento: true, imagenes: [jpeg base64 x2] }
 //      (asistencia de ese RUT creada hace < 15 min; nunca se escribe en "asistencias")
 // PANEL ADMIN (con PIN): { accion: "resultados", pin, asistencia_ids: [...] } -> último resultado por asistencia
+//                        { accion: "purgar", pin } -> RETENCIÓN 60 días: borra intentos con más de 60 días y
+//                        plantillas de RUT sin intentos en 60 días (y enroladas hace más de 60 días)
 // El resultado es ORIENTATIVO: nunca bloquea, modifica ni borra la asistencia (no se escribe en "asistencias").
 //
 // Variables de entorno (SOLO en Netlify; sin ellas la función responde 503 y no hace nada):
@@ -35,6 +37,7 @@ const WASM = "ort-wasm-simd-threaded.wasm", WASM_MJS = "ort-wasm-simd-threaded.m
 const MAX_IMG_BYTES = 400 * 1024, MAX_IMG_LADO = 1280;
 const LIMITE_INTENTOS = 30, VENTANA_LIMITE_MS = 10 * 60 * 1000;   // piloto: holgado para calibrar
 const INGRESO_PLAZO_MS = 15 * 60 * 1000, INGRESO_MAX_INTENTOS = 2;   // por asistencia
+const RETENCION_DIAS = 60;   // limpieza biométrica cada 2 meses
 
 const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
@@ -170,6 +173,23 @@ export default async (req) => {
       const resultados = {};
       filas.forEach(f => { if (!resultados[f.asistencia_id]) resultados[f.asistencia_id] = { tipo: f.tipo, estado: f.estado, score: f.score, liveness_ok: f.liveness_ok, fecha: f.fecha, rut: f.rut }; });
       return json({ ok: true, resultados });
+    }
+
+    // ----- Panel admin -> retención de 60 días (solo PIN) -----
+    if (b.accion === "purgar") {
+      await exigirPin(cfg, b.pin);
+      const corte = new Date(Date.now() - RETENCION_DIAS * 86400000).toISOString();
+      // RUT con actividad reciente: sus plantillas se conservan.
+      const recientes = new Set((await sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut&fecha=gte.${enc(corte)}&limit=10000`)).map(f => f.rut));
+      const viejas = (await sbFetch(cfg, `/rest/v1/guardias_biometria?select=rut&fecha_enrolamiento=lt.${enc(corte)}&limit=10000`)).map(f => f.rut).filter(r => !recientes.has(r));
+      let plantillas = 0;
+      for (let i = 0; i < viejas.length; i += 100) {
+        const lote = viejas.slice(i, i + 100);
+        await sbFetch(cfg, `/rest/v1/guardias_biometria?rut=in.(${lote.map(r => enc('"' + r + '"')).join(",")})`, { method: "DELETE", headers: { prefer: "return=minimal" } });
+        plantillas += lote.length;
+      }
+      const borrados = await sbFetch(cfg, `/rest/v1/biometria_intentos?fecha=lt.${enc(corte)}&select=id`, { method: "DELETE", headers: { prefer: "return=representation" } });
+      return json({ ok: true, plantillas, intentos: (borrados || []).length });
     }
 
     const rut = L.normRut(b.rut);
