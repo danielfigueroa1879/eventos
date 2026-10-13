@@ -1,4 +1,4 @@
-// PILOTO BIOMÉTRICO — PASO 0: DIAGNÓSTICO.
+// PILOTO BIOMÉTRICO — PASO 0 / 0b: DIAGNÓSTICO (0b: SFace fp32, 2 imágenes cronometradas).
 // Solo comprueba que Netlify puede empaquetar y ejecutar YuNet + SFace int8 (WebAssembly) y mide
 // tiempos y memoria con 3 imágenes PÚBLICAS de prueba incluidas en el paquete. NO usa base de datos,
 // NO usa claves, NO recibe imágenes del usuario y NO guarda nada.
@@ -14,10 +14,13 @@ let cache = null;                     // sesiones cargadas (se reutilizan mientr
 // Huellas SHA-256 de los modelos (OpenCV Zoo): si un archivo cambia, no se usa.
 const MODELOS = {
   det: { archivo: "face_detection_yunet_2023mar.onnx", sha256: "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4" },
-  rec: { archivo: "face_recognition_sface_2021dec_int8.onnx", sha256: "2b0e941e6f16cc048c20aee0c8e31f569118f65d702914540f7bfdc14048d78a" },
+  rec: { archivo: "face_recognition_sface_2021dec.onnx", sha256: "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79" },   // SFace fp32 (paso 0b)
 };
 const WASM = "ort-wasm-simd-threaded.wasm", WASM_MJS = "ort-wasm-simd-threaded.mjs";
-const PRUEBAS = [["a1.jpg", "A"], ["a2.jpg", "A"], ["b1.jpg", "B"]];   // imágenes públicas: A = misma persona, B = otra
+// Paso 0b: se CRONOMETRAN solo 2 imágenes (como una verificación real con 2 frames). La imagen de
+// otra persona (b1) se procesa DESPUÉS y aparte, solo para el score de "persona distinta".
+const PRUEBAS = [["a1.jpg", "A"], ["a2.jpg", "A"]];
+const IMPOSTOR = "b1.jpg";
 
 const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo, null, 2), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
@@ -95,6 +98,10 @@ export default async (req) => {
       const tc = performance.now(); emb[archivo] = await c.v.embedding(c.rec, im, caras[0]); const tEmb = performance.now() - tc;
       resultados.push({ archivo, persona, tamano: `${im.w}x${im.h}`, caras: caras.length, score_deteccion: +caras[0].score.toFixed(3), decodificar_ms: ms(tDec), detectar_ms: ms(tDetec), embedding_ms: ms(tEmb) });
     }
+    const tProc = performance.now() - tInicio;   // hasta aquí: carga (si fue en frío) + 2 imágenes
+    const ti = performance.now();
+    try { const im = c.v.decodificarJPEG(fs.readFileSync(path.join(dirPrueba, IMPOSTOR))); const cr = await c.v.detectar(c.det, im); if (cr.length) emb[IMPOSTOR] = await c.v.embedding(c.rec, im, cr[0]); else errores.push("Sin rostro en " + IMPOSTOR); } catch (e) { errores.push("impostor: " + e.message); }
+    const tImpostor = performance.now() - ti;
     const cmp = (x, y) => (emb[x] && emb[y]) ? +c.v.coseno(emb[x], emb[y]).toFixed(3) : null;
     const comparaciones = {
       "a1 vs a2 (misma persona, esperado >= 0.363)": cmp("a1.jpg", "a2.jpg"),
@@ -109,7 +116,7 @@ export default async (req) => {
       arranque_en_frio: frio,
       invocacion_de_esta_instancia: invocaciones,
       ms_desde_carga_del_modulo: Date.now() - T_MODULO,
-      tiempos: { ...(frio ? c.tiempos : { carga: "reutilizada (instancia caliente)" }), procesar_3_imagenes_ms: ms(resultados.reduce((a, r) => a + r.decodificar_ms + r.detectar_ms + r.embedding_ms, 0)), total_invocacion_ms: ms(performance.now() - tInicio) },
+      tiempos: { ...(frio ? c.tiempos : { carga: "reutilizada (instancia caliente)" }), procesar_2_imagenes_ms: ms(resultados.reduce((a, r) => a + r.decodificar_ms + r.detectar_ms + r.embedding_ms, 0)), total_interno_2_imagenes_ms: ms(tProc), extra_imagen_impostor_ms: ms(tImpostor), total_invocacion_ms: ms(performance.now() - tInicio) },
       resultados, comparaciones,
       memoria: { rss_mb: mb(mem.rss), heap_usado_mb: mb(mem.heapUsed), externa_mb: mb(mem.external), arraybuffers_mb: mb(mem.arrayBuffers), limite_lambda_mb: +process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE || null },
       entorno: { node: process.version, plataforma: `${process.platform}/${process.arch}`, cpus: (await import("node:os")).cpus().length, region: process.env.AWS_REGION || null },
