@@ -7,7 +7,7 @@
    API:
      await BioIngreso.capturar({ rut, fotoDesde })   // ANTES de crear la asistencia
         -> null                       (no aplica / sin cámara / servicio caído: usar la foto normal)
-        -> { rechazo: true }          (no aceptó el consentimiento: no ingresa)
+        (si no marca el consentimiento: "Debes aceptar" hasta 3 veces; a la 4.ª -> null = foto normal sin biometría)
         -> { cancelado: true }        (canceló la cámara: no ingresa, igual que hoy)
         -> { fotoBlob, token, imagenes }   (fotoBlob = foto de ingreso WebP, igual que la normal)
      await BioIngreso.procesar({ rut, asistenciaId, token, imagenes })   // DESPUÉS de subir la foto
@@ -35,6 +35,9 @@
       #bioi-tit{font-weight:800;font-size:17px;text-align:center;max-width:420px}
       #bioi-cons{max-width:420px;background:#0f172a;border:1px solid #334155;border-radius:14px;padding:16px;font-size:14px}
       #bioi-cons p{margin:0 0 10px}#bioi-cons small{color:#94a3b8;font-size:12px}
+      #bioi-chk{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px;border:1px solid #475569;border-radius:10px;cursor:pointer}
+      #bioi-chk input{width:22px;height:22px;flex-shrink:0;margin-top:1px}
+      #bioi-aviso{color:#fca5a5;font-weight:700;margin-top:10px;min-height:18px}
       #bioi-esc{position:relative;width:100%;max-width:400px;max-height:62vh;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#0f172a;display:none}
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -89,13 +92,24 @@
     const cerrar = () => { try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) { } stream = null; ui.capa.remove(); ui.estilo.remove(); };
 
     try {
-      // 1) Consentimiento OBLIGATORIO para continuar.
+      // 1) Consentimiento: una casilla. Sin marcarla, "Debes aceptar" (hasta 3 veces); a la 4.ª vez se
+      //    sigue SOLO con la foto normal (sin biometría): se devuelve null y la app usa la foto de siempre.
       ui.$("bioi-cons").innerHTML = `<p><b>${primeraVez ? "Primer registro con verificación facial" : "Verificación facial"}</b></p>
         <p>Tu foto de ingreso se usará también para ${primeraVez ? "crear" : "comparar con"} una plantilla biométrica cifrada de tu rostro, solo para verificar tu identidad en los ingresos a eventos.</p>
         <p>No se usa para identificar a otras personas y puedes pedir su eliminación al administrador.</p>
-        <small>Ley N° 19.628 y Ley N° 21.719 (datos sensibles). Para continuar con tu ingreso debes aceptar.</small>`;
-      if (!(await elegir(ui, "Acepto y continuar", "No acepto"))) { cerrar(); return { rechazo: true }; }
-
+        <small>Ley N° 19.628 y Ley N° 21.719 (datos sensibles).</small>
+        <label id="bioi-chk"><input type="checkbox" id="bioi-acepto"><span>Acepto la verificación facial</span></label>
+        <div id="bioi-aviso"></div>`;
+      ui.$("bioi-no").style.display = "none";
+      let intentos = 0;
+      for (;;) {
+        await elegir(ui, "Continuar", "");
+        if (ui.$("bioi-acepto").checked) break;
+        intentos++;
+        if (intentos >= 4) { cerrar(); return null; }   // 4.ª vez sin aceptar: solo la foto normal
+        ui.$("bioi-aviso").textContent = `Debes aceptar la verificación facial para continuar.${intentos === 3 ? " (último aviso)" : ""}`;
+      }
+      ui.$("bioi-no").style.display = "";
       // 2) Cámara.
       ui.$("bioi-cons").style.display = "none"; ui.$("bioi-esc").style.display = "block";
       ui.$("bioi-no").textContent = "Cancelar"; msg("Abriendo cámara…");

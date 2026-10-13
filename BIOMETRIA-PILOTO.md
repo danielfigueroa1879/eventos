@@ -29,7 +29,8 @@ update config set valor = '' where clave = 'biometria_piloto';                  
 Para usar `todos`, en Netlify `BIOMETRIA_PILOTO_RUTS` debe ser `*` (el interruptor de la app decide a quién aplica).
 
 Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
-1. **Consentimiento obligatorio** ("Acepto y continuar"). Si no acepta, no se registra el ingreso.
+1. **Consentimiento**: una casilla "Acepto la verificación facial" + Continuar. Sin marcarla aparece "Debes aceptar"
+   (hasta 3 veces); a la **4.ª vez** ingresa **solo con la foto normal** (a R2, sin biometría).
 2. Cámara: **frente** (cuenta regresiva) + **1 giro** (flecha, momento de captura aleatorio).
 3. La captura de **frente es la foto de ingreso**: se registra la asistencia y la foto se sube a **R2 como siempre**.
 4. Después se envían las capturas a la función: **primer ingreso del RUT = enrolamiento automático**;

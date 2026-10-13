@@ -2994,7 +2994,6 @@
           let aplicaBio = false; try { aplicaBio = bioAplica(await bioRutsP, rut.value); } catch (_) { }
           if (aplicaBio) {
             const bio = await capturaBiometrica(formatRut(rut.value));
-            if (bio && bio.rechazo) { toast("Debes aceptar la verificación facial para registrar tu ingreso.", false, 4500); return; }
             if (bio && bio.cancelado) { toast("Necesitas tomar la foto para completar tu ingreso.", false, 3500); return; }
             if (bio && bio.fotoBlob) { fotoBlob = bio.fotoBlob; bioPend = bio.token ? bio : null; }
           }
