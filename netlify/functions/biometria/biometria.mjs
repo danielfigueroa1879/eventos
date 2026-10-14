@@ -221,7 +221,6 @@ export default async (req) => {
     // ----- Ingreso con interruptor encendido (sin PIN) -----
     if (b.accion === "desafio_auto") {
       const [, p] = await Promise.all([exigirLimite(cfg, rut), leerPlantilla(cfg, rut)]);   // en paralelo
-      if (!modelos && !cargando) cargarModelos().catch(() => { });   // empieza a cargar los modelos ya
       const d = L.crearDesafio(cfg.k, rut, "auto");
       return json({ ok: true, modo: p && p.activo ? "verificacion" : "enrolamiento", pasos: d.pasos, token: d.token, vence: d.vence });
     }
