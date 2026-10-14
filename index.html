@@ -2321,7 +2321,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=8"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=9"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
@@ -2365,21 +2365,23 @@
         const limpiar = () => { try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) {} stream = null; };
         // Cerrar tocando el fondo oscuro = cancelar (además detiene la cámara y resuelve la promesa).
         const onBackdrop = (e) => { if (e.target.id === "modal") cerrar(null); };
-        const cerrar = (blob) => { if (terminado) return; terminado = true; try { $("#modal").removeEventListener("click", onBackdrop); } catch (_) {} limpiar(); closeModal(); resolve(blob || null); };
+        const cerrar = (blob) => { if (terminado) return; terminado = true; try { $("#modal").removeEventListener("click", onBackdrop); $("#modal").style.background = ""; } catch (_) {} limpiar(); closeModal(); resolve(blob || null); };
         $("#modal").addEventListener("click", onBackdrop);
+        // Fondo BLANCO mientras se toma la foto: la pantalla ilumina el rostro (sirve de noche).
+        $("#modal").style.background = "#ffffff";
 
         openModal(`
         <div class="text-center">
           <h2 class="font-bold text-slate-800 text-base mb-1">📸 Foto de verificación</h2>
           <p class="text-xs text-slate-500 mb-1">Centra tu rostro dentro del óvalo y toma la foto para finalizar tu ingreso.</p>
           <p class="text-[10.5px] text-slate-400 mb-3 leading-snug">🔒 Solo para control e identificación de ingreso (Leyes N° 19.628 y N° 21.719). No se usa reconocimiento facial.</p>
-          <div id="cap_stage" class="relative mx-auto rounded-2xl overflow-hidden bg-slate-900 shadow-inner" style="width:100%;max-width:300px;aspect-ratio:3/4;">
+          <div id="cap_stage" class="relative mx-auto rounded-2xl overflow-hidden bg-white shadow-inner" style="width:100%;max-width:300px;aspect-ratio:3/4;">
             <video id="cap_video" playsinline autoplay muted class="absolute inset-0 w-full h-full object-cover" style="transform:scaleX(-1)"></video>
             <img id="cap_preview" class="absolute inset-0 w-full h-full object-cover" style="display:none" alt="Foto tomada">
             <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 300 400" aria-hidden="true">
               <defs><mask id="cap_mask"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="178" rx="96" ry="126" fill="black"/></mask></defs>
-              <rect width="300" height="400" fill="rgba(15,23,42,0.55)" mask="url(#cap_mask)"/>
-              <ellipse cx="150" cy="178" rx="96" ry="126" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-dasharray="7 7" opacity="0.92"/>
+              <rect width="300" height="400" fill="rgba(255,255,255,0.92)" mask="url(#cap_mask)"/>
+              <ellipse cx="150" cy="178" rx="96" ry="126" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/>
             </svg>
           </div>
           <div id="cap_msg" class="text-[11px] text-slate-400 mt-2" style="min-height:16px"></div>
