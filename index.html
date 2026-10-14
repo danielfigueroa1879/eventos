@@ -2321,7 +2321,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=13"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=14"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
