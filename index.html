@@ -2323,6 +2323,35 @@
       if (window.BioIngreso) return Promise.resolve();
       return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=5"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
+    // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
+    // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
+    function pantallaProceso(pasos) {
+      const NOM = { verificar: "Verificando identidad", registrar: "Registrando ingreso" };
+      const el = document.createElement("div");
+      el.id = "procIngreso";
+      el.style.cssText = "position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)";
+      el.innerHTML = `<style>@keyframes procGiro{to{transform:rotate(360deg)}}@keyframes procLatido{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}</style>
+        <div style="background:#fff;border-radius:22px;padding:26px 22px;width:100%;max-width:330px;text-align:center;box-shadow:0 20px 50px -12px rgba(0,0,0,.45)">
+          <div style="position:relative;width:86px;height:86px;margin:0 auto 14px">
+            <div style="position:absolute;inset:0;border-radius:50%;border:6px solid #dcfce7;border-top-color:#16a34a;animation:procGiro .8s linear infinite"></div>
+            <img src="images/logo-os10-original.webp" alt="" style="position:absolute;inset:12px;width:62px;height:62px;border-radius:50%;animation:procLatido 1.6s ease-in-out infinite">
+          </div>
+          <div style="font-weight:800;font-size:18px;color:#0f172a">Procesando tu ingreso</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">No cierres esta pantalla</div>
+          <ul style="list-style:none;margin:16px 0 0;padding:0;text-align:left;display:grid;gap:10px">${pasos.map(k => `<li data-paso="${k}" style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:#94a3b8"><span style="width:22px;height:22px;flex-shrink:0;border-radius:50%;border:2.5px solid #cbd5e1;display:inline-flex;align-items:center;justify-content:center"></span>${NOM[k] || k}</li>`).join("")}</ul>
+        </div>`;
+      document.body.appendChild(el);
+      const paso = k => {
+        let antes = true;
+        el.querySelectorAll("[data-paso]").forEach(li => {
+          const ic = li.firstElementChild, actual = li.dataset.paso === k;
+          if (actual) antes = false;
+          if (antes) { li.style.color = "#15803d"; ic.style.cssText = "width:22px;height:22px;flex-shrink:0;border-radius:50%;background:#16a34a;display:inline-flex;align-items:center;justify-content:center"; ic.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'; }
+          else if (actual) { li.style.color = "#0f172a"; ic.style.cssText = "width:22px;height:22px;flex-shrink:0;border-radius:50%;border:3px solid #dcfce7;border-top-color:#16a34a;animation:procGiro .7s linear infinite"; ic.innerHTML = ""; }
+        });
+      };
+      return { paso, cerrar: () => el.remove() };
+    }
     // Captura biométrica en lugar de la foto normal. null = no aplica o falló -> se usa la foto normal.
     async function capturaBiometrica(rut) {
       try { await cargarBioCliente(); return await window.BioIngreso.capturar({ rut, fotoDesde: v => _fotoWebpDesde(v, v.videoWidth, v.videoHeight) }); }
@@ -2736,6 +2765,7 @@
       const bioRutsP = ev.biometria === false ? Promise.resolve(new Set()) : leerBioRuts();   // biometría (en segundo plano; vacío = apagado; false = apagada en este evento)
       let bioPend = null;               // capturas biométricas pendientes de enviar tras registrar
       let bioBloqueos = 0;              // verificaciones previas rechazadas (rostro de otra persona)
+      let procUI = null;                // pantalla "Procesando tu ingreso"
       // Aviso ROJO: el rostro no corresponde a la persona enrolada con este RUT. El ingreso NO se registró.
       const avisoNoCoincide = (rutTxt) => {
         openModal(`<div class="text-center">
@@ -2815,7 +2845,7 @@
 
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
         ${fotoRequerida ? `<div class="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-          <p class="text-[11px] text-slate-500 leading-snug" style="text-align:justify">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. No se realiza reconocimiento facial. Los datos se procesan de forma <b>cifrada</b>.</p>
+          <p class="text-[11px] text-slate-500 leading-snug" style="text-align:justify">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. <span id="g_avisoBio">No se realiza reconocimiento facial.</span> Los datos se procesan de forma <b>cifrada</b>.</p>
         </div>` : ""}
       </div>
 
@@ -2898,6 +2928,8 @@
         rut.value = formatRut(rut.value); rutMsg.innerHTML = ""; submit.disabled = true; submit.textContent = "Ingrese su RUT";
       });
       rut.addEventListener("blur", lookup);
+      // Con la verificación facial activa, el aviso de datos lo dice (se pide consentimiento aparte).
+      bioRutsP.then(set => { const a = $("#g_avisoBio"); if (a && set && set.size) a.textContent = "Si corresponde verificación facial (comparación 1:1 solo con tu propio registro), se te pedirá tu consentimiento antes de usarla."; }).catch(() => { });
       rut.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); lookup(); } });
 
       async function lookup() {
@@ -2974,7 +3006,7 @@
       }
 
       // Pantalla de ÉXITO — solo se muestra cuando la escritura quedó CONFIRMADA por el servidor.
-      function mostrarIngresoExitoso(asisRec) {
+      function mostrarIngresoExitoso(asisRec, pFoto) {
         sonarIngreso(); // sonido de confirmación de ingreso
         const esSup = !!(superSel && superSel.value === "supervisor");
         const v = esSup ? null : calcularVigencia(fecha.value);
@@ -2992,6 +3024,7 @@
           : `<div class="mt-3" id="vigReveal">${badge(v)} ${v.siges ? `<span class="text-xs text-slate-500">(${esc(v.siges)})</span>` : ""}</div>
         ${!v.puedeTrabajar ? `<p class="text-red-600 text-sm mt-3 font-medium">⚠ Este guardia NO cuenta con autorización vigente.</p>` : ""}`}
         <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt((asisRec && asisRec.hora_ingreso) || nowISO())}</p>
+        ${pFoto ? `<p id="fotoEstado" class="text-sm font-semibold mt-3" style="color:#64748b">📸 Guardando foto…</p>` : ""}
         <button id="otroRegistro" class="btn btn-p w-full mt-5">➕ Ingresar otro registro</button>
         <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">10</span> s…</p>
       </div></div>`;
@@ -3003,9 +3036,19 @@
           }, 2500);
         }
         let restante = 10, tmpAuto = null;
-        const irOtro = () => { if (tmpAuto) clearInterval(tmpAuto); renderGuard(ev.slug); };
+        let salio = false;
+        const irOtro = () => { if (salio) return; salio = true; if (tmpAuto) clearInterval(tmpAuto); renderGuard(ev.slug); };
         const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", irOtro);
-        tmpAuto = setInterval(() => { restante--; const c = $("#otroCount"); if (c) c.textContent = restante; if (restante <= 0) irOtro(); }, 1000);
+        // Mientras la foto se sube, no se vuelve sola al formulario (el contador espera en 0).
+        let fotoLista = !pFoto;
+        if (pFoto) pFoto.then(ok => {
+          fotoLista = true;
+          const fe = $("#fotoEstado");
+          if (fe) { fe.style.color = ok ? "#15803d" : "#dc2626"; fe.textContent = ok ? "✓ Foto guardada" : "⚠ Tu ingreso quedó registrado, pero la foto no se pudo guardar."; }
+          if (!ok) toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500);
+          if (restante <= 0) irOtro();
+        });
+        tmpAuto = setInterval(() => { if (restante > 0) restante--; const c = $("#otroCount"); if (c) c.textContent = restante; if (restante <= 0 && fotoLista) irOtro(); }, 1000);
       }
 
       const TIMEOUT_MS = 20000; // límite de espera para confirmar cada escritura en el servidor
@@ -3031,11 +3074,12 @@
               // RUT YA ENROLADO: se verifica ANTES de registrar. Si el rostro no corresponde (otra persona),
               // NO se registra el ingreso ni se guarda la foto. Si falla la conexión, se registra como antes.
               if (bioPend && bio.modo === "verificacion" && window.BioIngreso.verificarPrevio) {
-                const txt0 = submit.textContent; submit.disabled = true; submit.textContent = "Verificando identidad…";
+                submit.disabled = true;
+                procUI = pantallaProceso(["verificar", "registrar"]); procUI.paso("verificar");
                 let v = "error";
                 try { v = await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes }), 35000); } catch (_) { }
-                submit.disabled = false; submit.textContent = txt0;
-                if (v === "bloqueado") { fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
+                submit.disabled = false;
+                if (v === "bloqueado") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
                 bioPend = { ...bio, previo: true, previoOk: v === "ok" };   // tras registrar: vincular (o procesar si no quedó guardada)
               }
             }
@@ -3052,7 +3096,10 @@
       async function guardarIngreso() {
         const rutV = formatRut(rut.value);
         const txtPrev = submit.textContent;
-        submit.disabled = true; submit.textContent = "Guardando… no cierres esta ventana";
+        submit.disabled = true;
+        if (!procUI) procUI = pantallaProceso(["registrar"]);
+        procUI.paso("registrar");
+        const cerrarProc = () => { if (procUI) { procUI.cerrar(); procUI = null; } };
         try {
           // 1) Guardar/actualizar los datos del guardia (con límite de tiempo).
           if (modo === "nuevo" || (modo === "existe" && !guardiaExiste)) {
@@ -3079,27 +3126,32 @@
           // 2) Registrar la asistencia y CONFIRMAR que el servidor la escribió (devuelve la fila insertada).
           const asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superSel && superSel.value === "supervisor")), TIMEOUT_MS);
           if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
-          // 2b) Subir la foto de verificación (WebP HD) y adjuntarla a la asistencia recién creada.
-          //     Es "mejor esfuerzo": si fallara la subida NO se pierde el ingreso ya registrado.
-          if (fotoBlob) {
-            submit.textContent = "Guardando foto…";
-            try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fotoBlob), TIMEOUT_MS); if (u) asis.foto_url = u; fotoBlob = null; }
-            catch (e) { console.error("foto:", e); toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500); }
-          }
-          // 2c) BIOMETRÍA: la foto YA se subió (paso 2b, R2 como siempre). Ahora se enrola o verifica con
-          //     las mismas capturas. Si falla o no hay señal, el ingreso y la foto quedan igual.
-          if (bioPend) {
-            const b = bioPend; bioPend = null; submit.textContent = "Verificando…";
+          // VELOCIDAD: el ingreso YA quedó confirmado → se muestra el éxito (con sonido) al instante.
+          // La foto (R2) y la biometría siguen en SEGUNDO PLANO; la pantalla de éxito muestra "Guardando
+          // foto…" → "Foto guardada" y no vuelve al formulario sola hasta que termine.
+          const fb = fotoBlob, b = bioPend; fotoBlob = null; bioPend = null;
+          // 2b) Foto (WebP HD) a la asistencia recién creada. Mejor esfuerzo: un reintento si falla la red.
+          const pFoto = !fb ? null : (async () => {
+            for (let i = 0; i < 2; i++) {
+              try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fb), TIMEOUT_MS); if (u) asis.foto_url = u; return true; }
+              catch (e) { console.error("foto:", e); if ((e && e.status >= 400 && e.status < 500) || i === 1) return false; await new Promise(r => setTimeout(r, 1500)); }
+            }
+            return false;
+          })();
+          // 2c) BIOMETRÍA (en paralelo): vincular la verificación previa, o enrolar/verificar con las capturas.
+          if (b) (async () => {
             try {
               // Verificación previa OK: el vínculo se envía sin esperar (keepalive), el guardia ve su ingreso al tiro.
               if (b.previoOk) { window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id, enSegundoPlano: true }); }
               else if ((b.previo ? await conTimeout(window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id }), 20000) : null) !== "ok") await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 35000);
             } catch (_) { }
-          }
-          // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
-          mostrarIngresoExitoso(asis);
+          })();
+          // 3) Escritura confirmada → "Ingreso registrado" (la foto termina de subir en esa pantalla).
+          cerrarProc();
+          mostrarIngresoExitoso(asis, pFoto);
         } catch (err) {
           console.error(err);
+          cerrarProc();
           // ¿Ya estaba registrado? (doble toque o reintento cuya escritura anterior sí llegó al servidor).
           if (esErrorDuplicado(err)) {
             const ya = await Data.yaRegistrado(ev.id, rutV).catch(() => null);
