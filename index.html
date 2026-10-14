@@ -2321,7 +2321,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=9"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=12"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
@@ -2367,8 +2367,8 @@
         const onBackdrop = (e) => { if (e.target.id === "modal") cerrar(null); };
         const cerrar = (blob) => { if (terminado) return; terminado = true; try { $("#modal").removeEventListener("click", onBackdrop); $("#modal").style.background = ""; } catch (_) {} limpiar(); closeModal(); resolve(blob || null); };
         $("#modal").addEventListener("click", onBackdrop);
-        // Fondo BLANCO mientras se toma la foto: la pantalla ilumina el rostro (sirve de noche).
-        $("#modal").style.background = "#ffffff";
+        // Fondo: la imagen de fondo de la app con velo claro; el recuadro del óvalo es BLANCO e ilumina el rostro.
+        $("#modal").style.background = 'linear-gradient(rgba(238,242,240,.6),rgba(238,242,240,.6)), url("images/fondo.webp") center/cover no-repeat, #e5e9ee';
 
         openModal(`
         <div class="text-center">
@@ -2380,7 +2380,7 @@
             <img id="cap_preview" class="absolute inset-0 w-full h-full object-cover" style="display:none" alt="Foto tomada">
             <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 300 400" aria-hidden="true">
               <defs><mask id="cap_mask"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="178" rx="96" ry="126" fill="black"/></mask></defs>
-              <rect width="300" height="400" fill="rgba(255,255,255,0.92)" mask="url(#cap_mask)"/>
+              <rect width="300" height="400" fill="#ffffff" mask="url(#cap_mask)"/>
               <ellipse cx="150" cy="178" rx="96" ry="126" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/>
             </svg>
           </div>
