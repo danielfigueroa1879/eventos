@@ -2111,27 +2111,36 @@
         async subirFotoIngreso(evId, asisId, blob) {
           const path = `${evId}/${asisId}.webp`;
           // Miniatura 120x160 para listas/mapa (ahorra descarga). Si falla, se usa la foto completa.
-          let mini = null;
-          try {
-            const bmp = await createImageBitmap(blob);
-            const c = document.createElement("canvas"); c.width = 120; c.height = 160;
-            const k = Math.max(120 / bmp.width, 160 / bmp.height), w = bmp.width * k, h = bmp.height * k;
-            c.getContext("2d").drawImage(bmp, (120 - w) / 2, (160 - h) / 2, w, h);
-            mini = await new Promise(r => c.toBlob(r, "image/webp", 0.55));
-          } catch (e) { console.warn("miniatura:", e && e.message); }
+          const hacerMini = async () => {
+            try {
+              const bmp = await createImageBitmap(blob);
+              const c = document.createElement("canvas"); c.width = 120; c.height = 160;
+              const k = Math.max(120 / bmp.width, 160 / bmp.height), w = bmp.width * k, h = bmp.height * k;
+              c.getContext("2d").drawImage(bmp, (120 - w) / 2, (160 - h) / 2, w, h);
+              return await new Promise(r => c.toBlob(r, "image/webp", 0.55));
+            } catch (e) { console.warn("miniatura:", e && e.message); return null; }
+          };
+          // VELOCIDAD: si el navegador ya generó la foto en WebP, la miniatura también será WebP: se crea
+          // MIENTRAS se piden los enlaces de subida (antes era una cosa tras otra).
+          const esWebp = (blob.type || "") === "image/webp";
+          const pMini = hacerMini();
+          let mini = esWebp ? null : await pMini;
           // 1) Cloudflare R2: la función entrega enlaces de subida firmados y el navegador sube directo.
           //    Si R2 aún no está configurado o falla, se usa Supabase Storage como antes.
           let enR2 = false;
           try {
+            let d;
+            if (esWebp) { [d, mini] = await Promise.all([apiFotos({ accion: "subir", evento_id: evId, asistencia_id: asisId, tipo: "image/webp", tipoMini: "image/webp" }), pMini]); }
+            else d = await apiFotos({ accion: "subir", evento_id: evId, asistencia_id: asisId, tipo: blob.type || "image/webp", tipoMini: (mini || blob).type || "image/webp" });
             const chica = mini || blob;
-            const d = await apiFotos({ accion: "subir", evento_id: evId, asistencia_id: asisId, tipo: blob.type || "image/webp", tipoMini: chica.type || "image/webp" });
             const put = async (e, b) => { const r = await fetch(e.url, { method: "PUT", headers: e.headers, body: b }); if (!r.ok) throw new Error("PUT " + r.status); };
+            // Foto y miniatura se suben A LA VEZ. Miniatura: un reintento y, si sigue fallando, se usa la foto
+            // completa como miniatura (pesa más pero se ve). Si aun así falla, la foto queda guardada igual.
+            const subirMini = async () => { try { await put(d.mini, chica); } catch (_) { try { await put(d.mini, chica); } catch (_) { try { await put(d.mini, blob); } catch (e2) { console.warn("miniatura R2:", e2 && e2.message); } } } };
+            const pMiniR2 = subirMini();
             await put(d.foto, blob);
             enR2 = true;   // la foto ya está en R2: nada de esto se reenvía a Supabase
-            // Miniatura: un reintento y, si sigue fallando, se usa la foto completa como miniatura
-            // (pesa más pero se ve). Si aun así falla, la foto queda guardada igual.
-            try { await put(d.mini, chica); }
-            catch (_) { try { await put(d.mini, chica); } catch (_) { try { await put(d.mini, blob); } catch (e2) { console.warn("miniatura R2:", e2 && e2.message); } } }
+            await pMiniR2;
           } catch (e) {
             // Rechazo DEFINITIVO de la función (400/401/404/409: ids inválidos, asistencia inexistente o
             // que YA tiene foto): se detiene aquí. Solo un fallo técnico (red, 5xx, R2 caído) usa el respaldo.
@@ -2150,6 +2159,7 @@
             throw err;
           }
           // 2) Supabase Storage (respaldo).
+          if (!mini) mini = await pMini;
           const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true, cacheControl: "86400" });
           if (up.error) throw up.error;
           try { if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" }); } catch (e) { console.warn("miniatura:", e && e.message); }
@@ -2311,7 +2321,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=4"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=5"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // Captura biométrica en lugar de la foto normal. null = no aplica o falló -> se usa la foto normal.
     async function capturaBiometrica(rut) {
@@ -2970,7 +2980,10 @@
         const v = esSup ? null : calcularVigencia(fecha.value);
         const tn = calcularTurno((asisRec && asisRec.hora_ingreso) || nowISO(), ev);
         app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-7 max-w-sm text-center">
-        <div class="text-5xl mb-3">✅</div>
+        <style>@keyframes okSalto{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-22px) scale(1.08)}50%{transform:translateY(0) scale(.96)}65%{transform:translateY(-6px)}}</style>
+        <div class="mx-auto mb-3 flex items-center justify-center rounded-full" style="width:84px;height:84px;background:#16c60c;box-shadow:0 0 0 6px rgba(22,198,12,.18),0 10px 24px -6px rgba(22,198,12,.65);animation:okSalto .7s ease-out 3" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="54" height="54" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </div>
         <h1 class="font-bold text-xl text-slate-800">Ingreso registrado</h1>
         <p class="text-slate-600 mt-1">${esc(formatNombre(nombres.value))} ${esc(formatNombre(apellidos.value))}</p>
         ${tn ? `<div class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">🕑 ${esc(tn.etiqueta)} · ${esc(tn.rango)}</div>` : ""}

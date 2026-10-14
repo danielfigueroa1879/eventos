@@ -84,11 +84,10 @@
     if (!rut || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
     // ¿Aplica? (403/503 = no participa o servicio no configurado -> foto normal). Empieza a cargar los modelos.
     precalentar(rut);
-    let r;
-    try { r = await api({ accion: "desafio_auto", rut }, 10000); } catch (_) { return null; }
-    const tDesafio = Date.now();
-    if (r.status !== 200 || !r.d.pasos) return null;
-    const primeraVez = r.d.modo === "enrolamiento";
+    // VELOCIDAD: la pantalla de consentimiento se muestra AL TIRO; el desafío se pide en paralelo.
+    let r, tDesafio = 0;
+    const pDesafio = api({ accion: "desafio_auto", rut }, 10000).catch(() => ({ status: 0 })).then(x => { r = x; tDesafio = Date.now(); return x; });
+    const textos = pv => ({ tit: pv ? "Primer registro con verificación facial" : "Verificación facial", acc: pv ? "crear" : "comparar con" });
 
     const ui = crearCapa();
     let stream = null;
@@ -103,13 +102,15 @@
     try {
       // 1) Consentimiento: una casilla. Sin marcarla, "Debes aceptar" (hasta 3 veces); a la 4.ª vez se
       //    sigue SOLO con la foto normal (sin biometría): se devuelve null y la app usa la foto de siempre.
-      ui.$("bioi-cons").innerHTML = `<p><b>${primeraVez ? "Primer registro con verificación facial" : "Verificación facial"}</b></p>
-        <p>Tu foto de ingreso se usará también para ${primeraVez ? "crear" : "comparar con"} una plantilla biométrica cifrada de tu rostro, solo para verificar tu identidad en los ingresos a eventos.</p>
+      const t0 = textos(false);
+      ui.$("bioi-cons").innerHTML = `<p><b id="bioi-tit">${t0.tit}</b></p>
+        <p>Tu foto de ingreso se usará también para <span id="bioi-acc">${t0.acc}</span> una plantilla biométrica cifrada de tu rostro, solo para verificar tu identidad en los ingresos a eventos.</p>
         <p>No se usa para identificar a otras personas y puedes pedir su eliminación al administrador.</p>
         <small>Ley N° 19.628 y Ley N° 21.719 (datos sensibles).</small>
         <label id="bioi-chk"><input type="checkbox" id="bioi-acepto"><span>Acepto la verificación facial</span></label>
         <div id="bioi-aviso"></div>`;
       ui.$("bioi-no").style.display = "none";
+      pDesafio.then(x => { if (x.status === 200 && x.d.modo === "enrolamiento") { const t = textos(true); ui.$("bioi-tit").textContent = t.tit; ui.$("bioi-acc").textContent = t.acc; } });
       let intentos = 0;
       for (;;) {
         await elegir(ui, "Continuar", "");
@@ -119,6 +120,9 @@
         ui.$("bioi-aviso").textContent = `Debes aceptar la verificación facial para continuar.${intentos === 3 ? " (último aviso)" : ""}`;
       }
       ui.$("bioi-no").style.display = "";
+      // ¿Aplica? (403/503 = no participa o servicio no configurado -> foto normal).
+      if (!r) { msg("Preparando…"); await pDesafio; }
+      if (r.status !== 200 || !r.d.pasos) { cerrar(); return null; }
       // 2) Cámara.
       ui.$("bioi-cons").style.display = "none"; ui.$("bioi-esc").style.display = "block";
       ui.$("bioi-no").textContent = "Cancelar"; msg("Abriendo cámara…");
