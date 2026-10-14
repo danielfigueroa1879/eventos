@@ -28,23 +28,24 @@
   }
 
   // Interfaz propia (prefijo "bioi-") para no chocar con los estilos ni ids de la app.
+  // Fondo BLANCO con letras y líneas negras: la pantalla ilumina el rostro (sirve de noche).
   function crearCapa() {
     const st = document.createElement("style");
     st.textContent = `
-      #bioi-capa{position:fixed;inset:0;z-index:2147483647;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px 12px calc(12px + env(safe-area-inset-bottom));font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#e2e8f0}
+      #bioi-capa{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px 12px calc(12px + env(safe-area-inset-bottom));font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
       #bioi-tit{font-weight:800;font-size:17px;text-align:center;max-width:420px}
-      #bioi-cons{max-width:420px;background:#0f172a;border:1px solid #334155;border-radius:14px;padding:16px;font-size:14px}
-      #bioi-cons p{margin:0 0 10px}#bioi-cons small{color:#94a3b8;font-size:12px}
-      #bioi-chk{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px;border:1px solid #475569;border-radius:10px;cursor:pointer}
+      #bioi-cons{max-width:420px;background:#fff;border:1.5px solid #0f172a;border-radius:14px;padding:16px;font-size:14px}
+      #bioi-cons p{margin:0 0 10px}#bioi-cons small{color:#475569;font-size:12px}
+      #bioi-chk{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px;border:1.5px solid #0f172a;border-radius:10px;cursor:pointer}
       #bioi-chk input{width:22px;height:22px;flex-shrink:0;margin-top:1px}
-      #bioi-aviso{color:#fca5a5;font-weight:700;margin-top:10px;min-height:18px}
-      #bioi-esc{position:relative;width:100%;max-width:400px;max-height:62vh;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#0f172a;display:none}
+      #bioi-aviso{color:#dc2626;font-weight:700;margin-top:10px;min-height:18px}
+      #bioi-esc{position:relative;width:100%;max-width:400px;max-height:62vh;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#fff;display:none}
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-      #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#fff;font-weight:800;font-size:18px;background:linear-gradient(rgba(0,0,0,.75),transparent)}
-      #bioi-cta{position:absolute;left:0;right:0;bottom:14px;text-align:center;color:#fff;font-size:50px;font-weight:900;text-shadow:0 2px 8px #000}
-      #bioi-fl{position:absolute;top:50%;transform:translateY(-50%);display:none;flex-direction:column;align-items:center;gap:4px;color:#fde047;text-shadow:0 2px 10px #000;pointer-events:none}
-      #bioi-fl b{font-size:88px;line-height:1}#bioi-fl span{font-size:13px;font-weight:800;background:rgba(0,0,0,.6);padding:4px 8px;border-radius:8px;color:#fff;white-space:nowrap}
+      #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#0f172a;font-weight:800;font-size:18px;background:linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,0))}
+      #bioi-cta{position:absolute;left:0;right:0;bottom:14px;text-align:center;color:#0f172a;font-size:50px;font-weight:900;text-shadow:0 0 8px #fff}
+      #bioi-fl{position:absolute;top:50%;transform:translateY(-50%);display:none;flex-direction:column;align-items:center;gap:4px;color:#ea580c;text-shadow:0 0 6px #fff;pointer-events:none}
+      #bioi-fl b{font-size:88px;line-height:1}#bioi-fl span{font-size:13px;font-weight:800;background:#0f172a;padding:4px 8px;border-radius:8px;color:#fff;white-space:nowrap}
       #bioi-fl.izq{display:flex;left:6px}#bioi-fl.der{display:flex;right:6px}
       #bioi-fl.izq b{animation:bioiI .9s ease-in-out infinite}#bioi-fl.der b{animation:bioiD .9s ease-in-out infinite}
       @keyframes bioiI{50%{transform:translateX(-14px)}}@keyframes bioiD{50%{transform:translateX(14px)}}
@@ -53,8 +54,8 @@
       #bioi-guia{position:absolute;inset:0;pointer-events:none;display:none}
       #bioi-guia.izq,#bioi-guia.der{display:block}
       #bioi-guia .borde{position:absolute;top:0;bottom:0;width:26%;animation:bioiDest .7s ease-in-out infinite}
-      #bioi-guia.izq .borde{left:0;background:linear-gradient(to right,rgba(250,204,21,.75),rgba(250,204,21,0))}
-      #bioi-guia.der .borde{right:0;background:linear-gradient(to left,rgba(250,204,21,.75),rgba(250,204,21,0))}
+      #bioi-guia.izq .borde{left:0;background:linear-gradient(to right,rgba(245,158,11,.85),rgba(245,158,11,0))}
+      #bioi-guia.der .borde{right:0;background:linear-gradient(to left,rgba(245,158,11,.85),rgba(245,158,11,0))}
       /* Cabeza guía ABAJO (debajo del óvalo, sin tapar el rostro): gira hacia el lado de la flecha. */
       #bioi-guia .cab{position:absolute;bottom:6px;left:50%;width:66px;height:66px;margin-left:-33px;background:rgba(15,23,42,.7);border-radius:50%;border:2px solid #facc15}
       #bioi-guia .cab svg{width:100%;height:100%;overflow:visible}
@@ -69,15 +70,15 @@
       @keyframes bioiOreja{0%,15%{opacity:0}45%,85%{opacity:1}100%{opacity:0}}
       #bioi-msg{font-size:14px;text-align:center;max-width:420px;min-height:20px}
       #bioi-btns{display:flex;gap:10px;width:100%;max-width:420px}
-      #bioi-btns button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:1px solid #475569;background:transparent;color:#fff}
-      #bioi-btns button.p{background:#0f5323;border-color:#0f5323}#bioi-btns button:disabled{opacity:.45}`;
+      #bioi-btns button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:1.5px solid #0f172a;background:#fff;color:#0f172a}
+      #bioi-btns button.p{background:#0f5323;border-color:#0f5323;color:#fff}#bioi-btns button:disabled{opacity:.45}`;
     const c = document.createElement("div");
     c.id = "bioi-capa"; c.setAttribute("role", "dialog"); c.setAttribute("aria-modal", "true");
     c.innerHTML = `<div id="bioi-tit">📸 Foto y verificación facial</div>
       <div id="bioi-cons"></div>
       <div id="bioi-esc"><video playsinline autoplay muted></video>
         <svg viewBox="0 0 300 400" aria-hidden="true"><defs><mask id="bioi-m"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="black"/></mask></defs>
-          <rect width="300" height="400" fill="rgba(15,23,42,.5)" mask="url(#bioi-m)"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="7 7"/></svg>
+          <rect width="300" height="400" fill="rgba(255,255,255,.92)" mask="url(#bioi-m)"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/></svg>
         <div id="bioi-guia"><div class="borde"></div>
           <div class="cab"><svg viewBox="0 0 92 92"><g class="craneo"><ellipse class="oreja i" cx="20" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse class="oreja d" cx="72" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse cx="46" cy="48" rx="26" ry="31" fill="#fcd34d"/></g><g class="cara"><circle cx="37" cy="42" r="3.6" fill="#111827"/><circle cx="55" cy="42" r="3.6" fill="#111827"/><path d="M46 46 l-4 11 h8z" fill="#b45309"/><path d="M38 63 q8 5 16 0" stroke="#111827" stroke-width="2.6" fill="none" stroke-linecap="round"/></g></svg></div></div>
         <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
