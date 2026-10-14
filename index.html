@@ -2304,13 +2304,14 @@
     // "todos" (todos los guardias) o una lista de RUT separados por coma (vacío o ausente = apagado).
     // Si aplica, la "Foto de verificación" se reemplaza por la captura biométrica (frente + 1 giro): la
     // MISMA foto de frente se sube a R2 como siempre y sirve para enrolar (primer ingreso) o verificar.
-    // Nunca bloquea ni modifica la asistencia. El código de la cámara está en biometria-cliente.js.
+    // RUT ya enrolado: se verifica ANTES de registrar; si el rostro es de otra persona (NO COINCIDE) el ingreso
+    // NO se registra (aviso rojo). Si la función falla o no hay señal, se registra como antes. Cámara: biometria-cliente.js.
     const bioRutsDe = v => new Set(String(v || "").split(",").map(x => /^\s*todos\s*$/i.test(x) ? "*" : limpiaRut(x)).filter(r => r === "*" || r.length > 1));
     const bioAplica = (set, rut) => !!set && (set.has("*") || set.has(limpiaRut(rut)));
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=3"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // Captura biométrica en lugar de la foto normal. null = no aplica o falló -> se usa la foto normal.
     async function capturaBiometrica(rut) {
@@ -2724,6 +2725,19 @@
       let fotoBlob = null; // foto capturada (WebP HD) pendiente de subir tras crear la asistencia
       const bioRutsP = ev.biometria === false ? Promise.resolve(new Set()) : leerBioRuts();   // biometría (en segundo plano; vacío = apagado; false = apagada en este evento)
       let bioPend = null;               // capturas biométricas pendientes de enviar tras registrar
+      let bioBloqueos = 0;              // verificaciones previas rechazadas (rostro de otra persona)
+      // Aviso ROJO: el rostro no corresponde a la persona enrolada con este RUT. El ingreso NO se registró.
+      const avisoNoCoincide = (rutTxt) => {
+        openModal(`<div class="text-center">
+          <div class="text-5xl mb-2">⛔</div>
+          <h2 class="font-extrabold text-lg mb-2" style="color:#b91c1c">Ingreso NO registrado</h2>
+          <div class="rounded-xl p-3 mb-3 text-sm font-bold text-white" style="background:#dc2626">El rostro no corresponde a la persona enrolada con el RUT ${esc(rutTxt)}.</div>
+          <p class="text-xs text-slate-600 mb-4">${bioBloqueos >= 3 ? "Si eres el titular de este RUT, acércate al supervisor del evento." : "Si eres el titular, reintenta de frente, con buena luz y sin nada que cubra tu rostro."}</p>
+          <div class="flex gap-2"><button id="nc_cerrar" class="btn btn-ghost flex-1">Cerrar</button><button id="nc_otra" class="btn flex-1 font-bold text-white" style="background:#dc2626">Reintentar</button></div>
+        </div>`);
+        $("#nc_cerrar").addEventListener("click", closeModal);
+        $("#nc_otra").addEventListener("click", () => { closeModal(); submit.click(); });
+      };
       app.innerHTML = `
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
@@ -2996,7 +3010,19 @@
           if (aplicaBio) {
             const bio = await capturaBiometrica(formatRut(rut.value));
             if (bio && bio.cancelado) { toast("Necesitas tomar la foto para completar tu ingreso.", false, 3500); return; }
-            if (bio && bio.fotoBlob) { fotoBlob = bio.fotoBlob; bioPend = bio.token ? bio : null; }
+            if (bio && bio.fotoBlob) {
+              fotoBlob = bio.fotoBlob; bioPend = bio.token ? bio : null;
+              // RUT YA ENROLADO: se verifica ANTES de registrar. Si el rostro no corresponde (otra persona),
+              // NO se registra el ingreso ni se guarda la foto. Si falla la conexión, se registra como antes.
+              if (bioPend && bio.modo === "verificacion" && window.BioIngreso.verificarPrevio) {
+                const txt0 = submit.textContent; submit.disabled = true; submit.textContent = "Verificando identidad…";
+                let v = "error";
+                try { v = await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes }), 35000); } catch (_) { }
+                submit.disabled = false; submit.textContent = txt0;
+                if (v === "bloqueado") { fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
+                bioPend = { ...bio, previo: true };   // tras registrar: vincular (o procesar si no quedó guardada)
+              }
+            }
           }
         }
         if (fotoRequerida && !fotoBlob) {
@@ -3048,7 +3074,10 @@
           //     las mismas capturas. Si falla o no hay señal, el ingreso y la foto quedan igual.
           if (bioPend) {
             const b = bioPend; bioPend = null; submit.textContent = "Verificando…";
-            try { await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 35000); } catch (_) { }
+            try {
+              const vin = b.previo ? await conTimeout(window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id }), 20000) : null;
+              if (vin !== "ok") await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 35000);
+            } catch (_) { }
           }
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
           mostrarIngresoExitoso(asis);

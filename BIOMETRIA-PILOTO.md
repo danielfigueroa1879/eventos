@@ -40,8 +40,16 @@ Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
    (hasta 3 veces); a la **4.ª vez** ingresa **solo con la foto normal** (a R2, sin biometría).
 2. Cámara: **frente** (cuenta regresiva) + **1 giro** (flecha, momento de captura aleatorio).
 3. La captura de **frente es la foto de ingreso**: se registra la asistencia y la foto se sube a **R2 como siempre**.
-4. Después se envían las capturas a la función: **primer ingreso del RUT = enrolamiento automático**;
-   siguientes = **verificación 1:1**. Si la biometría falla o no hay señal, el ingreso y la foto quedan igual.
+4. **Primer ingreso del RUT** = enrolamiento automático (después de registrar, como antes).
+   **RUT ya enrolado** = verificación 1:1 **ANTES de registrar** (`procesar_auto` con `previo: true`):
+   - si el rostro **NO COINCIDE** (similitud < 0,30: otra persona) → **aviso rojo "Ingreso NO registrado"**,
+     no se crea la asistencia ni se sube la foto (puede reintentar; tras 3 rechazos se le indica ir al supervisor);
+   - si coincide (o queda en revisión ⚠) → se registra y la verificación se asocia a la asistencia (`vincular`);
+   - si la función falla o no hay señal → se registra igual, como antes.
+   Los rechazos quedan en `biometria_intentos` sin asistencia. Un guardia rechazado por error: el admin puede
+   desactivar la biometría del evento (botón 🧬) o restablecer su plantilla.
+   Nota: el bloqueo lo aplica la app; quien manipule el navegador podría saltárselo (las tablas de asistencia
+   siguen abiertas a la anon key, como siempre).
 5. Panel admin, junto a la foto: **✔✔ azul** verificado · **✔ azul** enrolado (primer ingreso) · **⚠** revisión ·
    **✖** no coincide. Clic = detalle y **Restablecer plantilla** (se vuelve a enrolar en el próximo ingreso).
    Resultado ORIENTATIVO. Detalle con score y "Restablecer" solo admin.

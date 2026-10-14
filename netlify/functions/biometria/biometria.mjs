@@ -230,7 +230,10 @@ export default async (req) => {
       try { d = L.leerDesafio(cfg.k, b.token); } catch (e) { throw new ErrorCliente(e.message); }
       if (d.rut !== rut || d.tipo !== "auto") throw new ErrorCliente("El desafío no corresponde a este RUT.");
       if (b.consentimiento !== true) throw new ErrorCliente("Falta el consentimiento.");
-      await exigirAsistenciaReciente(cfg, rut, b.asistencia_id);
+      // previo = verificación ANTES de registrar el ingreso (RUT ya enrolado): si el rostro NO COINCIDE
+      // la app no registra el ingreso. El intento queda sin asistencia y luego se vincula ("vincular").
+      const previo = b.previo === true;
+      if (!previo) await exigirAsistenciaReciente(cfg, rut, b.asistencia_id);
       if (await nonceUsado(cfg, d.nonce)) throw new ErrorCliente("Este desafío ya fue usado.", 409);
       const m = await cargarModelos();
       const tA = performance.now();
@@ -238,8 +241,9 @@ export default async (req) => {
       const vida = L.evaluarVida(frames);
       const frente = frames.find(f => f.paso === "frente" && f.emb);
       const p = await leerPlantilla(cfg, rut);
-      const base = { rut, liveness_ok: vida.ok, modelo: L.MODELO, metodo: L.METODO + "+auto", nonce: d.nonce, asistencia_id: b.asistencia_id };
+      const base = { rut, liveness_ok: vida.ok, modelo: L.MODELO, metodo: L.METODO + "+auto", nonce: d.nonce, asistencia_id: previo ? null : b.asistencia_id };
       const tiempos = () => ({ frio: m.frio, analisis_ms: ms(performance.now() - tA), total_ms: ms(performance.now() - t0) });
+      if (previo && (!p || !p.activo)) throw new ErrorCliente("Este RUT aún no está enrolado.", 409);
       if (!p || !p.activo) {
         // Primer ingreso: ENROLAMIENTO AUTOMÁTICO con la captura de frente (solo si superó la prueba de vida).
         if (!vida.ok || !frente) {
@@ -256,8 +260,20 @@ export default async (req) => {
       const score = frente ? +L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb).toFixed(4) : null;
       const r = L.decidir(score, vida);
       await registrarIntento(cfg, { ...base, tipo: "verificacion", estado: r.estado, score, detalle: { motivo: r.motivo, motivos: vida.motivos, medidas: vida.medidas, version_plantilla: p.version }, duracion_ms: ms(performance.now() - t0) });
-      // Al guardia no se le muestra el estado ni el score (resultado orientativo, solo para el supervisor).
-      return json({ ok: true, resultado: "registrado", tiempos: tiempos() });
+      // Al guardia no se le muestra el score. Solo en la verificación previa se le dice si quedó BLOQUEADO
+      // (similitud baja = otra persona): en ese caso la app no registra el ingreso.
+      const bloqueado = r.estado === L.ESTADOS.NO || (score != null && score < L.UMBRAL_NO_COINCIDE);
+      return json({ ok: true, resultado: "registrado", ...(previo ? { bloqueado } : {}), tiempos: tiempos() });
+    }
+    // Tras registrar el ingreso: asocia la verificación previa (mismo desafío) a la asistencia recién creada.
+    if (b.accion === "vincular") {
+      let d;
+      try { d = L.leerDesafio(cfg.k, b.token, 0); } catch (e) { throw new ErrorCliente(e.message); }   // firma válida; plazo abajo
+      if (d.rut !== rut || d.tipo !== "auto") throw new ErrorCliente("El desafío no corresponde a este RUT.");
+      if (Date.now() > d.vence + INGRESO_PLAZO_MS) throw new ErrorCliente("plazo vencido", 403);
+      await exigirAsistenciaReciente(cfg, rut, b.asistencia_id);
+      const f = await sbFetch(cfg, `/rest/v1/biometria_intentos?nonce=eq.${enc(d.nonce)}&rut=eq.${enc(rut)}&asistencia_id=is.null`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ asistencia_id: b.asistencia_id }) });
+      return json({ ok: true, vinculado: (f || []).length });
     }
 
     await exigirPin(cfg, b.pin);

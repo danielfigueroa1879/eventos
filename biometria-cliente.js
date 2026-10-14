@@ -147,7 +147,7 @@
       }
       cerrar();
       if (!fotoBlob) return null;   // no se pudo generar la foto: se usa la foto normal
-      return { fotoBlob, token, imagenes: token ? imgs : null };
+      return { fotoBlob, token, imagenes: token ? imgs : null, modo: r.status === 200 ? r.d.modo : null };
     } catch (e) {
       cerrar();
       return null;
@@ -163,5 +163,22 @@
     } catch (_) { return "error"; }
   }
 
-  window.BioIngreso = { capturar, procesar };
+  // RUT ya enrolado: verifica ANTES de registrar. Devuelve "bloqueado" (otra persona: no registrar),
+  // "ok" (registrar y luego vincular) o "error" (sin señal / falla: se registra igual, como antes).
+  async function verificarPrevio({ rut, token, imagenes }) {
+    if (!token || !imagenes) return "error";
+    try {
+      const r = await api({ accion: "procesar_auto", previo: true, rut, token, imagenes, consentimiento: true }, 30000);
+      if (r.status !== 200) return "error";
+      return r.d.bloqueado ? "bloqueado" : "ok";
+    } catch (_) { return "error"; }
+  }
+  // Asocia la verificación previa a la asistencia recién creada (para las palomas del panel).
+  async function vincular({ rut, token, asistenciaId }) {
+    if (!token || !asistenciaId) return "omitido";
+    try { const r = await api({ accion: "vincular", rut, token, asistencia_id: asistenciaId }, 15000); return r.status === 200 && r.d.vinculado ? "ok" : "error"; }
+    catch (_) { return "error"; }
+  }
+
+  window.BioIngreso = { capturar, procesar, verificarPrevio, vincular };
 })();
