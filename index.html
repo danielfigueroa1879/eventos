@@ -3026,7 +3026,7 @@
         <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt((asisRec && asisRec.hora_ingreso) || nowISO())}</p>
         ${pFoto ? `<p id="fotoEstado" class="text-sm font-semibold mt-3" style="color:#64748b">📸 Guardando foto…</p>` : ""}
         <button id="otroRegistro" class="btn btn-p w-full mt-5">➕ Ingresar otro registro</button>
-        <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">10</span> s…</p>
+        <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">4</span> s…</p>
       </div></div>`;
         // Prórroga: primero "NO VIGENTE" (amarillo) y luego revela "CON PRÓRROGA" en verde con tic (solo guardias)
         if (!esSup && v.estado === "VENCIDO_CON_PRORROGA") {
@@ -3035,20 +3035,18 @@
             if (vr) vr.innerHTML = `<span class="badge b-verde">✅ CON PRÓRROGA</span> <span class="text-xs text-slate-500">(${esc(v.siges)})</span>`;
           }, 2500);
         }
-        let restante = 10, tmpAuto = null;
+        let restante = 4, tmpAuto = null;   // vuelve rápido al formulario; foto y biometría siguen en segundo plano
         let salio = false;
         const irOtro = () => { if (salio) return; salio = true; if (tmpAuto) clearInterval(tmpAuto); renderGuard(ev.slug); };
         const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", irOtro);
-        // Mientras la foto se sube, no se vuelve sola al formulario (el contador espera en 0).
-        let fotoLista = !pFoto;
+        // La foto sigue subiendo en SEGUNDO PLANO aunque se vuelva al formulario (misma página). Si falla,
+        // el aviso aparece igual (toast) en la pantalla que esté abierta.
         if (pFoto) pFoto.then(ok => {
-          fotoLista = true;
           const fe = $("#fotoEstado");
           if (fe) { fe.style.color = ok ? "#15803d" : "#dc2626"; fe.textContent = ok ? "✓ Foto guardada" : "⚠ Tu ingreso quedó registrado, pero la foto no se pudo guardar."; }
           if (!ok) toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500);
-          if (restante <= 0) irOtro();
         });
-        tmpAuto = setInterval(() => { if (restante > 0) restante--; const c = $("#otroCount"); if (c) c.textContent = restante; if (restante <= 0 && fotoLista) irOtro(); }, 1000);
+        tmpAuto = setInterval(() => { restante--; const c = $("#otroCount"); if (c) c.textContent = Math.max(0, restante); if (restante <= 0) irOtro(); }, 1000);
       }
 
       const TIMEOUT_MS = 20000; // límite de espera para confirmar cada escritura en el servidor
