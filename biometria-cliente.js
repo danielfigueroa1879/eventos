@@ -48,6 +48,21 @@
       #bioi-fl.izq{display:flex;left:6px}#bioi-fl.der{display:flex;right:6px}
       #bioi-fl.izq b{animation:bioiI .9s ease-in-out infinite}#bioi-fl.der b{animation:bioiD .9s ease-in-out infinite}
       @keyframes bioiI{50%{transform:translateX(-14px)}}@keyframes bioiD{50%{transform:translateX(14px)}}
+      /* GUÍA REFORZADA (2.º intento o más): borde que destella del lado del giro, cartel grande y una
+         cabeza animada que gira hacia ese lado. */
+      #bioi-guia{position:absolute;inset:0;pointer-events:none;display:none}
+      #bioi-guia.izq,#bioi-guia.der{display:block}
+      #bioi-guia .borde{position:absolute;top:0;bottom:0;width:26%;animation:bioiDest .7s ease-in-out infinite}
+      #bioi-guia.izq .borde{left:0;background:linear-gradient(to right,rgba(250,204,21,.75),rgba(250,204,21,0))}
+      #bioi-guia.der .borde{right:0;background:linear-gradient(to left,rgba(250,204,21,.75),rgba(250,204,21,0))}
+      #bioi-guia .cartel{position:absolute;left:8px;right:8px;top:54px;background:#facc15;color:#111827;border-radius:12px;padding:8px 10px;text-align:center;font-weight:900;font-size:19px;line-height:1.2;box-shadow:0 6px 18px rgba(0,0,0,.45);animation:bioiPulso 1s ease-in-out infinite}
+      #bioi-guia .cartel small{display:block;font-size:12.5px;font-weight:700;margin-top:2px}
+      #bioi-guia .cab{position:absolute;bottom:70px;left:50%;width:92px;height:92px;margin-left:-46px;background:rgba(15,23,42,.72);border-radius:50%;border:3px solid #facc15}
+      #bioi-guia .cab svg{width:100%;height:100%}
+      #bioi-guia.izq .cara{animation:bioiCabI 1.6s ease-in-out infinite}#bioi-guia.der .cara{animation:bioiCabD 1.6s ease-in-out infinite}
+      @keyframes bioiDest{50%{opacity:.25}}@keyframes bioiPulso{50%{transform:scale(1.04)}}
+      @keyframes bioiCabI{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(-11px)}100%{transform:translateX(0)}}
+      @keyframes bioiCabD{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(11px)}100%{transform:translateX(0)}}
       #bioi-msg{font-size:14px;text-align:center;max-width:420px;min-height:20px}
       #bioi-btns{display:flex;gap:10px;width:100%;max-width:420px}
       #bioi-btns button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:1px solid #475569;background:transparent;color:#fff}
@@ -59,6 +74,8 @@
       <div id="bioi-esc"><video playsinline autoplay muted></video>
         <svg viewBox="0 0 300 400" aria-hidden="true"><defs><mask id="bioi-m"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="black"/></mask></defs>
           <rect width="300" height="400" fill="rgba(15,23,42,.5)" mask="url(#bioi-m)"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="7 7"/></svg>
+        <div id="bioi-guia"><div class="borde"></div><div class="cartel"></div>
+          <div class="cab"><svg viewBox="0 0 92 92"><ellipse cx="46" cy="48" rx="26" ry="31" fill="#fcd34d"/><g class="cara"><circle cx="37" cy="42" r="3.6" fill="#111827"/><circle cx="55" cy="42" r="3.6" fill="#111827"/><path d="M46 46 l-4 11 h8z" fill="#b45309"/><path d="M38 63 q8 5 16 0" stroke="#111827" stroke-width="2.6" fill="none" stroke-linecap="round"/></g></svg></div></div>
         <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
       <div id="bioi-msg"></div>
       <div id="bioi-btns"><button id="bioi-no">Cancelar</button><button id="bioi-si" class="p">Continuar</button></div>`;
@@ -80,7 +97,7 @@
     api({ accion: "precalentar", rut }, 15000).catch(() => { });
   }
 
-  async function capturar({ rut, fotoDesde }) {
+  async function capturar({ rut, fotoDesde, reintento }) {
     if (!rut || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
     // ¿Aplica? (403/503 = no participa o servicio no configurado -> foto normal). Empieza a cargar los modelos.
     precalentar(rut);
@@ -93,9 +110,17 @@
     let stream = null;
     const msg = t => { ui.$("bioi-msg").textContent = t || ""; };
     const indicar = paso => {
-      const f = ui.$("bioi-fl"); f.className = "";
-      if (paso === "giro_izquierda") { f.className = "izq"; f.querySelector("b").textContent = "⬅"; }
-      if (paso === "giro_derecha") { f.className = "der"; f.querySelector("b").textContent = "➡"; }
+      const f = ui.$("bioi-fl"), g = ui.$("bioi-guia"); f.className = ""; g.className = "";
+      const lado = paso === "giro_izquierda" ? "izq" : paso === "giro_derecha" ? "der" : "";
+      if (lado) { f.className = lado; f.querySelector("b").textContent = lado === "izq" ? "⬅" : "➡"; }
+      // 2.º intento o más: guía reforzada (borde que destella, cartel grande y cabeza animada).
+      if (lado && reintento) {
+        g.className = lado;
+        g.querySelector(".cartel").innerHTML = lado === "izq"
+          ? "⬅⬅ GIRA LA CABEZA HACIA ESTE LADO<small>Un poco (como mirando tu hombro) y quédate así hasta ver 📸</small>"
+          : "GIRA LA CABEZA HACIA ESTE LADO ➡➡<small>Un poco (como mirando tu hombro) y quédate así hasta ver 📸</small>";
+        try { navigator.vibrate && navigator.vibrate([120, 80, 120]); } catch (_) { }
+      }
     };
     const cerrar = () => { try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) { } stream = null; ui.capa.remove(); ui.estilo.remove(); };
 
@@ -131,7 +156,9 @@
       ui.video.srcObject = stream;
       await new Promise(res => { if (ui.video.readyState >= 2) res(); else ui.video.onloadeddata = () => res(); });
       ui.$("bioi-ins").textContent = "Encuadra tu rostro dentro del óvalo";
-      msg("Con buena luz y de frente. Cuando estés listo, pulsa el botón.");
+      msg(reintento
+        ? "Esta vez: primero mira al frente; cuando aparezca el cartel amarillo, GIRA la cabeza hacia ese lado y quédate así hasta ver 📸."
+        : "Con buena luz y de frente. Cuando estés listo, pulsa el botón.");
       if (!(await elegir(ui, "Estoy listo", "Cancelar"))) { cerrar(); return { cancelado: true }; }
       ui.$("bioi-no").disabled = true;
 
@@ -148,7 +175,8 @@
         ui.$("bioi-ins").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
         if (pasos[i].startsWith("giro_")) {
           msg("Gira la cabeza (unos 30°) y mantenla hasta ver 📸"); ui.$("bioi-cta").textContent = "";
-          await esperar(1000 + Math.floor(Math.random() * 1000));   // momento de captura aleatorio
+          // Momento de captura aleatorio; en el reintento, un poco más de tiempo para girar.
+          await esperar((reintento ? 1800 : 1000) + Math.floor(Math.random() * 1000));
         } else {
           msg("Quédate quieto mirando la cámara");
           for (let s = 2; s > 0; s--) { ui.$("bioi-cta").textContent = s; await esperar(900); }

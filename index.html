@@ -2321,7 +2321,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=6"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=7"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
@@ -2353,8 +2353,8 @@
       return { paso, cerrar: () => el.remove() };
     }
     // Captura biométrica en lugar de la foto normal. null = no aplica o falló -> se usa la foto normal.
-    async function capturaBiometrica(rut) {
-      try { await cargarBioCliente(); return await window.BioIngreso.capturar({ rut, fotoDesde: v => _fotoWebpDesde(v, v.videoWidth, v.videoHeight) }); }
+    async function capturaBiometrica(rut, reintento) {
+      try { await cargarBioCliente(); return await window.BioIngreso.capturar({ rut, reintento: !!reintento, fotoDesde: v => _fotoWebpDesde(v, v.videoWidth, v.videoHeight) }); }
       catch (e) { console.warn("biometría:", e && e.message); return null; }
     }
 
@@ -2767,7 +2767,9 @@
       let bioBloqueos = 0;              // verificaciones previas rechazadas (rostro de otra persona)
       let procUI = null;                // pantalla "Procesando tu ingreso"
       // Prueba de vida NO superada: el ingreso no se registra; debe repetir la verificación.
+      let bioVidaFallos = 0;            // pruebas de vida no superadas (desde el 2.º intento: guía reforzada)
       const avisoRepetirVida = (pista) => {
+        bioVidaFallos++;
         openModal(`<div class="text-center">
           <div class="text-5xl mb-2">🔄</div>
           <h2 class="font-extrabold text-lg mb-2" style="color:#b45309">Repite la verificación</h2>
@@ -3079,7 +3081,7 @@
           // BIOMETRÍA (solo con el interruptor encendido para este RUT): la captura de frente es la foto.
           let aplicaBio = false; try { aplicaBio = bioAplica(await bioRutsP, rut.value); } catch (_) { }
           if (aplicaBio) {
-            const bio = await capturaBiometrica(formatRut(rut.value));
+            const bio = await capturaBiometrica(formatRut(rut.value), bioVidaFallos > 0);   // 2.º intento: guía reforzada
             if (bio && bio.cancelado) { toast("Necesitas tomar la foto para completar tu ingreso.", false, 3500); return; }
             if (bio && bio.fotoBlob) {
               fotoBlob = bio.fotoBlob; bioPend = bio.token ? bio : null;
