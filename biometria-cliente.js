@@ -34,11 +34,19 @@
     st.textContent = `
       #bioi-capa{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px 12px calc(12px + env(safe-area-inset-bottom));font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
       #bioi-tit{font-weight:800;font-size:17px;text-align:center;max-width:420px}
-      #bioi-cons{max-width:420px;background:#fff;border:1.5px solid #0f172a;border-radius:14px;padding:16px;font-size:14px}
-      #bioi-cons p{margin:0 0 10px}#bioi-cons small{color:#475569;font-size:12px}
-      #bioi-chk{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px;border:1.5px solid #0f172a;border-radius:10px;cursor:pointer}
-      #bioi-chk input{width:22px;height:22px;flex-shrink:0;margin-top:1px}
-      #bioi-aviso{color:#dc2626;font-weight:700;margin-top:10px;min-height:18px}
+      /* Consentimiento: fondo gris suave (no blanco puro), tarjeta con encabezado verde. */
+      #bioi-capa.cons{background:#e5e9ee}
+      #bioi-cons{max-width:420px;width:100%;background:#fff;border:1px solid #cbd5e1;border-radius:16px;font-size:14.5px;overflow:hidden;box-shadow:0 10px 30px -10px rgba(15,23,42,.35)}
+      #bioi-cons .cab{background:#0f5323;color:#fff;font-weight:800;font-size:16px;padding:12px 16px}
+      #bioi-cons .cue{padding:14px 16px 16px}
+      #bioi-cons p{margin:0 0 10px;color:#1e293b}#bioi-cons small{color:#475569;font-size:12px}
+      #bioi-chk{display:flex;gap:12px;align-items:center;margin-top:14px;padding:14px;border:2.5px solid #0f5323;border-radius:12px;background:#f0fdf4;cursor:pointer;font-weight:800;font-size:16px;color:#0f5323}
+      #bioi-chk:has(input:checked){background:#bbf7d0}
+      #bioi-chk.mal{border-color:#dc2626;background:#fef2f2;color:#991b1b}
+      #bioi-chk input{width:30px;height:30px;flex-shrink:0;margin:0;accent-color:#0f5323}
+      #bioi-aviso{display:none;margin-top:12px;padding:10px 12px;border-radius:10px;background:#dc2626;color:#fff;font-weight:800;font-size:14.5px;text-align:center}
+      #bioi-aviso.on{display:block;animation:bioiSac .4s}
+      @keyframes bioiSac{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
       #bioi-esc{position:relative;width:100%;max-width:400px;max-height:62vh;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#fff;display:none}
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -130,27 +138,32 @@
       // 1) Consentimiento: una casilla. Sin marcarla, "Debes aceptar" (hasta 3 veces); a la 4.ª vez se
       //    sigue SOLO con la foto normal (sin biometría): se devuelve null y la app usa la foto de siempre.
       const t0 = textos(false);
-      ui.$("bioi-cons").innerHTML = `<p><b id="bioi-tit">${t0.tit}</b></p>
+      ui.capa.classList.add("cons");
+      ui.$("bioi-cons").innerHTML = `<div class="cab">🔒 <span id="bioi-ctit">${t0.tit}</span></div><div class="cue">
         <p>Tu foto de ingreso se usará también para <span id="bioi-acc">${t0.acc}</span> una plantilla biométrica cifrada de tu rostro, solo para verificar tu identidad en los ingresos a eventos.</p>
         <p>No se usa para identificar a otras personas y puedes pedir su eliminación al administrador.</p>
         <small>Ley N° 19.628 y Ley N° 21.719 (datos sensibles).</small>
         <label id="bioi-chk"><input type="checkbox" id="bioi-acepto"><span>Acepto la verificación facial</span></label>
-        <div id="bioi-aviso"></div>`;
+        <div id="bioi-aviso"></div></div>`;
+      ui.$("bioi-acepto").addEventListener("change", () => { ui.$("bioi-chk").classList.remove("mal"); ui.$("bioi-aviso").classList.remove("on"); });
       ui.$("bioi-no").style.display = "none";
-      pDesafio.then(x => { if (x.status === 200 && x.d.modo === "enrolamiento") { const t = textos(true); ui.$("bioi-tit").textContent = t.tit; ui.$("bioi-acc").textContent = t.acc; } });
+      pDesafio.then(x => { if (x.status === 200 && x.d.modo === "enrolamiento") { const t = textos(true); ui.$("bioi-ctit").textContent = t.tit; ui.$("bioi-acc").textContent = t.acc; } });
       let intentos = 0;
       for (;;) {
         await elegir(ui, "Continuar", "");
         if (ui.$("bioi-acepto").checked) break;
         intentos++;
         if (intentos >= 4) { cerrar(); return null; }   // 4.ª vez sin aceptar: solo la foto normal
-        ui.$("bioi-aviso").textContent = `Debes aceptar la verificación facial para continuar.${intentos === 3 ? " (último aviso)" : ""}`;
+        const av = ui.$("bioi-aviso"); av.classList.remove("on"); void av.offsetWidth;   // reinicia la animación
+        av.textContent = `⚠ Debes marcar la casilla para continuar.${intentos === 3 ? " (último aviso)" : ""}`;
+        av.classList.add("on"); ui.$("bioi-chk").classList.add("mal");
       }
       ui.$("bioi-no").style.display = "";
       // ¿Aplica? (403/503 = no participa o servicio no configurado -> foto normal).
       if (!r) { msg("Preparando…"); await pDesafio; }
       if (r.status !== 200 || !r.d.pasos) { cerrar(); return null; }
       // 2) Cámara.
+      ui.capa.classList.remove("cons");   // cámara: fondo BLANCO para iluminar el rostro
       ui.$("bioi-cons").style.display = "none"; ui.$("bioi-esc").style.display = "block";
       ui.$("bioi-no").textContent = "Cancelar"; msg("Abriendo cámara…");
       try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false }); }
