@@ -179,15 +179,17 @@
     } catch (_) { return "error"; }
   }
 
-  // RUT ya enrolado: verifica ANTES de registrar. Devuelve "bloqueado" (otra persona: no registrar),
-  // "ok" (registrar y luego vincular) o "error" (sin señal / falla: se registra igual, como antes).
+  // Revisión ANTES de registrar. Devuelve { estado }: "bloqueado" (otra persona: no registrar),
+  // "repetir" (prueba de vida no superada: repetir, con una pista), "ok" (registrar) o "error"
+  // (sin señal / falla: se registra igual, como antes). En el primer ingreso solo revisa la prueba de vida.
   async function verificarPrevio({ rut, token, imagenes }) {
-    if (!token || !imagenes) return "error";
+    if (!token || !imagenes) return { estado: "error" };
     try {
       const r = await api({ accion: "procesar_auto", previo: true, rut, token, imagenes, consentimiento: true }, 30000);
-      if (r.status !== 200) return "error";
-      return r.d.bloqueado ? "bloqueado" : "ok";
-    } catch (_) { return "error"; }
+      if (r.status !== 200) return { estado: "error" };
+      if (r.d.reintentar) return { estado: "repetir", pista: r.d.pista || "" };
+      return { estado: r.d.bloqueado ? "bloqueado" : "ok" };
+    } catch (_) { return { estado: "error" }; }
   }
   // Asocia la verificación previa a la asistencia recién creada (para las palomas del panel).
   async function vincular({ rut, token, asistenciaId, enSegundoPlano }) {

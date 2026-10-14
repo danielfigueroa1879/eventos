@@ -2321,7 +2321,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=5"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=6"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
@@ -2766,6 +2766,18 @@
       let bioPend = null;               // capturas biométricas pendientes de enviar tras registrar
       let bioBloqueos = 0;              // verificaciones previas rechazadas (rostro de otra persona)
       let procUI = null;                // pantalla "Procesando tu ingreso"
+      // Prueba de vida NO superada: el ingreso no se registra; debe repetir la verificación.
+      const avisoRepetirVida = (pista) => {
+        openModal(`<div class="text-center">
+          <div class="text-5xl mb-2">🔄</div>
+          <h2 class="font-extrabold text-lg mb-2" style="color:#b45309">Repite la verificación</h2>
+          <div class="rounded-xl p-3 mb-3 text-sm font-bold" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d">No se superó la prueba de vida. Tu ingreso aún NO está registrado.</div>
+          <p class="text-sm text-slate-700 mb-4">${esc(pista || "Mira al frente y luego gira la cabeza hacia el lado de la flecha.")}</p>
+          <div class="flex gap-2"><button id="rv_cerrar" class="btn btn-ghost flex-1">Cerrar</button><button id="rv_otra" class="btn flex-1 font-bold text-white" style="background:#16a34a">Reintentar</button></div>
+        </div>`);
+        $("#rv_cerrar").addEventListener("click", closeModal);
+        $("#rv_otra").addEventListener("click", () => { closeModal(); submit.click(); });
+      };
       // Aviso ROJO: el rostro no corresponde a la persona enrolada con este RUT. El ingreso NO se registró.
       const avisoNoCoincide = (rutTxt) => {
         openModal(`<div class="text-center">
@@ -3073,14 +3085,18 @@
               fotoBlob = bio.fotoBlob; bioPend = bio.token ? bio : null;
               // RUT YA ENROLADO: se verifica ANTES de registrar. Si el rostro no corresponde (otra persona),
               // NO se registra el ingreso ni se guarda la foto. Si falla la conexión, se registra como antes.
-              if (bioPend && bio.modo === "verificacion" && window.BioIngreso.verificarPrevio) {
+              // También en el PRIMER ingreso se revisa antes la prueba de vida (si no la supera, debe repetir).
+              if (bioPend && window.BioIngreso.verificarPrevio) {
+                const enrolar = bio.modo !== "verificacion";
                 submit.disabled = true;
                 procUI = pantallaProceso(["verificar", "registrar"]); procUI.paso("verificar");
-                let v = "error";
-                try { v = await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes }), 35000); } catch (_) { }
+                let v = { estado: "error" };
+                try { v = (await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes }), 35000)) || v; } catch (_) { }
                 submit.disabled = false;
-                if (v === "bloqueado") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
-                bioPend = { ...bio, previo: true, previoOk: v === "ok" };   // tras registrar: vincular (o procesar si no quedó guardada)
+                if (v.estado === "bloqueado") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
+                if (v.estado === "repetir") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; avisoRepetirVida(v.pista); return; }
+                // Primer ingreso: tras registrar se enrola (procesar). Ya enrolado: tras registrar se vincula.
+                bioPend = enrolar ? bio : { ...bio, previo: true, previoOk: v.estado === "ok" };
               }
             }
           }
