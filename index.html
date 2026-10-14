@@ -2321,7 +2321,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=10"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=11"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
@@ -2367,8 +2367,8 @@
         const onBackdrop = (e) => { if (e.target.id === "modal") cerrar(null); };
         const cerrar = (blob) => { if (terminado) return; terminado = true; try { $("#modal").removeEventListener("click", onBackdrop); $("#modal").style.background = ""; } catch (_) {} limpiar(); closeModal(); resolve(blob || null); };
         $("#modal").addEventListener("click", onBackdrop);
-        // Fondo BLANCO mientras se toma la foto: la pantalla ilumina el rostro (sirve de noche).
-        $("#modal").style.background = "#ffffff";
+        // Fondo gris suave mientras se toma la foto; el recuadro del óvalo es BLANCO e ilumina el rostro.
+        $("#modal").style.background = "#e5e9ee";
 
         openModal(`
         <div class="text-center">

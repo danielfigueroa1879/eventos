@@ -34,8 +34,8 @@
     st.textContent = `
       #bioi-capa{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px 12px calc(12px + env(safe-area-inset-bottom));font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
       #bioi-tit{font-weight:800;font-size:17px;text-align:center;max-width:420px}
-      /* Consentimiento: fondo gris suave (no blanco puro), tarjeta con encabezado verde. */
-      #bioi-capa.cons{background:#e5e9ee}
+      /* Fondo gris suave en toda la pantalla; solo el recuadro de la cámara (óvalo) es BLANCO. */
+      #bioi-capa,#bioi-capa.cons{background:#e5e9ee}
       #bioi-cons{max-width:420px;width:100%;background:#fff;border:1px solid #cbd5e1;border-radius:16px;font-size:14.5px;overflow:hidden;box-shadow:0 10px 30px -10px rgba(15,23,42,.35)}
       #bioi-cons .cab{background:#0f5323;color:#fff;font-weight:800;font-size:16px;padding:12px 16px}
       #bioi-cons .cue{padding:14px 16px 16px}
@@ -47,7 +47,7 @@
       #bioi-aviso{display:none;margin-top:12px;padding:10px 12px;border-radius:10px;background:#dc2626;color:#fff;font-weight:800;font-size:14.5px;text-align:center}
       #bioi-aviso.on{display:block;animation:bioiSac .4s}
       @keyframes bioiSac{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
-      #bioi-esc{position:relative;width:100%;max-width:400px;max-height:62vh;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#fff;display:none}
+      #bioi-esc{position:relative;width:100%;max-width:400px;max-height:62vh;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#fff;display:none;box-shadow:0 10px 30px -10px rgba(15,23,42,.35)}
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
       #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#0f172a;font-weight:800;font-size:18px;background:linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,0))}
@@ -163,7 +163,7 @@
       if (!r) { msg("Preparando…"); await pDesafio; }
       if (r.status !== 200 || !r.d.pasos) { cerrar(); return null; }
       // 2) Cámara.
-      ui.capa.classList.remove("cons");   // cámara: fondo BLANCO para iluminar el rostro
+      ui.capa.classList.remove("cons");   // cámara: el recuadro del óvalo es BLANCO (ilumina el rostro)
       ui.$("bioi-cons").style.display = "none"; ui.$("bioi-esc").style.display = "block";
       ui.$("bioi-no").textContent = "Cancelar"; msg("Abriendo cámara…");
       try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false }); }
