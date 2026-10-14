@@ -2311,7 +2311,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=3"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=4"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // Captura biométrica en lugar de la foto normal. null = no aplica o falló -> se usa la foto normal.
     async function capturaBiometrica(rut) {
@@ -2895,6 +2895,9 @@
         if (!val) return;
         if (!rutValido(val)) { rutMsg.innerHTML = `<span class="text-red-600">RUT inválido, revísalo.</span>`; return; }
         rutMsg.innerHTML = `<span class="text-slate-400">Buscando…</span>`;
+        // VELOCIDAD: con la biometría activa, apenas hay un RUT válido se descarga el módulo de cámara y se
+        // "despierta" la función (carga de modelos ~5 s) mientras el guardia completa el formulario.
+        if (fotoRequerida) bioRutsP.then(set => { if (bioAplica(set, val)) cargarBioCliente().then(() => window.BioIngreso.precalentar && window.BioIngreso.precalentar(formatRut(val))).catch(() => { }); }).catch(() => { });
         let g = null; try { g = await Data.getGuardia(val); } catch (err) { console.error(err); }
         const ya = await Data.yaRegistrado(ev.id, val).catch(() => null);
         // Solo bloquea si el registro anterior sigue VIGENTE (mismo turno / dentro de 2 h).
@@ -3020,7 +3023,7 @@
                 try { v = await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes }), 35000); } catch (_) { }
                 submit.disabled = false; submit.textContent = txt0;
                 if (v === "bloqueado") { fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
-                bioPend = { ...bio, previo: true };   // tras registrar: vincular (o procesar si no quedó guardada)
+                bioPend = { ...bio, previo: true, previoOk: v === "ok" };   // tras registrar: vincular (o procesar si no quedó guardada)
               }
             }
           }
@@ -3075,8 +3078,9 @@
           if (bioPend) {
             const b = bioPend; bioPend = null; submit.textContent = "Verificando…";
             try {
-              const vin = b.previo ? await conTimeout(window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id }), 20000) : null;
-              if (vin !== "ok") await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 35000);
+              // Verificación previa OK: el vínculo se envía sin esperar (keepalive), el guardia ve su ingreso al tiro.
+              if (b.previoOk) { window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id, enSegundoPlano: true }); }
+              else if ((b.previo ? await conTimeout(window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id }), 20000) : null) !== "ok") await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 35000);
             } catch (_) { }
           }
           // 3) Escritura confirmada → recién ahora mostramos "Ingreso registrado".
