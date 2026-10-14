@@ -3026,7 +3026,7 @@
         <p class="text-slate-400 text-xs mt-4">${esc(ev.nombre_evento)} · ${horaFmt((asisRec && asisRec.hora_ingreso) || nowISO())}</p>
         ${pFoto ? `<p id="fotoEstado" class="text-sm font-semibold mt-3" style="color:#64748b">📸 Guardando foto…</p>` : ""}
         <button id="otroRegistro" class="btn btn-p w-full mt-5">➕ Ingresar otro registro</button>
-        <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">2</span> s…</p>
+        <p class="text-slate-400 text-xs mt-2">Nuevo registro automático en <span id="otroCount">1</span> s…</p>
       </div></div>`;
         // Prórroga: primero "NO VIGENTE" (amarillo) y luego revela "CON PRÓRROGA" en verde con tic (solo guardias)
         if (!esSup && v.estado === "VENCIDO_CON_PRORROGA") {
@@ -3035,7 +3035,7 @@
             if (vr) vr.innerHTML = `<span class="badge b-verde">✅ CON PRÓRROGA</span> <span class="text-xs text-slate-500">(${esc(v.siges)})</span>`;
           }, 2500);
         }
-        let restante = 2, tmpAuto = null;   // vuelve rápido al formulario; foto y biometría siguen en segundo plano
+        let restante = 1, tmpAuto = null;   // vuelve rápido al formulario; foto y biometría siguen en segundo plano
         let salio = false;
         const irOtro = () => { if (salio) return; salio = true; if (tmpAuto) clearInterval(tmpAuto); renderGuard(ev.slug); };
         const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", irOtro);
