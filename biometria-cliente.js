@@ -19,10 +19,10 @@
   const esperar = n => new Promise(r => setTimeout(r, n));
   const INSTR = { frente: "Mira al frente", giro_izquierda: "Gira la cabeza hacia la flecha ⬅", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
 
-  async function api(cuerpo, timeoutMs = 25000) {
+  async function api(cuerpo, timeoutMs = 25000, keepalive = false) {
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), timeoutMs);
     try {
-      const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo), signal: ctl.signal });
+      const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo), signal: ctl.signal, keepalive });
       return { status: r.status, d: await r.json().catch(() => ({})) };
     } finally { clearTimeout(t); }
   }
@@ -72,12 +72,21 @@
     return new Promise(res => { si.onclick = () => { si.disabled = true; res(true); }; no.onclick = () => res(false); });
   }
 
+  // Despierta la función (carga de modelos) por adelantado. Máximo una vez por minuto.
+  let ultimoCalentar = 0;
+  function precalentar(rut) {
+    if (!rut || Date.now() - ultimoCalentar < 60000) return;
+    ultimoCalentar = Date.now();
+    api({ accion: "precalentar", rut }, 15000).catch(() => { });
+  }
+
   async function capturar({ rut, fotoDesde }) {
     if (!rut || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
     // ¿Aplica? (403/503 = no participa o servicio no configurado -> foto normal). Empieza a cargar los modelos.
-    api({ accion: "precalentar", rut }, 15000).catch(() => { });
+    precalentar(rut);
     let r;
     try { r = await api({ accion: "desafio_auto", rut }, 10000); } catch (_) { return null; }
+    const tDesafio = Date.now();
     if (r.status !== 200 || !r.d.pasos) return null;
     const primeraVez = r.d.modo === "enrolamiento";
 
@@ -123,8 +132,11 @@
       ui.$("bioi-no").disabled = true;
 
       // 3) Desafío nuevo (vence a los 90 s): frente + 1 giro.
-      msg("Preparando…");
-      try { r = await api({ accion: "desafio_auto", rut }, 10000); } catch (_) { r = { status: 0 }; }
+      // Se reutiliza el primer desafío si le quedan > 45 s (vence a los 90 s): una consulta menos.
+      if (Date.now() - tDesafio > 45000) {
+        msg("Preparando…");
+        try { r = await api({ accion: "desafio_auto", rut }, 10000); } catch (_) { r = { status: 0 }; }
+      }
       const pasos = r.status === 200 && r.d.pasos ? r.d.pasos : ["frente"];   // si falla, al menos la foto de frente
       const token = r.status === 200 ? r.d.token : null;
       const imgs = []; let fotoBlob = null;
@@ -132,10 +144,10 @@
         ui.$("bioi-ins").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
         if (pasos[i].startsWith("giro_")) {
           msg("Gira la cabeza (unos 30°) y mantenla hasta ver 📸"); ui.$("bioi-cta").textContent = "";
-          await esperar(1500 + Math.floor(Math.random() * 1500));   // momento de captura aleatorio
+          await esperar(1000 + Math.floor(Math.random() * 1000));   // momento de captura aleatorio
         } else {
           msg("Quédate quieto mirando la cámara");
-          for (let s = 3; s > 0; s--) { ui.$("bioi-cta").textContent = s; await esperar(1000); }
+          for (let s = 2; s > 0; s--) { ui.$("bioi-cta").textContent = s; await esperar(900); }
         }
         const v = ui.video, k = Math.min(1, 480 / v.videoWidth), cv = document.createElement("canvas");
         cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
@@ -143,7 +155,7 @@
         imgs.push(cv.toDataURL("image/jpeg", 0.85).split(",")[1]);
         // La captura de FRENTE es también la foto de ingreso (mismo proceso que la foto normal: WebP 3:4).
         if (pasos[i] === "frente" && !fotoBlob) { try { fotoBlob = await fotoDesde(v); } catch (_) { fotoBlob = null; } }
-        ui.$("bioi-cta").textContent = "📸"; await esperar(350);
+        ui.$("bioi-cta").textContent = "📸"; await esperar(250);
       }
       cerrar();
       if (!fotoBlob) return null;   // no se pudo generar la foto: se usa la foto normal
@@ -174,11 +186,11 @@
     } catch (_) { return "error"; }
   }
   // Asocia la verificación previa a la asistencia recién creada (para las palomas del panel).
-  async function vincular({ rut, token, asistenciaId }) {
+  async function vincular({ rut, token, asistenciaId, enSegundoPlano }) {
     if (!token || !asistenciaId) return "omitido";
-    try { const r = await api({ accion: "vincular", rut, token, asistencia_id: asistenciaId }, 15000); return r.status === 200 && r.d.vinculado ? "ok" : "error"; }
+    try { const r = await api({ accion: "vincular", rut, token, asistencia_id: asistenciaId }, 15000, !!enSegundoPlano); return r.status === 200 && r.d.vinculado ? "ok" : "error"; }
     catch (_) { return "error"; }
   }
 
-  window.BioIngreso = { capturar, procesar, verificarPrevio, vincular };
+  window.BioIngreso = { capturar, procesar, verificarPrevio, vincular, precalentar };
 })();

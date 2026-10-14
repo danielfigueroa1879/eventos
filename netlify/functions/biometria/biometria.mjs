@@ -220,8 +220,8 @@ export default async (req) => {
 
     // ----- Ingreso con interruptor encendido (sin PIN) -----
     if (b.accion === "desafio_auto") {
-      await exigirLimite(cfg, rut);
-      const p = await leerPlantilla(cfg, rut);
+      const [, p] = await Promise.all([exigirLimite(cfg, rut), leerPlantilla(cfg, rut)]);   // en paralelo
+      if (!modelos && !cargando) cargarModelos().catch(() => { });   // empieza a cargar los modelos ya
       const d = L.crearDesafio(cfg.k, rut, "auto");
       return json({ ok: true, modo: p && p.activo ? "verificacion" : "enrolamiento", pasos: d.pasos, token: d.token, vence: d.vence });
     }
@@ -233,14 +233,15 @@ export default async (req) => {
       // previo = verificación ANTES de registrar el ingreso (RUT ya enrolado): si el rostro NO COINCIDE
       // la app no registra el ingreso. El intento queda sin asistencia y luego se vincula ("vincular").
       const previo = b.previo === true;
-      if (!previo) await exigirAsistenciaReciente(cfg, rut, b.asistencia_id);
-      if (await nonceUsado(cfg, d.nonce)) throw new ErrorCliente("Este desafío ya fue usado.", 409);
-      const m = await cargarModelos();
+      // En paralelo: validaciones en Supabase + plantilla + modelos (antes iban una tras otra).
+      const [, usado, p, m] = await Promise.all([
+        previo ? null : exigirAsistenciaReciente(cfg, rut, b.asistencia_id),
+        nonceUsado(cfg, d.nonce), leerPlantilla(cfg, rut), cargarModelos()]);
+      if (usado) throw new ErrorCliente("Este desafío ya fue usado.", 409);
       const tA = performance.now();
       const frames = await analizar(m, d.pasos, b.imagenes);
       const vida = L.evaluarVida(frames);
       const frente = frames.find(f => f.paso === "frente" && f.emb);
-      const p = await leerPlantilla(cfg, rut);
       const base = { rut, liveness_ok: vida.ok, modelo: L.MODELO, metodo: L.METODO + "+auto", nonce: d.nonce, asistencia_id: previo ? null : b.asistencia_id };
       const tiempos = () => ({ frio: m.frio, analisis_ms: ms(performance.now() - tA), total_ms: ms(performance.now() - t0) });
       if (previo && (!p || !p.activo)) throw new ErrorCliente("Este RUT aún no está enrolado.", 409);
