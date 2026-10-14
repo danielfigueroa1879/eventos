@@ -17,7 +17,8 @@
   if (window.BioIngreso) return;
   const API = "/.netlify/functions/biometria";
   const esperar = n => new Promise(r => setTimeout(r, n));
-  const FLECHA = '<svg viewBox="0 0 84 64" aria-hidden="true"><path d="M4 22h44V6l32 26-32 26V42H4z" fill="#dc2626" stroke="#7f1d1d" stroke-width="3" stroke-linejoin="round"/></svg>';
+  // Misma forma que la flecha de antes (cuerpo grueso y cabeza corta), pero ROJA.
+  const FLECHA = '<svg viewBox="0 0 84 60" aria-hidden="true"><path d="M0 13H56V0L84 30 56 60V47H0Z" fill="#dc2626"/></svg>';
   const INSTR = { frente: "Mira al frente", giro_izquierda: "Gira la cabeza hacia la flecha ⬅", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
 
   async function api(cuerpo, timeoutMs = 25000, keepalive = false) {
@@ -58,7 +59,7 @@
       #bioi-fl{position:absolute;top:50%;transform:translateY(-50%);display:none;flex-direction:column;align-items:center;gap:4px;color:#ea580c;text-shadow:0 0 6px #fff;pointer-events:none}
       /* Flecha dibujada (SVG), ROJA y del mismo grosor a ambos lados y en todos los intentos (antes era
          un carácter que cada celular dibujaba distinto). La izquierda es la misma flecha espejada. */
-      #bioi-fl b{display:block;width:84px;height:64px;line-height:0}#bioi-fl b svg{width:100%;height:100%;filter:drop-shadow(0 0 3px #fff) drop-shadow(0 2px 4px rgba(0,0,0,.35))}
+      #bioi-fl b{display:block;width:84px;height:60px;line-height:0}#bioi-fl b svg{width:100%;height:100%;filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 2px #fff)}
       #bioi-fl.izq b svg{transform:scaleX(-1)}#bioi-fl span{font-size:13px;font-weight:800;background:#0f172a;padding:4px 8px;border-radius:8px;color:#fff;white-space:nowrap}
       #bioi-fl.izq{display:flex;left:6px}#bioi-fl.der{display:flex;right:6px}
       #bioi-fl.izq b{animation:bioiI .9s ease-in-out infinite}#bioi-fl.der b{animation:bioiD .9s ease-in-out infinite}
