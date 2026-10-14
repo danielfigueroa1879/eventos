@@ -33,9 +33,11 @@
     const st = document.createElement("style");
     st.textContent = `
       #bioi-capa{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px 12px calc(12px + env(safe-area-inset-bottom));font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
-      #bioi-tit{font-weight:800;font-size:17px;text-align:center;max-width:420px}
-      /* Fondo gris suave en toda la pantalla; solo el recuadro de la cámara (óvalo) es BLANCO. */
-      #bioi-capa,#bioi-capa.cons{background:#e5e9ee}
+      #bioi-tit{font-weight:800;font-size:17px;text-align:center;max-width:420px;background:rgba(255,255,255,.88);padding:6px 14px;border-radius:999px}
+      /* Fuera de los recuadros: la MISMA imagen de fondo de la app (desenfocada, con velo claro).
+         La tarjeta del aviso es blanca y el recuadro de la cámara es BLANCO 100% (ilumina el rostro). */
+      #bioi-capa,#bioi-capa.cons{background:#e5e9ee;overflow:hidden;isolation:isolate}
+      #bioi-capa::before{content:"";position:absolute;inset:-12px;z-index:-1;background:linear-gradient(rgba(238,242,240,.6),rgba(238,242,240,.6)),url("images/fondo.webp") center/cover no-repeat;filter:blur(3px)}
       #bioi-cons{max-width:420px;width:100%;background:#fff;border:1px solid #cbd5e1;border-radius:16px;font-size:14.5px;overflow:hidden;box-shadow:0 10px 30px -10px rgba(15,23,42,.35)}
       #bioi-cons .cab{background:#0f5323;color:#fff;font-weight:800;font-size:16px;padding:12px 16px}
       #bioi-cons .cue{padding:14px 16px 16px}
@@ -76,7 +78,7 @@
       @keyframes bioiCrI{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(-3px)}100%{transform:translateX(0)}}
       @keyframes bioiCrD{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(3px)}100%{transform:translateX(0)}}
       @keyframes bioiOreja{0%,15%{opacity:0}45%,85%{opacity:1}100%{opacity:0}}
-      #bioi-msg{font-size:14px;text-align:center;max-width:420px;min-height:20px}
+      #bioi-msg{font-size:14px;text-align:center;max-width:420px;min-height:20px;background:rgba(255,255,255,.88);padding:6px 12px;border-radius:10px}#bioi-msg:empty{background:none}
       #bioi-btns{display:flex;gap:10px;width:100%;max-width:420px}
       #bioi-btns button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:1.5px solid #0f172a;background:#fff;color:#0f172a}
       #bioi-btns button.p{background:#0f5323;border-color:#0f5323;color:#fff}#bioi-btns button:disabled{opacity:.45}`;
@@ -86,7 +88,7 @@
       <div id="bioi-cons"></div>
       <div id="bioi-esc"><video playsinline autoplay muted></video>
         <svg viewBox="0 0 300 400" aria-hidden="true"><defs><mask id="bioi-m"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="black"/></mask></defs>
-          <rect width="300" height="400" fill="rgba(255,255,255,.92)" mask="url(#bioi-m)"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/></svg>
+          <rect width="300" height="400" fill="#ffffff" mask="url(#bioi-m)"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/></svg>
         <div id="bioi-guia"><div class="borde"></div>
           <div class="cab"><svg viewBox="0 0 92 92"><g class="craneo"><ellipse class="oreja i" cx="20" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse class="oreja d" cx="72" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse cx="46" cy="48" rx="26" ry="31" fill="#fcd34d"/></g><g class="cara"><circle cx="37" cy="42" r="3.6" fill="#111827"/><circle cx="55" cy="42" r="3.6" fill="#111827"/><path d="M46 46 l-4 11 h8z" fill="#b45309"/><path d="M38 63 q8 5 16 0" stroke="#111827" stroke-width="2.6" fill="none" stroke-linecap="round"/></g></svg></div></div>
         <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
