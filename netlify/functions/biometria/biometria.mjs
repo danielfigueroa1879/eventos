@@ -132,6 +132,16 @@ async function exigirAsistenciaReciente(cfg, rut, asisId) {
   if (n >= INGRESO_MAX_INTENTOS) throw new ErrorCliente("ya se verificó esta asistencia", 429);
 }
 
+// Pista para el guardia cuando no supera la prueba de vida (sin revelar umbrales ni puntajes).
+function pistaVida(motivos) {
+  const m = (motivos || []).join(" | ");
+  if (/más de un rostro/.test(m)) return "Debe aparecer solo una persona frente a la cámara.";
+  if (/no se detectó rostro|muy lejos/.test(m)) return "Acércate a la cámara y deja tu rostro completo dentro del óvalo, con buena luz.";
+  if (/lado contrario|no se detectó el giro/.test(m)) return "Gira la cabeza hacia el lado que indica la flecha y mantenla hasta ver 📸.";
+  if (/no mira al frente/.test(m)) return "En la primera foto mira directo a la cámara.";
+  return "Repite la verificación: mira al frente y luego gira la cabeza hacia la flecha.";
+}
+
 // ---------- Imágenes ----------
 function decodificar(v, b64) {
   if (typeof b64 !== "string") throw new ErrorCliente("imagen inválida");
@@ -243,7 +253,16 @@ export default async (req) => {
       const frente = frames.find(f => f.paso === "frente" && f.emb);
       const base = { rut, liveness_ok: vida.ok, modelo: L.MODELO, metodo: L.METODO + "+auto", nonce: d.nonce, asistencia_id: previo ? null : b.asistencia_id };
       const tiempos = () => ({ frio: m.frio, analisis_ms: ms(performance.now() - tA), total_ms: ms(performance.now() - t0) });
-      if (previo && (!p || !p.activo)) throw new ErrorCliente("Este RUT aún no está enrolado.", 409);
+      // Prueba de vida NO superada en la verificación previa: el guardia debe REPETIR (no se registra).
+      // Se responde una pista amable (sin score). En el primer ingreso (sin plantilla) el previo solo
+      // revisa la prueba de vida: si la supera no se guarda nada y el enrolamiento ocurre tras registrar.
+      // (Si el rostro es claramente de OTRA persona, manda el bloqueo de más abajo, no "repetir".)
+      const otraPersona = !!(p && p.activo && frente) && L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb) < L.UMBRAL_NO_COINCIDE;
+      if (previo && (!vida.ok || !frente) && !otraPersona) {
+        await registrarIntento(cfg, { ...base, tipo: p && p.activo ? "verificacion" : "enrolamiento", estado: p && p.activo ? L.ESTADOS.REVISAR : "RECHAZADO", detalle: { motivo: "prueba de vida no superada (previa)", motivos: vida.motivos, medidas: vida.medidas }, duracion_ms: ms(performance.now() - t0) });
+        return json({ ok: true, resultado: "repetir", reintentar: true, pista: pistaVida(vida.motivos), tiempos: tiempos() });
+      }
+      if (previo && (!p || !p.activo)) return json({ ok: true, resultado: "vida_ok", bloqueado: false, tiempos: tiempos() });
       if (!p || !p.activo) {
         // Primer ingreso: ENROLAMIENTO AUTOMÁTICO con la captura de frente (solo si superó la prueba de vida).
         if (!vida.ok || !frente) {
