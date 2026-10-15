@@ -852,7 +852,8 @@
       /* "Guardias ingresados": SIEMPRE ABIERTO en PC (vista rápida): sin flecha, no se cierra al tocarlo
          ni solo a los segundos. Más delgado. */
       #empResumenPanel[hidden] { display: block !important; }
-      #empToggleResumen { padding-top: .2rem; padding-bottom: .2rem; pointer-events: none; cursor: default; }
+      #empToggleResumen { display: none !important; }   /* sin la franja "Guardias ingresados 0/10" */
+      #empResumenPanel { border-top: 0; }
       #empResumenChevron { display: none !important; }
       #empToggleResumen .text-xl { font-size: 1.05rem; }
       #empResumenPanel { padding-bottom: .4rem; }
