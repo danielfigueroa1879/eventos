@@ -4044,7 +4044,9 @@
         <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
         ${qrBotonesHTML(ev, { conLink: true })}
       </div>
-      <div id="admQrAcciones" class="flex gap-2 mt-3 flex-wrap justify-center">
+      <!-- Celular: las opciones del evento se abren en el mismo panel lateral ☰ de PC (los botones originales quedan ocultos y el panel los usa). -->
+      <button id="menuEvMovil" type="button" class="md:hidden w-full mt-3 btn btn-ghost h-11 text-sm font-bold text-slate-700 flex items-center justify-center gap-2 rounded-xl" aria-label="Opciones del evento"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Opciones del evento</button>
+      <div id="admQrAcciones" class="hidden gap-2 mt-3 flex-wrap justify-center">
         <button id="toggleFotoQR" type="button" role="switch" aria-checked="${fotoEv ? 'true' : 'false'}" title="Activar/desactivar la foto de verificación al registrar el ingreso en ESTE evento (los demás no cambian)"
           class="btn text-sm px-4 py-2.5 font-bold shadow-md rounded-xl inline-flex items-center gap-2 border transition-colors ${fotoEv ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300'}">
           📸 Foto de ingreso
@@ -4210,6 +4212,7 @@
       const bef = $("#expFotos"); if (bef) bef.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asistMostrada));
       if ($("#menuEv")) $("#menuEv").addEventListener("click", () => abrirMenuEvento(ev));
+      if ($("#menuEvMovil")) $("#menuEvMovil").addEventListener("click", () => abrirMenuEvento(ev));
       const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
       const bvt = $("#verificarTodosBtn"); if (bvt) bvt.addEventListener("click", () => { try { verificarTodosAsistido(ev, filas); } catch (_) {} });
@@ -4609,7 +4612,7 @@
           <button type="button" id="menuEvX" class="menuEv-item" style="width:auto;padding:.4rem" aria-label="Cerrar">${ICO.cerrar}</button></div>
         <div class="cuerpo">
           ${grupo("Ingreso", item("toggleFotoQR", ICO.camara, "Foto de ingreso", { estado: sw("toggleFotoQR") }) + item("toggleBioQR", ICO.cara, "Biometría", { estado: sw("toggleBioQR") }) + item("bioEnrolados", ICO.usuarios, "Enrolados"))}
-          ${grupo("Código QR", item("toggleQR", ICO.qr, "Ver código QR") + item("qrDl", ICO.descarga, "Descargar QR (PNG)") + item("qrPr", ICO.imprimir, "Imprimir QR") + item("qrCp", ICO.enlace, "Copiar link de ingreso"))}
+          ${grupo("Código QR", (window.matchMedia("(min-width: 768px)").matches ? item("toggleQR", ICO.qr, "Ver código QR") : "") + item("qrDl", ICO.descarga, "Descargar QR (PNG)") + item("qrPr", ICO.imprimir, "Imprimir QR") + item("qrCp", ICO.enlace, "Copiar link de ingreso"))}
           ${grupo("Informes", item("cuentaOS10", ICO.informe, "Cuenta O.S.10") + item("expEventosXls", ICO.descarga, "Descargar eventos") + item("expInfractores", ICO.bandera, "Infractores") + item("revSexo", ICO.persona))}
           ${grupo("Evento", item("histTurnos", ICO.carpeta) + item("cerrarPartido", ICO.bandera2) + item("histPartidos", ICO.carpeta) + item("distEv", ICO.mapa, "Distribución") + item("linkEmpresa", ICO.enlace, "Link empresa") + item("linkVista", ICO.ojo, "Compartir solo vista") + item("editEv", ICO.lapiz, "Editar evento") + item("archEv", ICO.archivo))}
           ${grupo("Zona de cuidado", item("delEv", ICO.basura, "Eliminar evento", { peligro: true }))}
