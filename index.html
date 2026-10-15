@@ -833,6 +833,15 @@
 
     /* Recuadro del encabezado del evento (detrás del nombre) */
     .evHeaderBox { background: #F3FDF6; }
+    /* PANEL ADMIN (celular y PC): sin la pestaña "QR y estado del evento"; el QR se abre al frente
+       desde el menú de opciones del evento (☰ → Ver código QR). */
+    #admQrCard:has(#qrPanel[hidden]) { display: none; }
+    #admQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(460px, 92vw); max-height: 90vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
+    #admQrCard #toggleQR, #admQrAcciones { display: none !important; }
+    #admQrCard #qrPanel { border-top: 0; }
+    #admQrFondo { position: fixed; inset: 0; z-index: 54; background: rgba(15, 23, 42, .55); }
+    body:has(#qrPanel:not([hidden])) #admQrFondo { display: block !important; }
+    #admQrCerrar { display: flex !important; }
     html[data-theme="dark"] .evHeaderBox { background: #12212e; }
     /* Vista empresa en PC: banner verde FIJO arriba, a todo el ancho (ver ajustarEmpBanner). */
     @media (min-width: 768px) {
@@ -857,13 +866,6 @@
       /* PANEL ADMIN (PC/tablet): sin las pestañas "Resumen" ni "QR y estado" para ahorrar espacio.
          Los totales van dentro del recuadro "Guardias" y el QR se abre al frente desde ☰ → Ver código QR. */
       #admResCard { display: none !important; }
-      #admQrCard:has(#qrPanel[hidden]) { display: none; }
-      #admQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(460px, 92vw); max-height: 90vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
-      #admQrCard #toggleQR, #admQrAcciones { display: none !important; }
-      #admQrCard #qrPanel { border-top: 0; }
-      #admQrFondo { position: fixed; inset: 0; z-index: 54; background: rgba(15, 23, 42, .55); }
-      body:has(#qrPanel:not([hidden])) #admQrFondo { display: block !important; }
-      #admQrCerrar { display: flex !important; }
       /* Recuadro "Guardias": H/M · totales (repartidos en partes iguales) · buscar + 2 botones, en una línea. */
       div:has(> #admTotales) { flex-wrap: nowrap !important; }
       #admTotales { flex: 1 1 0; min-width: 0; }
@@ -4187,7 +4189,7 @@
       // PC: el QR se abre al frente (desde ☰ → Ver código QR) y se cierra con el botón, el fondo o Esc.
       $("#admQrCerrarBtn").addEventListener("click", () => qrAbrir(false));
       $("#admQrFondo").addEventListener("click", () => qrAbrir(false));
-      if (!window._admQrEsc) { window._admQrEsc = true; document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("admQrFondo") && ADMIN_STATE.showQR && window.matchMedia("(min-width: 768px)").matches) { const b = document.getElementById("admQrCerrarBtn"); if (b) b.click(); } }); }
+      if (!window._admQrEsc) { window._admQrEsc = true; document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("admQrFondo") && ADMIN_STATE.showQR) { const b = document.getElementById("admQrCerrarBtn"); if (b) b.click(); } }); }
 
       // QR (con logo O.S.10 al centro y margen blanco)
       montarQR($("#qrbox"), ev);
@@ -4612,7 +4614,7 @@
           <button type="button" id="menuEvX" class="menuEv-item" style="width:auto;padding:.4rem" aria-label="Cerrar">${ICO.cerrar}</button></div>
         <div class="cuerpo">
           ${grupo("Ingreso", item("toggleFotoQR", ICO.camara, "Foto de ingreso", { estado: sw("toggleFotoQR") }) + item("toggleBioQR", ICO.cara, "Biometría", { estado: sw("toggleBioQR") }) + item("bioEnrolados", ICO.usuarios, "Enrolados"))}
-          ${grupo("Código QR", (window.matchMedia("(min-width: 768px)").matches ? item("toggleQR", ICO.qr, "Ver código QR") : "") + item("qrDl", ICO.descarga, "Descargar QR (PNG)") + item("qrPr", ICO.imprimir, "Imprimir QR") + item("qrCp", ICO.enlace, "Copiar link de ingreso"))}
+          ${grupo("Código QR", item("toggleQR", ICO.qr, "Ver código QR") + item("qrDl", ICO.descarga, "Descargar QR (PNG)") + item("qrPr", ICO.imprimir, "Imprimir QR") + item("qrCp", ICO.enlace, "Copiar link de ingreso"))}
           ${grupo("Informes", item("cuentaOS10", ICO.informe, "Cuenta O.S.10") + item("expEventosXls", ICO.descarga, "Descargar eventos") + item("expInfractores", ICO.bandera, "Infractores") + item("revSexo", ICO.persona))}
           ${grupo("Evento", item("histTurnos", ICO.carpeta) + item("cerrarPartido", ICO.bandera2) + item("histPartidos", ICO.carpeta) + item("distEv", ICO.mapa, "Distribución") + item("linkEmpresa", ICO.enlace, "Link empresa") + item("linkVista", ICO.ojo, "Compartir solo vista") + item("editEv", ICO.lapiz, "Editar evento") + item("archEv", ICO.archivo))}
           ${grupo("Zona de cuidado", item("delEv", ICO.basura, "Eliminar evento", { peligro: true }))}
