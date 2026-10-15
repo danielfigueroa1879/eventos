@@ -242,12 +242,29 @@ export default async (req) => {
       if (caras.length !== 1) return json({ ok: true, caras: caras.length, listo: false });
       const cara = caras[0], pose = m.v.pose(cara), cara_frac = cara.box[2] / im.w;
       const dir = b.direccion === "izquierda" ? "izquierda" : b.direccion === "derecha" ? "derecha" : null;
-      let listo = false;
+      let listo = false, progreso = 0, contrario = false, movimiento = false;
       if (dir && cara_frac >= L.CARA_MIN_FRAC) {
         const signo = L.CONVENCION_GIRO[dir];
-        listo = Math.abs(pose.giro) >= L.GIRO_LADO_MIN && Math.sign(pose.giro) === signo;
+        const avance = pose.giro * signo;
+        // Zona muerta pequeña para que el ruido natural en reposo no cambie el color.
+        const zonaMuerta = L.GIRO_LADO_MIN * 0.12;
+        movimiento = Math.abs(avance) >= zonaMuerta;
+        contrario = movimiento && avance < 0;
+        if (movimiento && !contrario) {
+          progreso = Math.max(0, Math.min(1, (avance - zonaMuerta) / (L.GIRO_LADO_MIN - zonaMuerta)));
+        }
+        listo = avance >= L.GIRO_LADO_MIN;
       }
-      return json({ ok: true, caras: 1, giro: +pose.giro.toFixed(3), cara_frac: +cara_frac.toFixed(3), listo });
+      return json({
+        ok: true,
+        caras: 1,
+        giro: +pose.giro.toFixed(3),
+        cara_frac: +cara_frac.toFixed(3),
+        movimiento,
+        contrario,
+        progreso: +progreso.toFixed(3),
+        listo
+      });
     }
 
     // ----- Ingreso con interruptor encendido (sin PIN) -----
