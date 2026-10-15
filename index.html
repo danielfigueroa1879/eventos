@@ -837,7 +837,12 @@
     /* PC: el banner del evento queda pegado arriba y ocupa TODO el ancho del área principal
        (anula el relleno de #main: md:p-6 = 1.5rem), sin bordes redondeados. Celular: sin cambios. */
     @media (min-width: 768px) {
-      #main > .evHeaderBox { margin: -1.5rem -1.5rem .75rem; border-radius: 0; padding: .9rem 1.5rem; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); }
+      #main > .evHeaderBox { margin: -1.5rem -1.5rem .75rem; border-radius: 0; padding: .45rem 1.5rem; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); align-items: center; overflow: hidden; box-sizing: border-box; }
+      /* Misma altura que el recuadro verde del menú (se ajusta por JS) y texto compacto para que quepa. */
+      #main > .evHeaderBox h1 { font-size: 1.15rem; line-height: 1.3; }
+      #main > .evHeaderBox .text-sm { font-size: .78rem; line-height: 1.3; }
+      #main > .evHeaderBox .text-xs { font-size: .7rem; line-height: 1.3; }
+      #main > .evHeaderBox .mt-0\.5 { margin-top: 0; }
     }
 
     /* Botón "subir" (chevron hacia arriba) que aparece al hacer scroll */
@@ -3264,7 +3269,7 @@
 
     <!-- Sidebar / Drawer -->
     <aside id="sidebar" class="bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 w-80 max-w-[92%] -translate-x-full transition-transform duration-300 overflow-y-auto shadow-2xl md:static md:translate-x-0 md:w-72 md:max-w-none md:min-h-screen md:overflow-visible md:shadow-none md:transition-none md:z-auto">
-      <div class="brand-bg text-white p-4 flex items-center gap-3">
+      <div id="sbBrand" class="brand-bg text-white p-4 flex items-center gap-3">
         <img src="images/logo-os10-original.webp" class="w-11 h-11 rounded-full bg-white/90" alt="OS10">
         <div class="flex-1">
           <div class="font-bold text-lg leading-tight">CONTROL EVENTOS</div>
@@ -3889,7 +3894,7 @@
       const lockBtnHTML = (id, cls) => `<button id="${id}" class="btn btn-ghost ${cls} h-9 !py-0 px-2.5 sm:px-3 text-xs font-extrabold items-center justify-center gap-1 whitespace-nowrap${registroAbierto ? " text-green-700" : ""}" title="${registroAbierto ? "Edición ABIERTA — los guardias pueden corregir sus datos. Toca para CERRAR." : "Edición CERRADA — los guardias no pueden modificar sus datos. Toca para ABRIR."}">${registroAbierto ? "Abierto" : "Cerrado"}</button>`;
 
       main.innerHTML = `
-    <div class="flex items-start justify-between gap-2 mb-3 rounded-xl p-3 evHeaderBox">
+    <div class="flex items-start justify-between gap-2 mb-3 rounded-xl p-3 evHeaderBox" id="evBanner">
       <div class="min-w-0">
         <div class="flex items-center gap-2 min-w-0">
           <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</h1>
@@ -4161,6 +4166,7 @@
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       // Interruptor "Biometría" POR EVENTO: columna eventos.biometria (false = solo foto en este evento).
       // Los demás eventos no cambian. El interruptor general sigue siendo config "biometria_piloto".
+      ajustarBanner();
       const btnBioEnr = $("#bioEnrolados"); if (btnBioEnr) btnBioEnr.addEventListener("click", modalEnrolados);
       const btnBioQR = $("#toggleBioQR");
       if (btnBioQR) btnBioQR.addEventListener("click", () => {
@@ -4445,6 +4451,13 @@
         BIO_EMP.reint++; clearTimeout(BIO_EMP.tmr); BIO_EMP.tmr = setTimeout(() => { if (root.isConnected && root.querySelector("[data-bio-e]")) pintarBioEmpresa(root, ev); }, 10000);
       } else if (!recientes.length) BIO_EMP.reint = 0;
     }
+    // PC: el banner del evento toma la MISMA altura que el recuadro verde del menú (quedan alineados abajo).
+    function ajustarBanner() {
+      const b = document.getElementById("evBanner"), v = document.getElementById("sbBrand");
+      if (!b) return;
+      b.style.height = (v && window.matchMedia("(min-width: 768px)").matches && v.offsetHeight) ? v.offsetHeight + "px" : "";
+    }
+    window.addEventListener("resize", () => ajustarBanner());
     // ENROLADOS (solo admin con PIN): totales y lista de guardias con plantilla facial. Se consulta SOLO al
     // abrir la ventana (una llamada a la función + nombres desde la caché de guardias).
     async function modalEnrolados() {
