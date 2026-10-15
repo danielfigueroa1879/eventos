@@ -4856,7 +4856,10 @@
       openModal(`
     <div class="flex items-center justify-between mb-3 -mt-1">
       <div class="flex items-center gap-2 min-w-0">
-        <span class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/10" aria-hidden="true">${avatarSVG(_sexG, a.rut)}</span>
+        ${(!empresa && a.foto_url)
+          // Foto de ingreso en el círculo (tocar = ver la foto en grande); sin foto, el avatar de siempre.
+          ? `<button id="dg_foto_btn" type="button" class="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-emerald-500 bg-slate-100 active:opacity-80" title="Ver foto de ingreso"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" loading="lazy"></button>`
+          : `<span class="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/10" aria-hidden="true">${avatarSVG(_sexG, a.rut)}</span>`}
         <h2 class="font-bold text-slate-800 text-sm tracking-wide">DETALLE DE GUARDIA</h2>
       </div>
       <button id="dg_x" class="text-slate-400 hover:text-slate-700 text-xl leading-none flex-shrink-0">✕</button>
@@ -4865,12 +4868,6 @@
       <div><span class="inline-block font-bold text-lg ${nameColor} leading-tight${nameBox ? ' rounded-lg px-3 py-1 ' + nameBox : ''}">${esc(nomFull)}</span></div>
       <div class="inline-block mt-1.5">${esSup ? "" : vigenciaPill(v)}${g.fecha_ultimo_examen ? ` <span class="text-[11px] font-semibold text-slate-500 align-middle">${esSup ? "Autorización" : "Examen"}: ${esc(fechaFmt(g.fecha_ultimo_examen))}</span>` : ""}${a.es_supervisor ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 align-middle">🤵 SUPERVISOR</span>` : ""}${esSPD(g, a) ? ` <span class="text-[11px] font-bold px-2 py-0.5 rounded-full align-middle" style="background:#1b3a8f;color:#ffffff" title="Autorizado por la Subsecretaría de Prevención del Delito">SPD</span>` : ""}</div>
     </div>
-    ${(!empresa && a.foto_url) ? `<div class="flex justify-center mb-3">
-      <button id="dg_foto_btn" type="button" class="relative rounded-2xl overflow-hidden ring-1 ring-slate-200 shadow-sm bg-slate-100 active:opacity-80" style="width:104px;aspect-ratio:3/4" title="Ver foto de ingreso">
-        <img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" loading="lazy">
-        <span class="absolute bottom-0 inset-x-0 bg-black/45 text-white text-[9px] py-0.5 flex items-center justify-center gap-1">📸 Ver foto</span>
-      </button>
-    </div>` : ""}
     ${tieneFicha(g) ? `<div class="rounded-xl border-2 border-red-500 bg-red-50 px-3 py-2 mb-3">
       <div class="text-center text-red-800 font-extrabold text-xs mb-1">⚠ ${getInfracciones(g).length === 1 ? "OBSERVACIÓN" : getInfracciones(g).length + " OBSERVACIONES"}</div>
       ${getInfracciones(g).map(r => `<div class="text-center py-1 border-t border-red-200 first:border-0">
