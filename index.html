@@ -860,7 +860,9 @@
       #empToggleResumen { display: none !important; }   /* sin la franja "Guardias ingresados 0/10" */
       #empResWrap { display: none !important; }          /* en PC los totales van dentro del recuadro "Guardias" */
       /* Totales: ocupan todo el espacio disponible, repartidos en partes iguales. */
-      #empTotales { gap: .5rem; margin: 0 .75rem; flex-wrap: nowrap; }
+      /* Mismo ancho y misma posición que la barra de botones de arriba (columna de 62rem centrada). */
+      div:has(> #empTotales) { position: relative; min-height: 2rem; }
+      #empTotales { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(62rem, calc(100% - 26rem)); gap: .5rem; margin: 0; flex-wrap: nowrap; }
       #empTotales > span { flex: 1 1 0; min-width: 0; text-align: center; padding: .3rem .4rem; font-size: .74rem; overflow: hidden; text-overflow: ellipsis; }
       #empTotales > span b { font-size: 1rem; }
       #empResumenPanel { border-top: 0; }
