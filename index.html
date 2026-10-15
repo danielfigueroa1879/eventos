@@ -849,10 +849,11 @@
       #empBanner .text-sm { font-size: .7rem; line-height: 1.15; }
       /* QR: en PC se abre con el botón de la barra; cerrado no ocupa espacio. */
       #empQrCard:has(#empQrPanel[hidden]) { display: none; }
-      /* "Guardias ingresados": FIJO bajo el banner al bajar (vista rápida) y más delgado. */
-      #empResWrap { position: sticky; top: calc(var(--empBanH, 56px) + 4px); z-index: 30; }
-      #empResCard { box-shadow: 0 6px 16px -6px rgba(15, 23, 42, .25); }
-      #empToggleResumen { padding-top: .2rem; padding-bottom: .2rem; }
+      /* "Guardias ingresados": SIEMPRE ABIERTO en PC (vista rápida): sin flecha, no se cierra al tocarlo
+         ni solo a los segundos. Más delgado. */
+      #empResumenPanel[hidden] { display: block !important; }
+      #empToggleResumen { padding-top: .2rem; padding-bottom: .2rem; pointer-events: none; cursor: default; }
+      #empResumenChevron { display: none !important; }
       #empToggleResumen .text-xl { font-size: 1.05rem; }
       #empResumenPanel { padding-bottom: .4rem; }
       #empResumenPanel > .mt-3 { margin-top: .35rem; height: .4rem; }
