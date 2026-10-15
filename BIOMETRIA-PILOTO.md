@@ -64,6 +64,11 @@ Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
 - La vista previa usa la MISMA base de datos que producción: para probar, usa un evento de prueba y el QR
   generado desde el panel de la vista previa.
 
+## Ver los enrolados
+Panel admin → "🔳 QR y estado del evento" → **🧬 Enrolados** (con PIN). Muestra cuántos guardias están enrolados,
+nuevos, verificados, "no coincide" y pruebas de vida fallidas de los últimos 7 días, y la lista (RUT, nombre, fecha)
+con buscador y **Restablecer**. Consulta la función (`accion: "resumen"`) solo al abrir la ventana.
+
 ## Qué se guarda
 - `guardias_biometria`: plantilla **cifrada** (AES-256-GCM, ligada al RUT), modelo, versión, fecha, consentimiento.
 - `biometria_intentos`: tipo, estado, score, resultado de la prueba de vida, medidas y tiempos. **Sin imágenes.**
