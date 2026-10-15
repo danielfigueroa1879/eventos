@@ -854,6 +854,24 @@
       #empBanner .text-sm { font-size: .7rem; line-height: 1.15; }
       /* QR: en PC se abre con el botón de la barra; cerrado no ocupa espacio. */
       #empQrCard:has(#empQrPanel[hidden]) { display: none; }
+      /* PANEL ADMIN (PC/tablet): sin las pestañas "Resumen" ni "QR y estado" para ahorrar espacio.
+         Los totales van dentro del recuadro "Guardias" y el QR se abre al frente desde ☰ → Ver código QR. */
+      #admResCard { display: none !important; }
+      #admQrCard:has(#qrPanel[hidden]) { display: none; }
+      #admQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(460px, 92vw); max-height: 90vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
+      #admQrCard #toggleQR, #admQrAcciones { display: none !important; }
+      #admQrCard #qrPanel { border-top: 0; }
+      #admQrFondo { position: fixed; inset: 0; z-index: 54; background: rgba(15, 23, 42, .55); }
+      body:has(#qrPanel:not([hidden])) #admQrFondo { display: block !important; }
+      #admQrCerrar { display: flex !important; }
+      /* Recuadro "Guardias": H/M · totales (repartidos en partes iguales) · buscar + 2 botones, en una línea. */
+      div:has(> #admTotales) { flex-wrap: nowrap !important; }
+      #admTotales { flex: 1 1 0; min-width: 0; }
+      #admTotales > span { flex: 1 1 0; min-width: 0; text-align: center; padding: .28rem .35rem; font-size: .72rem; overflow: hidden; text-overflow: ellipsis; }
+      #admTotales > span b { font-size: .95rem; margin-right: .2rem; }
+      #admControles { width: auto !important; flex-shrink: 0; gap: .4rem; }
+      #admControles #buscar { width: 13rem; height: 2rem; font-size: .8rem; }
+      #admControles .btn { height: 2rem; font-size: .78rem; padding-left: .6rem; padding-right: .6rem; }
       /* En PC el QR se abre AL FRENTE, centrado, con fondo oscuro y botón "Cerrar". */
       #empQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(560px, 92vw); max-height: 90vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
       #empQrFondo { position: fixed; inset: 0; z-index: 54; background: rgba(15, 23, 42, .55); display: none; }
@@ -880,6 +898,19 @@
       #empResumenPanel > .grid > div { padding-top: .15rem; padding-bottom: .15rem; }
       #empResumenPanel > .grid .text-lg { font-size: .95rem; line-height: 1.15; }
       #empResumenPanel > .grid .text-\[11px\] { font-size: .64rem; line-height: 1.1; }
+    }
+    /* Tablets y PC angostos: los totales pasan a una segunda fila, a todo el ancho del recuadro. */
+    @media (min-width: 768px) and (max-width: 1599px) {
+      div:has(> #admTotales) { flex-wrap: wrap !important; }
+      #admTotales { order: 3; flex: 1 1 100%; display: grid !important; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
+      #admControles { margin-left: auto; }
+    }
+    /* Tablet vertical: XLS/PDF siguen en "Compartir" y la Cuenta O.S.10 en ☰; así el encabezado no se desborda. */
+    @media (min-width: 768px) and (max-width: 1023px) {
+      #btnCuentaOS10Top, #expExcel, #expPDF { display: none !important; }
+      #main > .evHeaderBox > div:first-child { flex: 1 1 0; overflow: hidden; }
+      #admControles { flex: 1 1 100%; min-width: 0; }
+      #admControles #buscar { flex: 1 1 0; width: auto; min-width: 6rem; }
     }
     /* PC: el banner del evento queda pegado arriba y ocupa TODO el ancho del área principal
        (anula el relleno de #main: md:p-6 = 1.5rem), sin bordes redondeados. Celular: sin cambios. */
@@ -3360,7 +3391,7 @@
     </aside>
 
     <!-- Main -->
-    <main id="main" class="flex-1 p-4 md:p-6 bg-slate-200 md:bg-transparent"></main>
+    <main id="main" class="flex-1 min-w-0 p-4 md:p-6 bg-slate-200 md:bg-transparent"></main>
   </div>`;
 
       $("#nuevoEv").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalNuevoEvento(); });
@@ -3972,7 +4003,7 @@
       </div>
     </div>
 
-    <div class="card mb-3 overflow-hidden">
+    <div id="admResCard" class="card mb-3 overflow-hidden">
       <button id="toggleResumen" class="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-[13px] sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
         <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 min-w-0">
           <span class="leading-tight"><span class="res-short">Res.</span><span class="res-full">Resumen de acreditaciones</span></span>
@@ -3996,12 +4027,14 @@
       </div>
     </div>
 
-    <div class="card mb-3 overflow-hidden">
+    <div id="admQrFondo" class="hidden" aria-hidden="true"></div>
+    <div id="admQrCard" class="card mb-3 overflow-hidden">
     <button id="toggleQR" class="w-full px-3 py-2.5 flex items-center justify-between text-sm font-semibold text-slate-700">
       <span>🔳 QR y estado del evento</span>
       <span id="qrChevron" class="text-slate-400 transition-transform flex-shrink-0" style="${ADMIN_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
     </button>
     <div id="qrPanel" class="p-3 border-t border-slate-100" ${ADMIN_STATE.showQR ? "" : "hidden"}>
+      <div id="admQrCerrar" class="hidden items-center justify-between mb-2"><span class="font-bold text-slate-800">Código QR del evento</span><button id="admQrCerrarBtn" type="button" class="btn btn-ghost text-sm px-3 py-1" aria-label="Cerrar">✕ Cerrar</button></div>
       <div class="flex items-center justify-between mb-1.5">
         <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia${nSup ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSup} supervisor${nSup === 1 ? '' : 'es'}</span>` : ''}</div>
         <div class="text-xl font-bold text-green-700">${filas.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
@@ -4011,7 +4044,7 @@
         <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
         ${qrBotonesHTML(ev, { conLink: true })}
       </div>
-      <div class="flex gap-2 mt-3 flex-wrap justify-center">
+      <div id="admQrAcciones" class="flex gap-2 mt-3 flex-wrap justify-center">
         <button id="toggleFotoQR" type="button" role="switch" aria-checked="${fotoEv ? 'true' : 'false'}" title="Activar/desactivar la foto de verificación al registrar el ingreso en ESTE evento (los demás no cambian)"
           class="btn text-sm px-4 py-2.5 font-bold shadow-md rounded-xl inline-flex items-center gap-2 border transition-colors ${fotoEv ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300'}">
           📸 Foto de ingreso
@@ -4061,7 +4094,12 @@
             <button id="compartirMovil" class="btn btn-ghost h-9 !py-0 !px-2.5 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
           </div>
         </div>
-        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto justify-end min-w-0">
+        <!-- PC/tablet: totales del turno dentro del recuadro (reemplazan el recuadro "Resumen de acreditaciones") -->
+        <div id="admTotales" class="hidden md:flex items-center gap-1.5">
+          ${[["Total", filas.length, "azul"], ["Vigentes", nV, "verde"], ["Prórroga", nP, "amarillo"], ["Sin curso", nS, "rojo"], ["Superv.", nSup, "celeste"], ["SPD", contarSpdAprobados(ev, filas), "spd"]]
+            .map(([l, n, c]) => `<span class="b-${c} rounded-lg font-semibold whitespace-nowrap" title="${l}"><b class="font-extrabold">${n}</b> ${l}</span>`).join("")}
+        </div>
+        <div id="admControles" class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" type="search" class="fld h-9 py-1.5 text-sm min-w-0 basis-full sm:basis-auto sm:flex-none sm:w-auto sm:max-w-xs${buscaMovilAbierto ? "" : " hidden sm:block"}" placeholder="Buscar por RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
           <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
           <button id="verificarTodosBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-white rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="background:#0f5323;" title="Verificar todos los guardias uno por uno (asistido con Zosepcar)">✅ Verificar todos</button>
@@ -4137,11 +4175,16 @@
 
       // QR / estado (panel colapsable)
       const qrPanel = $("#qrPanel"), qrChevron = $("#qrChevron");
-      $("#toggleQR").addEventListener("click", () => {
-        ADMIN_STATE.showQR = !ADMIN_STATE.showQR;
-        qrPanel.hidden = !ADMIN_STATE.showQR;
-        qrChevron.style.transform = ADMIN_STATE.showQR ? "rotate(180deg)" : "";
-      });
+      const qrAbrir = abrir => {
+        ADMIN_STATE.showQR = abrir;
+        qrPanel.hidden = !abrir;
+        qrChevron.style.transform = abrir ? "rotate(180deg)" : "";
+      };
+      $("#toggleQR").addEventListener("click", () => qrAbrir(!ADMIN_STATE.showQR));
+      // PC: el QR se abre al frente (desde ☰ → Ver código QR) y se cierra con el botón, el fondo o Esc.
+      $("#admQrCerrarBtn").addEventListener("click", () => qrAbrir(false));
+      $("#admQrFondo").addEventListener("click", () => qrAbrir(false));
+      if (!window._admQrEsc) { window._admQrEsc = true; document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("admQrFondo") && ADMIN_STATE.showQR && window.matchMedia("(min-width: 768px)").matches) { const b = document.getElementById("admQrCerrarBtn"); if (b) b.click(); } }); }
 
       // QR (con logo O.S.10 al centro y margen blanco)
       montarQR($("#qrbox"), ev);
@@ -4566,7 +4609,7 @@
           <button type="button" id="menuEvX" class="menuEv-item" style="width:auto;padding:.4rem" aria-label="Cerrar">${ICO.cerrar}</button></div>
         <div class="cuerpo">
           ${grupo("Ingreso", item("toggleFotoQR", ICO.camara, "Foto de ingreso", { estado: sw("toggleFotoQR") }) + item("toggleBioQR", ICO.cara, "Biometría", { estado: sw("toggleBioQR") }) + item("bioEnrolados", ICO.usuarios, "Enrolados"))}
-          ${grupo("Código QR", item("qrDl", ICO.descarga, "Descargar QR (PNG)") + item("qrPr", ICO.imprimir, "Imprimir QR") + item("qrCp", ICO.enlace, "Copiar link de ingreso"))}
+          ${grupo("Código QR", item("toggleQR", ICO.qr, "Ver código QR") + item("qrDl", ICO.descarga, "Descargar QR (PNG)") + item("qrPr", ICO.imprimir, "Imprimir QR") + item("qrCp", ICO.enlace, "Copiar link de ingreso"))}
           ${grupo("Informes", item("cuentaOS10", ICO.informe, "Cuenta O.S.10") + item("expEventosXls", ICO.descarga, "Descargar eventos") + item("expInfractores", ICO.bandera, "Infractores") + item("revSexo", ICO.persona))}
           ${grupo("Evento", item("histTurnos", ICO.carpeta) + item("cerrarPartido", ICO.bandera2) + item("histPartidos", ICO.carpeta) + item("distEv", ICO.mapa, "Distribución") + item("linkEmpresa", ICO.enlace, "Link empresa") + item("linkVista", ICO.ojo, "Compartir solo vista") + item("editEv", ICO.lapiz, "Editar evento") + item("archEv", ICO.archivo))}
           ${grupo("Zona de cuidado", item("delEv", ICO.basura, "Eliminar evento", { peligro: true }))}
