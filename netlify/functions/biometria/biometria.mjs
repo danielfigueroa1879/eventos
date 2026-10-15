@@ -230,6 +230,26 @@ export default async (req) => {
       return json({ ok: true, frio: m.frio, carga_ms: m.frio ? m.carga_ms : 0, total_ms: ms(performance.now() - t0) });
     }
 
+    // ----- Guía de giro EN VIVO (sin guardar imagen ni plantilla) -----
+    // Devuelve solo la pose mínima necesaria para pintar la guía de la cámara.
+    // No intenta medir la dirección de las pupilas: con YuNet solo validamos giro de cabeza,
+    // cantidad de rostros y tamaño/encuadre del rostro.
+    if (b.accion === "pose_live") {
+      await exigirLimite(cfg, rut);
+      const m = await cargarModelos();
+      const im = decodificar(m.v, b.imagen);
+      const caras = await m.v.detectar(m.det, im);
+      if (caras.length !== 1) return json({ ok: true, caras: caras.length, listo: false });
+      const cara = caras[0], pose = m.v.pose(cara), cara_frac = cara.box[2] / im.w;
+      const dir = b.direccion === "izquierda" ? "izquierda" : b.direccion === "derecha" ? "derecha" : null;
+      let listo = false;
+      if (dir && cara_frac >= L.CARA_MIN_FRAC) {
+        const signo = L.CONVENCION_GIRO[dir];
+        listo = Math.abs(pose.giro) >= L.GIRO_LADO_MIN && Math.sign(pose.giro) === signo;
+      }
+      return json({ ok: true, caras: 1, giro: +pose.giro.toFixed(3), cara_frac: +cara_frac.toFixed(3), listo });
+    }
+
     // ----- Ingreso con interruptor encendido (sin PIN) -----
     if (b.accion === "desafio_auto") {
       const [, p] = await Promise.all([exigirLimite(cfg, rut), leerPlantilla(cfg, rut)]);   // en paralelo
