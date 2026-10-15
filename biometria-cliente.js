@@ -64,8 +64,7 @@
       #bioi-fl.izq{display:flex;left:6px}#bioi-fl.der{display:flex;right:6px}
       #bioi-fl.izq b{animation:bioiI .9s ease-in-out infinite}#bioi-fl.der b{animation:bioiD .9s ease-in-out infinite}
       /* Giro confirmado: verde intenso y luminoso para que se note claramente. */
-      #bioi-esc.ok-giro{background:#22c55e;box-shadow:inset 0 0 90px 35px rgba(34,197,94,.65),0 0 0 6px #22c55e,0 0 36px 16px rgba(34,197,94,.85)}
-      #bioi-esc.ok-giro>svg{background:rgba(34,197,94,.32)}
+      #bioi-esc.ok-giro{box-shadow:0 0 0 2px rgba(34,197,94,.15)}
       #bioi-esc.ok-giro #bioi-ovalo{stroke:#22c55e!important;stroke-width:7!important;stroke-dasharray:none!important;filter:drop-shadow(0 0 9px #22c55e)}
       #bioi-esc.ok-giro #bioi-fl b svg path{fill:#22c55e!important}
       #bioi-esc.ok-giro #bioi-fl span{background:#16a34a;color:#fff;font-size:15px}
