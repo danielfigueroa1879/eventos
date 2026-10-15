@@ -834,6 +834,10 @@
     /* Recuadro del encabezado del evento (detrás del nombre) */
     .evHeaderBox { background: #F3FDF6; }
     html[data-theme="dark"] .evHeaderBox { background: #12212e; }
+    /* Vista empresa en PC: banner verde FIJO arriba, a todo el ancho (ver ajustarEmpBanner). */
+    @media (min-width: 768px) {
+      #empBanner { position: fixed !important; top: 0; left: 0; right: 0; z-index: 45; border-radius: 0; border-width: 0; padding-left: 1.5rem; padding-right: 1.5rem; }
+    }
     /* PC: el banner del evento queda pegado arriba y ocupa TODO el ancho del área principal
        (anula el relleno de #main: md:p-6 = 1.5rem), sin bordes redondeados. Celular: sin cambios. */
     @media (min-width: 768px) {
@@ -4451,6 +4455,16 @@
         BIO_EMP.reint++; clearTimeout(BIO_EMP.tmr); BIO_EMP.tmr = setTimeout(() => { if (root.isConnected && root.querySelector("[data-bio-e]")) pintarBioEmpresa(root, ev); }, 10000);
       } else if (!recientes.length) BIO_EMP.reint = 0;
     }
+    // VISTA EMPRESA (PC): el banner verde queda FIJO arriba y a todo el ancho de la página. Como sale del
+    // flujo, un espaciador con su misma altura evita que tape el contenido. Celular sin cambios.
+    function ajustarEmpBanner() {
+      const b = document.getElementById("empBanner"), sp = document.getElementById("empBannerSp");
+      if (!b || !sp) return;
+      sp.style.height = window.matchMedia("(min-width: 768px)").matches ? (b.offsetHeight + 12) + "px" : "";
+      // Las imágenes del banner cargan después y cambian su alto: se vuelve a medir cuando cambia.
+      if (!b._ro && window.ResizeObserver) { b._ro = new ResizeObserver(() => ajustarEmpBanner()); b._ro.observe(b); }
+    }
+    window.addEventListener("resize", () => ajustarEmpBanner());
     // PC: el banner del evento toma la MISMA altura que el recuadro verde del menú (quedan alineados abajo).
     function ajustarBanner() {
       const b = document.getElementById("evBanner"), v = document.getElementById("sbBrand");
@@ -8602,7 +8616,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
     <div class="min-h-screen w-full px-3 pt-0.5 pb-3 md:px-4 md:pt-1 md:pb-6 max-w-[104rem] mx-auto">
       <!-- Los 3 primeros contenedores van mucho más angostos (banner, QR, Guardias ingresados) -->
       <div class="max-w-[62rem] mx-auto">
-      <div class="brand-bg rounded-2xl px-5 py-3.5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
+      <div id="empBannerSp" aria-hidden="true"></div>
+      <div id="empBanner" class="brand-bg rounded-2xl px-5 py-3.5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
         ${esPartido(ev) ? `<span aria-hidden="true" class="pointer-events-none select-none absolute left-1/3 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/10 leading-none" style="font-size:8rem">⚽</span>` : ""}
         <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" title="Ir a os10coquimbo.cl" class="relative flex-shrink-0"><img src="images/logo-os10-original.webp" class="w-14 h-14 rounded-full bg-white/90" alt="OS10 Coquimbo"></a>
         <div class="flex-1 min-w-0 relative">
@@ -8725,6 +8740,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         if ($("#qrPr")) $("#qrPr").addEventListener("click", () => prQR(ev));
         // Detalle del guardia (solo lectura) al tocar una fila en celular
         app.querySelectorAll("[data-detail]").forEach(x => x.addEventListener("click", () => modalDetalleGuardia(asist.find(a => a.id === x.dataset.detail), ev, { empresa: true })));
+        ajustarEmpBanner();
         const empDist = document.getElementById("empDist");
         // La empresa tiene acceso COMPLETO a la distribución: crear/editar/mover/eliminar puestos y
         // asignar guardias (igual que el admin). El mapa se abre en modo edición.
