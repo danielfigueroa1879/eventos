@@ -3968,6 +3968,7 @@
         <button id="expPDF" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="Descargar PDF"><span class="font-bold text-red-600">PDF</span></button>
         ${hayFotosAdmin(asistMostrada) ? `<button id="expFotos" class="btn btn-ghost text-xs px-2.5 hidden md:inline-block" title="PDF o Excel con la foto de ingreso de cada guardia">📸</button>` : ""}
         <button id="compartir" class="btn btn-ghost px-3 hidden md:flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+        <button id="menuEv" class="btn btn-ghost px-3 hidden md:flex items-center justify-center" title="Opciones del evento" aria-label="Opciones del evento"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       </div>
     </div>
 
@@ -4165,6 +4166,7 @@
       $("#expPDF").addEventListener("click", () => descargarPDF(ev, asistMostrada));
       const bef = $("#expFotos"); if (bef) bef.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asistMostrada));
+      if ($("#menuEv")) $("#menuEv").addEventListener("click", () => abrirMenuEvento(ev));
       const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
       const bvt = $("#verificarTodosBtn"); if (bvt) bvt.addEventListener("click", () => { try { verificarTodosAsistido(ev, filas); } catch (_) {} });
@@ -4507,10 +4509,80 @@
         qr: s('<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>'),
         carpeta: s('<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>'),
         reloj: s('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+        camara: s('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>'),
+        cara: s('<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>'),
+        usuarios: s('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+        descarga: s('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>'),
+        imprimir: s('<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/>'),
+        enlace: s('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
+        informe: s('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h8"/>'),
+        bandera: s('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'),
+        ojo: s('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>'),
+        lapiz: s('<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>'),
+        archivo: s('<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>'),
+        basura: s('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
+        cerrar: s('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+        persona: s('<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>'),
+        bandera2: s('<path d="M6 3v18"/><path d="M6 4h12l-3 4 3 4H6"/>'),
         flecha: s('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'),
         ajustes: s('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
       };
     })();
+    // MENÚ LATERAL DEL EVENTO (PC, admin): botón ☰ junto a Compartir. Agrupa TODAS las opciones del
+    // recuadro "QR y estado del evento". Cada opción solo "presiona" el botón original del panel, así se
+    // usa exactamente la misma lógica (confirmaciones, PIN, etc.) y nada se duplica.
+    function abrirMenuEvento(ev) {
+      const prev = document.getElementById("menuEvCapa"); if (prev) prev.remove();
+      const orig = id => document.getElementById(id);
+      const limpio = el => (el ? el.textContent : "").replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+/, "").replace(/\s+/g, " ").trim();
+      const item = (id, ic, texto, extra) => {
+        const el = orig(id); if (!el || el.classList.contains("hidden")) return "";
+        return `<button type="button" data-menu-ev="${id}" class="menuEv-item${extra && extra.peligro ? " peligro" : ""}">${ic}<span class="flex-1 text-left">${esc(texto || limpio(el))}</span>${extra && extra.estado != null ? `<span class="menuEv-sw${extra.estado ? " on" : ""}"><i></i></span>` : ""}</button>`;
+      };
+      const sw = id => { const el = orig(id); return el ? el.getAttribute("aria-checked") === "true" : null; };
+      const grupo = (titulo, html) => html.trim() ? `<div class="menuEv-grupo"><div class="menuEv-tit">${titulo}</div>${html}</div>` : "";
+      const capa = document.createElement("div");
+      capa.id = "menuEvCapa";
+      capa.innerHTML = `<style>
+        #menuEvCapa{position:fixed;inset:0;z-index:80}
+        #menuEvCapa .fondo{position:absolute;inset:0;background:rgba(15,23,42,.45);opacity:0;transition:opacity .2s}
+        #menuEvCapa .panel{position:absolute;top:0;right:0;bottom:0;width:min(360px,92vw);background:#fff;box-shadow:-16px 0 40px -12px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease-out}
+        #menuEvCapa.abierto .fondo{opacity:1}#menuEvCapa.abierto .panel{transform:none}
+        #menuEvCapa .cab{display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.1rem;border-bottom:1px solid #e2e8f0}
+        #menuEvCapa .cuerpo{flex:1;overflow:auto;padding:.5rem .6rem 1rem}
+        .menuEv-grupo{padding:.4rem 0;border-bottom:1px solid #f1f5f9}.menuEv-grupo:last-child{border-bottom:0}
+        .menuEv-tit{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;padding:.45rem .6rem .25rem}
+        .menuEv-item{width:100%;display:flex;align-items:center;gap:.7rem;padding:.55rem .6rem;border-radius:.6rem;font-size:.9rem;font-weight:500;color:#334155;transition:background .12s}
+        .menuEv-item:hover{background:#f1f5f9;color:#0f172a}.menuEv-item .ico{width:1.1rem;height:1.1rem;flex-shrink:0;color:#64748b}
+        .menuEv-item.peligro{color:#b91c1c}.menuEv-item.peligro .ico{color:#dc2626}.menuEv-item.peligro:hover{background:#fef2f2}
+        .menuEv-sw{width:2.1rem;height:1.2rem;border-radius:999px;background:#cbd5e1;position:relative;flex-shrink:0;transition:background .15s}
+        .menuEv-sw i{position:absolute;top:.15rem;left:.15rem;width:.9rem;height:.9rem;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+        .menuEv-sw.on{background:#16a34a}.menuEv-sw.on i{left:1.05rem}
+        html[data-theme="dark"] #menuEvCapa .panel{background:#0f172a}html[data-theme="dark"] .menuEv-item{color:#e2e8f0}html[data-theme="dark"] .menuEv-item:hover{background:#1e293b}
+      </style>
+      <div class="fondo"></div>
+      <aside class="panel" role="dialog" aria-label="Opciones del evento">
+        <div class="cab"><div class="flex-1 min-w-0"><div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Opciones del evento</div><div class="font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</div><div class="text-xs text-slate-500 truncate">${esc(ev.empresa || "")}</div></div>
+          <button type="button" id="menuEvX" class="menuEv-item" style="width:auto;padding:.4rem" aria-label="Cerrar">${ICO.cerrar}</button></div>
+        <div class="cuerpo">
+          ${grupo("Ingreso", item("toggleFotoQR", ICO.camara, "Foto de ingreso", { estado: sw("toggleFotoQR") }) + item("toggleBioQR", ICO.cara, "Biometría", { estado: sw("toggleBioQR") }) + item("bioEnrolados", ICO.usuarios, "Enrolados"))}
+          ${grupo("Código QR", item("qrDl", ICO.descarga, "Descargar QR (PNG)") + item("qrPr", ICO.imprimir, "Imprimir QR") + item("qrCp", ICO.enlace, "Copiar link de ingreso"))}
+          ${grupo("Informes", item("cuentaOS10", ICO.informe, "Cuenta O.S.10") + item("expEventosXls", ICO.descarga, "Descargar eventos") + item("expInfractores", ICO.bandera, "Infractores") + item("revSexo", ICO.persona))}
+          ${grupo("Evento", item("histTurnos", ICO.carpeta) + item("cerrarPartido", ICO.bandera2) + item("histPartidos", ICO.carpeta) + item("distEv", ICO.mapa, "Distribución") + item("linkEmpresa", ICO.enlace, "Link empresa") + item("linkVista", ICO.ojo, "Compartir solo vista") + item("editEv", ICO.lapiz, "Editar evento") + item("archEv", ICO.archivo))}
+          ${grupo("Zona de cuidado", item("delEv", ICO.basura, "Eliminar evento", { peligro: true }))}
+        </div>
+      </aside>`;
+      document.body.appendChild(capa);
+      requestAnimationFrame(() => capa.classList.add("abierto"));
+      const cerrar = () => { capa.classList.remove("abierto"); document.removeEventListener("keydown", onKey); setTimeout(() => capa.remove(), 220); };
+      const onKey = e => { if (e.key === "Escape") cerrar(); };
+      document.addEventListener("keydown", onKey);
+      capa.querySelector(".fondo").addEventListener("click", cerrar);
+      capa.querySelector("#menuEvX").addEventListener("click", cerrar);
+      capa.querySelectorAll("[data-menu-ev]").forEach(b => b.addEventListener("click", () => {
+        const el = orig(b.dataset.menuEv); cerrar(); if (el) el.click();
+      }));
+    }
     // VISTA EMPRESA (PC): el banner verde queda FIJO arriba y a todo el ancho de la página. Como sale del
     // flujo, un espaciador con su misma altura evita que tape el contenido. Celular sin cambios.
     function ajustarEmpBanner() {
