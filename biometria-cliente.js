@@ -57,6 +57,7 @@
       #bioi-esc{position:relative;width:100%;max-width:400px;max-height:62vh;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#fff;display:none;box-shadow:0 10px 30px -10px rgba(15,23,42,.35)}
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+      #bioi-ovalo{transition:stroke .45s ease,stroke-width .45s ease,filter .45s ease}
       #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#0f172a;font-weight:800;font-size:18px;background:linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,0))}
       #bioi-cta{position:absolute;left:0;right:0;bottom:78px;text-align:center;color:#0f172a;font-size:50px;font-weight:900;text-shadow:0 0 8px #fff}#bioi-cta svg{width:52px;height:52px;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 6px #fff)}
       #bioi-fl{position:absolute;top:50%;transform:translateY(-50%);display:none;flex-direction:column;align-items:center;gap:4px;color:#ea580c;text-shadow:0 0 6px #fff;pointer-events:none}
@@ -183,7 +184,8 @@
 
     async function esperarGiroVerde(paso) {
       const direccion = paso === "giro_izquierda" ? "izquierda" : "derecha";
-      // AHORRO DE SERVIDOR: máximo 8 consultas por giro, una cada ~0,7 s (antes ~17, cada 0,35 s).
+      // AHORRO DE SERVIDOR: máximo 8 consultas por giro, una cada ~0,5 s (antes ~17, cada 0,35 s).
+      // El color del óvalo cambia con transición suave entre lecturas (se ve fluido sin más consultas).
       // Si el servidor no responde bien (error, límite), se deja de consultar y se usa la espera simple.
       const limite = Date.now() + 6500, MAX_CONSULTAS = 8;
       let consecutivos = 0, huboRespuesta = false, consultas = 0;
@@ -210,7 +212,7 @@
             return true;
           }
         } else consecutivos = 0;
-        await esperar(700);
+        await esperar(500);
       }
       return huboRespuesta ? false : null; // null = guía live no disponible; usar fallback antiguo
     }
