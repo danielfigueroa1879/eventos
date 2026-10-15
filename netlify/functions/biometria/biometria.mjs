@@ -11,13 +11,12 @@
 //   { accion: "borrar", pin, rut }                                   -> elimina la plantilla de ese RUT
 // INGRESO con interruptor encendido (SIN PIN). La MISMA captura de frente es la foto de ingreso y la
 // imagen biométrica. Si el RUT YA tiene plantilla activa, se verifica automáticamente. Si NO tiene plantilla,
-// la primera captura genera una plantilla PENDIENTE (activo=false): no sirve para verificar identidad hasta
-// que un supervisor/admin la apruebe con PIN. La asistencia nunca se bloquea por quedar pendiente.
+// el primer ingreso válido crea y activa la plantilla automáticamente después de superar la prueba de vida.
+// Esto permite incorporar guardias nuevos/de apoyo sin depender de una aprobación manual del administrador.
 //   { accion: "desafio_auto", rut }                                  -> { modo, pasos: [frente, 1 giro], token }
 //   { accion: "procesar_auto", rut, asistencia_id, token, consentimiento: true, imagenes: [jpeg base64 x2] }
 //      (asistencia de ese RUT creada hace < 15 min; nunca se escribe en "asistencias")
 // PANEL ADMIN (con PIN): { accion: "resultados", pin, asistencia_ids: [...] } -> último resultado por asistencia
-//                        { accion: "aprobar_enrolamiento", pin, rut } -> activa una plantilla pendiente
 //                        { accion: "purgar", pin } -> RETENCIÓN 60 días: borra intentos con más de 60 días y
 //                        plantillas de RUT sin intentos en 60 días (y enroladas hace más de 60 días)
 // El resultado es ORIENTATIVO: nunca bloquea, modifica ni borra la asistencia (no se escribe en "asistencias").
@@ -235,7 +234,7 @@ export default async (req) => {
     if (b.accion === "desafio_auto") {
       const [, p] = await Promise.all([exigirLimite(cfg, rut), leerPlantilla(cfg, rut)]);   // en paralelo
       const d = L.crearDesafio(cfg.k, rut, "auto");
-      return json({ ok: true, modo: p && p.activo ? "verificacion" : (p ? "pendiente" : "enrolamiento"), pasos: d.pasos, token: d.token, vence: d.vence });
+      return json({ ok: true, modo: p && p.activo ? "verificacion" : "enrolamiento", pasos: d.pasos, token: d.token, vence: d.vence });
     }
     if (b.accion === "procesar_auto") {
       let d;
@@ -267,33 +266,27 @@ export default async (req) => {
       }
       if (previo && (!p || !p.activo)) return json({ ok: true, resultado: "vida_ok", bloqueado: false, tiempos: tiempos() });
       if (!p || !p.activo) {
-        // Primer enrolamiento automático, pero NO confiable todavía:
-        // la captura crea una plantilla CIFRADA y PENDIENTE (activo=false).
-        // Solo un supervisor/admin con PIN puede activarla posteriormente.
-        // Mientras esté pendiente, nunca se usa para comparar identidad y la asistencia sigue normal.
+        // Primer ingreso: enrolamiento automático e inmediato para permitir guardias nuevos/de apoyo.
+        // La plantilla solo se crea si supera la prueba de vida y existe una asistencia reciente del mismo RUT.
         if (!vida.ok || !frente) {
           await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "RECHAZADO", detalle: { motivos: vida.motivos, medidas: vida.medidas }, duracion_ms: ms(performance.now() - t0) });
           return json({ ok: true, resultado: "sin_enrolar", tiempos: tiempos() });
-        }
-        if (p && !p.activo) {
-          await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "PENDIENTE_ADMIN", detalle: { motivo: "plantilla pendiente de aprobación", medidas: vida.medidas, version: p.version }, duracion_ms: ms(performance.now() - t0) });
-          return json({ ok: true, resultado: "pendiente", pendiente_aprobacion: true, tiempos: tiempos() });
         }
         const ahora = new Date().toISOString();
         const fila = {
           rut,
           plantilla: L.cifrarPlantilla(cfg.k, rut, frente.emb),
           modelo: L.MODELO,
-          version: 1,
+          version: p ? p.version + 1 : 1,
           muestras: 1,
           fecha_enrolamiento: ahora,
           consentimiento_fecha: ahora,
-          enrolado_por: "auto-ingreso-pendiente",
-          activo: false
+          enrolado_por: "auto-ingreso-inicial",
+          activo: true
         };
-        await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "PENDIENTE_ADMIN", detalle: { motivo: "primera plantilla pendiente de aprobación", medidas: vida.medidas, version: 1 }, duracion_ms: ms(performance.now() - t0) });
+        await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "ENROLADO", detalle: { motivo: "primer enrolamiento automático", medidas: vida.medidas, version: fila.version }, duracion_ms: ms(performance.now() - t0) });
         await sbFetch(cfg, "/rest/v1/guardias_biometria?on_conflict=rut", { method: "POST", headers: { prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(fila) });
-        return json({ ok: true, resultado: "pendiente", pendiente_aprobacion: true, tiempos: tiempos() });
+        return json({ ok: true, resultado: "enrolado", primer_enrolamiento: true, tiempos: tiempos() });
       }
       // Ingresos siguientes: VERIFICACIÓN 1:1 contra la plantilla del RUT.
       const score = frente ? +L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb).toFixed(4) : null;
@@ -328,18 +321,6 @@ export default async (req) => {
       const p = await leerPlantilla(cfg, rut);
       const intentos = await sbFetch(cfg, `/rest/v1/biometria_intentos?select=tipo,estado,score,liveness_ok,detalle,duracion_ms,fecha&rut=eq.${enc(rut)}&order=fecha.desc&limit=20`);
       return json({ ok: true, rut, enrolado: !!(p && p.activo), plantilla: p ? { version: p.version, modelo: p.modelo, muestras: p.muestras, fecha: p.fecha_enrolamiento } : null, intentos });
-    }
-
-    if (b.accion === "aprobar_enrolamiento") {
-      const p = await leerPlantilla(cfg, rut);
-      if (!p) throw new ErrorCliente("No existe una plantilla pendiente para este RUT.", 404);
-      if (p.activo) return json({ ok: true, aprobado: true, ya_activo: true });
-      await sbFetch(cfg, `/rest/v1/guardias_biometria?rut=eq.${enc(rut)}`, {
-        method: "PATCH",
-        headers: { prefer: "return=minimal" },
-        body: JSON.stringify({ activo: true, enrolado_por: "aprobado-admin-pin" })
-      });
-      return json({ ok: true, aprobado: true });
     }
 
     if (b.accion === "borrar") {
