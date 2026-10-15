@@ -10,7 +10,9 @@
 //   { accion: "estado", pin, rut }                                   -> enrolado / últimos intentos (sin plantilla)
 //   { accion: "borrar", pin, rut }                                   -> elimina la plantilla de ese RUT
 // INGRESO con interruptor encendido (SIN PIN). La MISMA captura de frente es la foto de ingreso y la
-// imagen biométrica. Primer ingreso de un RUT = enrolamiento automático; los siguientes = verificación.
+// imagen biométrica. Si el RUT YA tiene plantilla activa, se verifica automáticamente. Si NO tiene plantilla,
+// el primer ingreso válido crea y activa la plantilla automáticamente después de superar la prueba de vida.
+// Esto permite incorporar guardias nuevos/de apoyo sin depender de una aprobación manual del administrador.
 //   { accion: "desafio_auto", rut }                                  -> { modo, pasos: [frente, 1 giro], token }
 //   { accion: "procesar_auto", rut, asistencia_id, token, consentimiento: true, imagenes: [jpeg base64 x2] }
 //      (asistencia de ese RUT creada hace < 15 min; nunca se escribe en "asistencias")
@@ -228,6 +230,26 @@ export default async (req) => {
       return json({ ok: true, frio: m.frio, carga_ms: m.frio ? m.carga_ms : 0, total_ms: ms(performance.now() - t0) });
     }
 
+    // ----- Guía de giro EN VIVO (sin guardar imagen ni plantilla) -----
+    // Devuelve solo la pose mínima necesaria para pintar la guía de la cámara.
+    // No intenta medir la dirección de las pupilas: con YuNet solo validamos giro de cabeza,
+    // cantidad de rostros y tamaño/encuadre del rostro.
+    if (b.accion === "pose_live") {
+      await exigirLimite(cfg, rut);
+      const m = await cargarModelos();
+      const im = decodificar(m.v, b.imagen);
+      const caras = await m.v.detectar(m.det, im);
+      if (caras.length !== 1) return json({ ok: true, caras: caras.length, listo: false });
+      const cara = caras[0], pose = m.v.pose(cara), cara_frac = cara.box[2] / im.w;
+      const dir = b.direccion === "izquierda" ? "izquierda" : b.direccion === "derecha" ? "derecha" : null;
+      let listo = false;
+      if (dir && cara_frac >= L.CARA_MIN_FRAC) {
+        const signo = L.CONVENCION_GIRO[dir];
+        listo = Math.abs(pose.giro) >= L.GIRO_LADO_MIN && Math.sign(pose.giro) === signo;
+      }
+      return json({ ok: true, caras: 1, giro: +pose.giro.toFixed(3), cara_frac: +cara_frac.toFixed(3), listo });
+    }
+
     // ----- Ingreso con interruptor encendido (sin PIN) -----
     if (b.accion === "desafio_auto") {
       const [, p] = await Promise.all([exigirLimite(cfg, rut), leerPlantilla(cfg, rut)]);   // en paralelo
@@ -264,16 +286,27 @@ export default async (req) => {
       }
       if (previo && (!p || !p.activo)) return json({ ok: true, resultado: "vida_ok", bloqueado: false, tiempos: tiempos() });
       if (!p || !p.activo) {
-        // Primer ingreso: ENROLAMIENTO AUTOMÁTICO con la captura de frente (solo si superó la prueba de vida).
+        // Primer ingreso: enrolamiento automático e inmediato para permitir guardias nuevos/de apoyo.
+        // La plantilla solo se crea si supera la prueba de vida y existe una asistencia reciente del mismo RUT.
         if (!vida.ok || !frente) {
           await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "RECHAZADO", detalle: { motivos: vida.motivos, medidas: vida.medidas }, duracion_ms: ms(performance.now() - t0) });
           return json({ ok: true, resultado: "sin_enrolar", tiempos: tiempos() });
         }
         const ahora = new Date().toISOString();
-        const fila = { rut, plantilla: L.cifrarPlantilla(cfg.k, rut, frente.emb), modelo: L.MODELO, version: p ? p.version + 1 : 1, muestras: 1, fecha_enrolamiento: ahora, consentimiento_fecha: ahora, enrolado_por: "auto-ingreso", activo: true };
-        await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "ENROLADO", detalle: { medidas: vida.medidas, version: fila.version }, duracion_ms: ms(performance.now() - t0) });
+        const fila = {
+          rut,
+          plantilla: L.cifrarPlantilla(cfg.k, rut, frente.emb),
+          modelo: L.MODELO,
+          version: p ? p.version + 1 : 1,
+          muestras: 1,
+          fecha_enrolamiento: ahora,
+          consentimiento_fecha: ahora,
+          enrolado_por: "auto-ingreso-inicial",
+          activo: true
+        };
+        await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "ENROLADO", detalle: { motivo: "primer enrolamiento automático", medidas: vida.medidas, version: fila.version }, duracion_ms: ms(performance.now() - t0) });
         await sbFetch(cfg, "/rest/v1/guardias_biometria?on_conflict=rut", { method: "POST", headers: { prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(fila) });
-        return json({ ok: true, resultado: "enrolado", tiempos: tiempos() });
+        return json({ ok: true, resultado: "enrolado", primer_enrolamiento: true, tiempos: tiempos() });
       }
       // Ingresos siguientes: VERIFICACIÓN 1:1 contra la plantilla del RUT.
       const score = frente ? +L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb).toFixed(4) : null;
