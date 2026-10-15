@@ -211,6 +211,23 @@ export default async (req) => {
       return json({ ok: true, resultados });
     }
 
+    // ----- Panel admin -> resumen de enrolados (solo PIN; sin plantillas) -----
+    if (b.accion === "resumen") {
+      await exigirPin(cfg, b.pin);
+      const hace7 = new Date(Date.now() - 7 * 86400000).toISOString();
+      const [plant, ints] = await Promise.all([
+        sbFetch(cfg, `/rest/v1/guardias_biometria?select=rut,fecha_enrolamiento&activo=is.true&order=fecha_enrolamiento.desc&limit=10000`),
+        sbFetch(cfg, `/rest/v1/biometria_intentos?select=estado,liveness_ok&fecha=gte.${enc(hace7)}&limit=50000`)]);
+      const cuenta = f => ints.filter(f).length;
+      return json({ ok: true,
+        enrolados: plant.length,
+        nuevos_7d: plant.filter(x => x.fecha_enrolamiento >= hace7).length,
+        verificados_7d: cuenta(x => x.estado === L.ESTADOS.OK),
+        no_coincide_7d: cuenta(x => x.estado === L.ESTADOS.NO),
+        vida_fallida_7d: cuenta(x => x.liveness_ok === false),
+        lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento })) });
+    }
+
     // ----- Panel admin -> retención de 60 días (solo PIN) -----
     if (b.accion === "purgar") {
       await exigirPin(cfg, b.pin);

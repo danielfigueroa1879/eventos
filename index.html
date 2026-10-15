@@ -1612,6 +1612,7 @@
         async deleteEvento(id) { set(K.ev, get(K.ev).filter(x => x.id !== id)); set(K.as, get(K.as).filter(x => x.evento_id !== id)); set(K.pu, get(K.pu).filter(x => x.evento_id !== id)); const his = get(K.hp).filter(h => h.evento_id === id).map(h => h.id); set(K.hp, get(K.hp).filter(h => h.evento_id !== id)); set(K.hpa, get(K.hpa).filter(x => !his.includes(x.historial_id))); ping(); },
         async getEventoBySlug(slug) { return get(K.ev).find(x => x.slug === slug) || null; },
         async getGuardia(rut) { return get(K.gu).find(x => x.rut === rut) || null; },
+        async guardiasPorRut(ruts) { const s = new Set(ruts); return get(K.gu).filter(x => s.has(x.rut)); },
         async listGuardias() { return get(K.gu); },
         async upsertGuardia(g) { const a = get(K.gu); const i = a.findIndex(x => x.rut === g.rut); const rec = { ...g, updated_at: nowISO() }; if (i >= 0) a[i] = { ...a[i], ...rec }; else a.push(rec); set(K.gu, a); ping(); return rec; },
         async bulkUpsertGuardias(arr) { const a = get(K.gu); const by = {}; a.forEach(g => by[g.rut] = g); arr.forEach(g => by[g.rut] = { ...by[g.rut], ...g, updated_at: nowISO() }); set(K.gu, Object.values(by)); ping(); return arr.length; },
@@ -1961,6 +1962,7 @@
         },
         async getEventoBySlug(slug) { const d = ok(await sb.from("eventos").select("*").eq("slug", slug).limit(1)); return d[0] || null; },
         async getGuardia(rut) { const d = ok(await sb.from("guardias_central").select("*").eq("rut", rut).limit(1)); return d[0] || null; },
+        async guardiasPorRut(ruts) { return guardiasDe([...new Set(ruts)]); },
         async listGuardias() { return ok(await sb.from("guardias_central").select("*")); },
         async upsertGuardia(g) { const r = ok(await sb.from("guardias_central").upsert({ ...g, updated_at: nowISO() }).select().single()); if (r && r.rut) guCache.set(r.rut, { g: r, t: Date.now() }); return r; },
         async bulkUpsertGuardias(arr) { arr.forEach(g => g && g.rut && guCache.delete(g.rut)); let n = 0; for (let i = 0; i < arr.length; i += 150) { const chunk = arr.slice(i, i + 150).map(g => ({ ...g, updated_at: nowISO() })); const r = await sb.from("guardias_central").upsert(chunk); if (r.error) throw r.error; n += chunk.length; } return n; },
@@ -3967,6 +3969,7 @@
           </span>
           <span class="text-xs font-semibold">${on ? (todos ? 'Activada' : `Solo ${ADMIN_STATE.bioRuts.size} RUT`) : 'Desactivada (solo foto)'}</span>
         </button>`; })() : ""}
+        ${ADMIN_STATE.bioRuts && ADMIN_STATE.bioRuts.size ? `<button id="bioEnrolados" type="button" class="btn text-sm px-4 py-2.5 font-bold shadow-md rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-300" title="Guardias con verificación facial registrada (solo admin)">🧬 Enrolados</button>` : ""}
         <button id="cuentaOS10" class="btn text-sm px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md rounded-xl">📋 Cuenta O.S.10</button>
         <button id="expEventosXls" class="btn text-sm px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold shadow-md rounded-xl" title="Descargar todos los eventos en Excel (.xlsx) o PDF (hoja oficio horizontal)">⬇ Descargar eventos</button>
         <button id="expInfractores" class="btn text-sm px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-bold shadow-md rounded-xl" title="Descargar en Excel el registro de todos los guardias infractores / detenidos">🚩 Infractores</button>
@@ -4153,6 +4156,7 @@
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       // Interruptor "Biometría" POR EVENTO: columna eventos.biometria (false = solo foto en este evento).
       // Los demás eventos no cambian. El interruptor general sigue siendo config "biometria_piloto".
+      const btnBioEnr = $("#bioEnrolados"); if (btnBioEnr) btnBioEnr.addEventListener("click", modalEnrolados);
       const btnBioQR = $("#toggleBioQR");
       if (btnBioQR) btnBioQR.addEventListener("click", () => {
         const on = ev.biometria !== false;
@@ -4435,6 +4439,49 @@
       if (recientes.length && BIO_EMP.reint < 12) {
         BIO_EMP.reint++; clearTimeout(BIO_EMP.tmr); BIO_EMP.tmr = setTimeout(() => { if (root.isConnected && root.querySelector("[data-bio-e]")) pintarBioEmpresa(root, ev); }, 10000);
       } else if (!recientes.length) BIO_EMP.reint = 0;
+    }
+    // ENROLADOS (solo admin con PIN): totales y lista de guardias con plantilla facial. Se consulta SOLO al
+    // abrir la ventana (una llamada a la función + nombres desde la caché de guardias).
+    async function modalEnrolados() {
+      let pin = (() => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } })();
+      if (!pin) { pin = prompt("Biometría: ingresa el PIN de administrador") || ""; if (!pin) return; try { sessionStorage.setItem("os10_admin_pin", pin); } catch (_) { } }
+      openModal(`<div class="text-center text-slate-500 py-6">🧬 Cargando enrolados…</div>`);
+      let d;
+      try {
+        const r = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "resumen", pin }) });
+        d = await r.json().catch(() => ({}));
+        if (r.status === 401) { try { sessionStorage.removeItem("os10_admin_pin"); } catch (_) { } closeModal(); toast("PIN incorrecto.", "danger", 4000); return; }
+        if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+      } catch (e) { closeModal(); toast("No se pudo consultar: " + (e.message || e), "danger", 5000); return; }
+      const lista = d.lista || [];
+      let nombres = {};
+      try { (await Data.guardiasPorRut(lista.map(x => x.rut))).forEach(g => { nombres[g.rut] = ((g.nombres || "") + " " + (g.apellidos || "")).trim(); }); } catch (_) { }
+      const tile = (n, t, c) => `<div class="rounded-xl p-2 text-center" style="background:${c}"><div class="text-xl font-extrabold text-slate-800">${n}</div><div class="text-[11px] font-semibold text-slate-600 leading-tight">${t}</div></div>`;
+      const fila = x => `<div data-enr="${esc(x.rut)}" class="flex items-center gap-2 py-2 border-b border-slate-100 text-sm">
+          <div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">${esc(nombres[x.rut] || "—")}</div><div class="text-xs text-slate-500 font-mono">${esc(x.rut)} · ${esc(fechaFmt(String(x.fecha || "").slice(0, 10)))}</div></div>
+          <button data-enr-reset="${esc(x.rut)}" class="btn btn-ghost text-xs px-2 py-1" title="Borra su plantilla: se vuelve a enrolar en su próximo ingreso">Restablecer</button></div>`;
+      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">🧬 Guardias enrolados</h2>
+        <p class="text-xs text-slate-500 mb-3">Con verificación facial registrada. Solo administrador.</p>
+        <div class="grid grid-cols-3 gap-2 mb-2">${tile(d.enrolados || 0, "Enrolados", "#dbeafe")}${tile(d.nuevos_7d || 0, "Nuevos (7 días)", "#dcfce7")}${tile(d.verificados_7d || 0, "Verificados (7 días)", "#e0e7ff")}</div>
+        <div class="grid grid-cols-2 gap-2 mb-3">${tile(d.no_coincide_7d || 0, "⛔ No coincide (7 días)", "#fee2e2")}${tile(d.vida_fallida_7d || 0, "🔄 Prueba de vida fallida (7 días)", "#fef3c7")}</div>
+        <input id="enrBuscar" class="fld text-sm mb-2" placeholder="Buscar por RUT o nombre…">
+        <div id="enrLista" style="max-height:45vh;overflow:auto">${lista.length ? lista.map(fila).join("") : `<div class="text-center text-slate-400 py-4 text-sm">Aún no hay guardias enrolados.</div>`}</div>
+        <button id="enrCerrar" class="btn btn-ghost w-full mt-3">Cerrar</button>`);
+      $("#enrCerrar").addEventListener("click", closeModal);
+      $("#enrBuscar").addEventListener("input", e => {
+        const q = e.target.value.trim().toLowerCase();
+        document.querySelectorAll("#enrLista [data-enr]").forEach(el => { const r = el.dataset.enr; el.style.display = !q || r.toLowerCase().includes(q) || (nombres[r] || "").toLowerCase().includes(q) ? "" : "none"; });
+      });
+      document.querySelectorAll("#enrLista [data-enr-reset]").forEach(b => b.addEventListener("click", async () => {
+        const rut = b.dataset.enrReset;
+        if (!confirm(`¿Restablecer la verificación facial de ${nombres[rut] || rut}? Se volverá a enrolar en su próximo ingreso.`)) return;
+        b.disabled = true;
+        try {
+          const r = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "borrar", pin, rut }) });
+          if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || ("HTTP " + r.status));
+          b.closest("[data-enr]").remove(); toast("Plantilla restablecida.");
+        } catch (e) { b.disabled = false; toast("No se pudo restablecer: " + (e.message || e), "danger", 4000); }
+      }));
     }
     // RETENCIÓN BIOMÉTRICA (60 días): la función borra los intentos con más de 60 días y las plantillas de
     // guardias sin ingresos en 60 días. Requiere el PIN de esta pestaña; si falla, se reintenta la próxima vez.
