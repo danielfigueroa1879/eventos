@@ -63,6 +63,13 @@
       #bioi-fl.izq b svg{transform:scaleX(-1)}#bioi-fl span{font-size:13px;font-weight:800;background:#0f172a;padding:4px 8px;border-radius:8px;color:#fff;white-space:nowrap}
       #bioi-fl.izq{display:flex;left:6px}#bioi-fl.der{display:flex;right:6px}
       #bioi-fl.izq b{animation:bioiI .9s ease-in-out infinite}#bioi-fl.der b{animation:bioiD .9s ease-in-out infinite}
+      /* Giro confirmado: verde intenso y luminoso para que se note claramente. */
+      #bioi-esc.ok-giro{box-shadow:0 0 0 5px #22c55e,0 0 30px 12px rgba(34,197,94,.75)}
+      #bioi-esc.ok-giro #bioi-ovalo{stroke:#22c55e!important;stroke-width:7!important;stroke-dasharray:none!important;filter:drop-shadow(0 0 9px #22c55e)}
+      #bioi-esc.ok-giro #bioi-fl b svg path{fill:#22c55e!important}
+      #bioi-esc.ok-giro #bioi-fl span{background:#16a34a;color:#fff;font-size:15px}
+      #bioi-esc.ok-giro #bioi-ins{color:#14532d}
+      #bioi-esc.ok-giro #bioi-cta{color:#16a34a;font-size:38px;text-shadow:0 0 10px #fff,0 0 18px #22c55e}
       @keyframes bioiI{50%{transform:translateX(-14px)}}@keyframes bioiD{50%{transform:translateX(14px)}}
       /* GUÍA REFORZADA (2.º intento o más): borde que destella del lado del giro y una
          cabeza animada que gira hacia ese lado. */
@@ -93,7 +100,7 @@
       <div id="bioi-cons"></div>
       <div id="bioi-esc"><video playsinline autoplay muted></video>
         <svg viewBox="0 0 300 400" aria-hidden="true"><defs><mask id="bioi-m"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="black"/></mask></defs>
-          <rect width="300" height="400" fill="#ffffff" mask="url(#bioi-m)"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/></svg>
+          <rect width="300" height="400" fill="#ffffff" mask="url(#bioi-m)"/><ellipse id="bioi-ovalo" cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/></svg>
         <div id="bioi-guia"><div class="borde"></div>
           <div class="cab"><svg viewBox="0 0 92 92"><g class="craneo"><ellipse class="oreja i" cx="20" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse class="oreja d" cx="72" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse cx="46" cy="48" rx="26" ry="31" fill="#fcd34d"/></g><g class="cara"><circle cx="37" cy="42" r="3.6" fill="#111827"/><circle cx="55" cy="42" r="3.6" fill="#111827"/><path d="M46 46 l-4 11 h8z" fill="#b45309"/><path d="M38 63 q8 5 16 0" stroke="#111827" stroke-width="2.6" fill="none" stroke-linecap="round"/></g></svg></div></div>
         <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
@@ -131,6 +138,7 @@
     const msg = t => { ui.$("bioi-msg").textContent = t || ""; };
     const indicar = paso => {
       const f = ui.$("bioi-fl"), g = ui.$("bioi-guia"); f.className = ""; g.className = "";
+      ui.$("bioi-esc").classList.remove("ok-giro");
       const lado = paso === "giro_izquierda" ? "izq" : paso === "giro_derecha" ? "der" : "";
       if (lado) { f.className = lado; f.querySelector("b").innerHTML = FLECHA; }
       // 2.º intento o más: guía reforzada (borde que destella y cabeza animada abajo).
@@ -140,6 +148,42 @@
       }
     };
     const cerrar = () => { try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) { } stream = null; ui.capa.remove(); ui.estilo.remove(); };
+
+    // Frame liviano para la guía EN VIVO. No se guarda: el servidor devuelve solo pose/encuadre.
+    const frameLive = () => {
+      const v = ui.video, k = Math.min(1, 320 / v.videoWidth), cv = document.createElement("canvas");
+      cv.width = Math.max(1, Math.round(v.videoWidth * k)); cv.height = Math.max(1, Math.round(v.videoHeight * k));
+      cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
+      return cv.toDataURL("image/jpeg", 0.62).split(",")[1];
+    };
+    async function esperarGiroVerde(paso) {
+      const direccion = paso === "giro_izquierda" ? "izquierda" : "derecha";
+      const limite = Date.now() + 6500;
+      let consecutivos = 0, huboRespuesta = false;
+      while (Date.now() < limite) {
+        let r;
+        try {
+          r = await api({ accion: "pose_live", rut, direccion, imagen: frameLive() }, 4500);
+          huboRespuesta = true;
+        } catch (_) { r = null; }
+        if (r && r.status === 200 && r.d && r.d.listo) {
+          consecutivos++;
+          // Dos lecturas seguidas evitan que un único frame accidental pinte verde.
+          if (consecutivos >= 2) {
+            ui.$("bioi-esc").classList.add("ok-giro");
+            ui.$("bioi-ins").textContent = "✓ Giro correcto";
+            ui.$("bioi-fl").querySelector("span").textContent = "¡Bien!";
+            ui.$("bioi-cta").textContent = "✓ BIEN";
+            msg("Mantén la posición y la mirada hacia la cámara");
+            try { navigator.vibrate && navigator.vibrate(120); } catch (_) { }
+            await esperar(350);
+            return true;
+          }
+        } else consecutivos = 0;
+        await esperar(350);
+      }
+      return huboRespuesta ? false : null; // null = guía live no disponible; usar fallback antiguo
+    }
 
     try {
       // 1) Consentimiento: una casilla. Sin marcarla, "Debes aceptar" (hasta 3 veces); a la 4.ª vez se
@@ -196,9 +240,16 @@
       for (let i = 0; i < pasos.length; i++) {
         ui.$("bioi-ins").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
         if (pasos[i].startsWith("giro_")) {
-          msg("Gira la cabeza (unos 30°) y mantenla hasta ver 📸"); ui.$("bioi-cta").textContent = "";
-          // Momento de captura aleatorio; en el reintento, un poco más de tiempo para girar.
-          await esperar((reintento ? 1800 : 1000) + Math.floor(Math.random() * 1000));
+          msg("Gira la cabeza (unos 30°) y mantén la mirada hacia la cámara"); ui.$("bioi-cta").textContent = "";
+          const verde = await esperarGiroVerde(pasos[i]);
+          if (verde === false) {
+            // Hubo medición, pero aún no alcanzó el giro correcto: damos una oportunidad extra antes de capturar.
+            msg("Gira un poco más hacia la flecha y mantén la posición");
+            await esperar(reintento ? 1200 : 900);
+          } else if (verde === null) {
+            // Si la guía en vivo no está disponible, no bloqueamos el ingreso: fallback al comportamiento anterior.
+            await esperar((reintento ? 1800 : 1000) + Math.floor(Math.random() * 1000));
+          }
         } else {
           msg("Quédate quieto mirando la cámara");
           for (let s = 2; s > 0; s--) { ui.$("bioi-cta").textContent = s; await esperar(900); }
