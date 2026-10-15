@@ -19,6 +19,7 @@
   const esperar = n => new Promise(r => setTimeout(r, n));
   // Misma forma que la flecha de antes (cuerpo grueso y cabeza corta), pero ROJA.
   const FLECHA = '<svg viewBox="0 0 84 60" aria-hidden="true"><path d="M0 13H56V0L84 30 56 60V47H0Z" fill="#dc2626"/></svg>';
+  const FACE_ID = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M22 8H14a6 6 0 0 0-6 6v8M42 8h8a6 6 0 0 1 6 6v8M22 56H14a6 6 0 0 1-6-6v-8M42 56h8a6 6 0 0 0 6-6v-8" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M22 27v-3M42 27v-3M32 23v13c0 3-2 5-5 5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path d="M22 43c3 4 7 6 10 6s7-2 10-6" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>';
   const INSTR = { frente: "Mira al frente", giro_izquierda: "Gira la cabeza hacia la flecha ⬅", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
 
   async function api(cuerpo, timeoutMs = 25000, keepalive = false) {
@@ -55,7 +56,7 @@
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
       #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#0f172a;font-weight:800;font-size:18px;background:linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,0))}
-      #bioi-cta{position:absolute;left:0;right:0;bottom:14px;text-align:center;color:#0f172a;font-size:50px;font-weight:900;text-shadow:0 0 8px #fff}
+      #bioi-cta{position:absolute;left:0;right:0;bottom:14px;text-align:center;color:#0f172a;font-size:50px;font-weight:900;text-shadow:0 0 8px #fff}#bioi-cta svg{width:52px;height:52px;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 6px #fff)}
       #bioi-fl{position:absolute;top:50%;transform:translateY(-50%);display:none;flex-direction:column;align-items:center;gap:4px;color:#ea580c;text-shadow:0 0 6px #fff;pointer-events:none}
       /* Flecha dibujada (SVG), ROJA y del mismo grosor a ambos lados y en todos los intentos (antes era
          un carácter que cada celular dibujaba distinto). La izquierda es la misma flecha espejada. */
@@ -246,7 +247,7 @@
       await new Promise(res => { if (ui.video.readyState >= 2) res(); else ui.video.onloadeddata = () => res(); });
       ui.$("bioi-ins").textContent = "Encuadra tu rostro dentro del óvalo";
       msg(reintento
-        ? "Esta vez: primero mira al frente; cuando se ilumine un lado, GIRA la cabeza hacia ese lado (como la carita de abajo) y quédate así hasta ver 📸."
+        ? "Esta vez: primero mira al frente; cuando se ilumine un lado, GIRA la cabeza hacia ese lado (como la carita de abajo) y quédate así hasta ver el ícono de verificación facial."
         : "Con buena luz y de frente. Cuando estés listo, pulsa el botón.");
       if (!(await elegir(ui, "Estoy listo", "Cancelar"))) { cerrar(); return { cancelado: true }; }
       ui.$("bioi-no").disabled = true;
@@ -283,7 +284,7 @@
         imgs.push(cv.toDataURL("image/jpeg", 0.85).split(",")[1]);
         // La captura de FRENTE es también la foto de ingreso (mismo proceso que la foto normal: WebP 3:4).
         if (pasos[i] === "frente" && !fotoBlob) { try { fotoBlob = await fotoDesde(v); } catch (_) { fotoBlob = null; } }
-        ui.$("bioi-cta").textContent = "📸"; await esperar(250);
+        ui.$("bioi-cta").innerHTML = FACE_ID; await esperar(250);
       }
       cerrar();
       if (!fotoBlob) return null;   // no se pudo generar la foto: se usa la foto normal
