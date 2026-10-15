@@ -63,13 +63,14 @@
       #bioi-fl.izq b svg{transform:scaleX(-1)}#bioi-fl span{font-size:13px;font-weight:800;background:#0f172a;padding:4px 8px;border-radius:8px;color:#fff;white-space:nowrap}
       #bioi-fl.izq{display:flex;left:6px}#bioi-fl.der{display:flex;right:6px}
       #bioi-fl.izq b{animation:bioiI .9s ease-in-out infinite}#bioi-fl.der b{animation:bioiD .9s ease-in-out infinite}
-      /* Giro confirmado: verde intenso y luminoso para que se note claramente. */
-      #bioi-esc.ok-giro{box-shadow:0 0 0 2px rgba(34,197,94,.15)}
-      #bioi-esc.ok-giro #bioi-ovalo{stroke:#22c55e!important;stroke-width:7!important;stroke-dasharray:none!important;filter:drop-shadow(0 0 9px #22c55e)}
+      /* El contenedor permanece BLANCO para iluminar el rostro. Solo cambia el óvalo segmentado. */
+      #bioi-ovalo{transition:stroke .16s linear,stroke-width .16s linear,filter .16s linear}
+      #bioi-esc.ok-giro #bioi-ovalo{stroke:#22c55e!important;stroke-width:7!important;filter:drop-shadow(0 0 10px #22c55e);animation:bioiOkFlash .42s ease-out}
       #bioi-esc.ok-giro #bioi-fl b svg path{fill:#22c55e!important}
       #bioi-esc.ok-giro #bioi-fl span{background:#16a34a;color:#fff;font-size:15px}
       #bioi-esc.ok-giro #bioi-ins{color:#14532d}
       #bioi-esc.ok-giro #bioi-cta{color:#16a34a;font-size:38px;text-shadow:0 0 10px #fff,0 0 18px #22c55e}
+      @keyframes bioiOkFlash{0%{filter:drop-shadow(0 0 2px #22c55e)}45%{filter:drop-shadow(0 0 22px #22c55e)}100%{filter:drop-shadow(0 0 10px #22c55e)}}
       @keyframes bioiI{50%{transform:translateX(-14px)}}@keyframes bioiD{50%{transform:translateX(14px)}}
       /* GUÍA REFORZADA (2.º intento o más): borde que destella del lado del giro y una
          cabeza animada que gira hacia ese lado. */
@@ -139,6 +140,8 @@
     const indicar = paso => {
       const f = ui.$("bioi-fl"), g = ui.$("bioi-guia"); f.className = ""; g.className = "";
       ui.$("bioi-esc").classList.remove("ok-giro");
+      const ovalo = ui.$("bioi-ovalo");
+      ovalo.style.stroke = "#0f172a"; ovalo.style.strokeWidth = "3"; ovalo.style.filter = "";
       const lado = paso === "giro_izquierda" ? "izq" : paso === "giro_derecha" ? "der" : "";
       if (lado) { f.className = lado; f.querySelector("b").innerHTML = FLECHA; }
       // 2.º intento o más: guía reforzada (borde que destella y cabeza animada abajo).
@@ -156,6 +159,25 @@
       cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
       return cv.toDataURL("image/jpeg", 0.62).split(",")[1];
     };
+    const pintarProgresoGiro = d => {
+      const o = ui.$("bioi-ovalo");
+      if (!d || d.movimiento !== true) {
+        o.style.stroke = "#0f172a"; o.style.strokeWidth = "3"; o.style.filter = "";
+        return;
+      }
+      if (d.contrario) {
+        o.style.stroke = "#dc2626"; o.style.strokeWidth = "6"; o.style.filter = "drop-shadow(0 0 7px #dc2626)";
+        return;
+      }
+      // 0 = amarillo intenso; 1 = verde. El tono cambia continuamente según el giro real.
+      const p = Math.max(0, Math.min(1, Number(d.progreso) || 0));
+      const hue = 48 + (142 - 48) * p;
+      const color = `hsl(${hue} 88% 45%)`;
+      o.style.stroke = color;
+      o.style.strokeWidth = String(4 + 3 * p);
+      o.style.filter = `drop-shadow(0 0 ${4 + 7 * p}px ${color})`;
+    };
+
     async function esperarGiroVerde(paso) {
       const direccion = paso === "giro_izquierda" ? "izquierda" : "derecha";
       const limite = Date.now() + 6500;
@@ -166,6 +188,7 @@
           r = await api({ accion: "pose_live", rut, direccion, imagen: frameLive() }, 4500);
           huboRespuesta = true;
         } catch (_) { r = null; }
+        if (r && r.status === 200 && r.d) pintarProgresoGiro(r.d);
         if (r && r.status === 200 && r.d && r.d.listo) {
           consecutivos++;
           // Dos lecturas seguidas evitan que un único frame accidental pinte verde.
