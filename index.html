@@ -849,10 +849,18 @@
       #empBanner .text-sm { font-size: .7rem; line-height: 1.15; }
       /* QR: en PC se abre con el botón de la barra; cerrado no ocupa espacio. */
       #empQrCard:has(#empQrPanel[hidden]) { display: none; }
-      /* "Guardias ingresados" más delgado en PC. */
-      #empResumenPanel { padding-bottom: .5rem; }
-      #empResumenPanel > .mt-3 { margin-top: .5rem; }
-      #empResumenPanel > .grid { margin-top: .5rem; }
+      /* "Guardias ingresados": FIJO bajo el banner al bajar (vista rápida) y más delgado. */
+      #empResWrap { position: sticky; top: calc(var(--empBanH, 56px) + 4px); z-index: 30; }
+      #empResCard { box-shadow: 0 6px 16px -6px rgba(15, 23, 42, .25); }
+      #empToggleResumen { padding-top: .2rem; padding-bottom: .2rem; }
+      #empToggleResumen .text-xl { font-size: 1.05rem; }
+      #empResumenPanel { padding-bottom: .4rem; }
+      #empResumenPanel > .mt-3 { margin-top: .35rem; height: .4rem; }
+      #empResumenPanel > .mt-3 > div { height: .4rem; }
+      #empResumenPanel > .grid { margin-top: .4rem; gap: .4rem; }
+      #empResumenPanel > .grid > div { padding-top: .15rem; padding-bottom: .15rem; }
+      #empResumenPanel > .grid .text-lg { font-size: .95rem; line-height: 1.15; }
+      #empResumenPanel > .grid .text-\[11px\] { font-size: .64rem; line-height: 1.1; }
     }
     /* PC: el banner del evento queda pegado arriba y ocupa TODO el ancho del área principal
        (anula el relleno de #main: md:p-6 = 1.5rem), sin bordes redondeados. Celular: sin cambios. */
@@ -4490,6 +4498,7 @@
       const b = document.getElementById("empBanner"), sp = document.getElementById("empBannerSp");
       if (!b || !sp) return;
       sp.style.height = window.matchMedia("(min-width: 768px)").matches ? (b.offsetHeight + 8) + "px" : "";
+      document.documentElement.style.setProperty("--empBanH", b.offsetHeight + "px");
       // Las imágenes del banner cargan después y cambian su alto: se vuelve a medir cuando cambia.
       if (!b._ro && window.ResizeObserver) { b._ro = new ResizeObserver(() => ajustarEmpBanner()); b._ro.observe(b); }
     }
@@ -8684,7 +8693,9 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           </div>` : ""}
         </div>
       </div>
-      <div class="card mt-2 overflow-hidden">
+      </div><!-- fin envoltura angosta (parte superior) -->
+      <div id="empResWrap" class="max-w-[62rem] mx-auto">
+      <div class="card mt-2 overflow-hidden" id="empResCard">
         <button id="empToggleResumen" class="w-full px-4 py-1.5 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
           <span>Guardias ingresados${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</span>
           <span class="flex items-center gap-2 flex-shrink-0">
