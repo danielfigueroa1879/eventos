@@ -849,6 +849,11 @@
       #empBanner .text-sm { font-size: .7rem; line-height: 1.15; }
       /* QR: en PC se abre con el botón de la barra; cerrado no ocupa espacio. */
       #empQrCard:has(#empQrPanel[hidden]) { display: none; }
+      /* En PC el QR se abre AL FRENTE, centrado, con fondo oscuro y botón "Cerrar". */
+      #empQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(560px, 92vw); max-height: 90vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
+      #empQrFondo { position: fixed; inset: 0; z-index: 54; background: rgba(15, 23, 42, .55); display: none; }
+      body:has(#empQrPanel:not([hidden])) #empQrFondo { display: block; }
+      #empQrCerrar { display: flex !important; }
       /* "Guardias ingresados": SIEMPRE ABIERTO en PC (vista rápida): sin flecha, no se cierra al tocarlo
          ni solo a los segundos. Más delgado. */
       #empResumenPanel[hidden] { display: block !important; }
@@ -8679,12 +8684,14 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <span class="ml-auto text-sm font-semibold text-slate-700 bg-slate-100/95 border border-slate-200 rounded-xl px-3 py-1.5 whitespace-nowrap">${ICO.reloj} ${esc(eventoTipoTexto(ev))}${(() => { const tn = usaT ? calcularTurno(new Date().toISOString(), ev) : null; return tn ? " · " + esc(tn.etiqueta) : ""; })()}</span>
       </div>
       <div class="mt-3 md:hidden"><button id="empDist" class="btn btn-p w-full relative flex items-center justify-center gap-2">🗺️ Distribución de facciones <svg class="absolute right-4" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button></div>
+      <div id="empQrFondo" class="hidden md:block" aria-hidden="true"></div>
       <div class="card mt-2 overflow-hidden" id="empQrCard">
         <button id="empToggleQR" class="md:hidden w-full px-3 py-1.5 flex items-center justify-between text-sm font-semibold text-slate-700">
           <span>🔳 QR y estado del evento</span>
           <span id="empQrChevron" class="text-slate-400 transition-transform flex-shrink-0" style="${EMPRESA_STATE.showQR ? "transform:rotate(180deg)" : ""}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
         </button>
         <div id="empQrPanel" class="p-3 border-t border-slate-100" ${EMPRESA_STATE.showQR ? "" : "hidden"}>
+          <div id="empQrCerrar" class="hidden items-center justify-between mb-2"><span class="font-bold text-slate-800">QR y estado del evento</span><button id="empQrCerrarBtn" type="button" class="btn btn-ghost text-sm px-3 py-1" aria-label="Cerrar">✕ Cerrar</button></div>
           <div class="flex items-center justify-between mb-1.5">
             <div class="font-semibold text-slate-700 text-sm">Progreso de asistencia${nSupE ? ` <span class="text-[11px] text-sky-700 font-normal">+ ${nSupE} supervisor${nSupE === 1 ? '' : 'es'}</span>` : ''}</div>
             <div class="text-xl font-bold text-green-700">${filasG.length}<span class="text-sm text-slate-400"> / ${total || "—"}</span></div>
@@ -8816,12 +8823,15 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         // Barra de PC: mismos destinos que los botones de celular.
         if ($("#empDist2")) $("#empDist2").addEventListener("click", () => abrirDistribucion(ev));
         if ($("#empHist2")) $("#empHist2").addEventListener("click", () => modalHistorialTurnos(ev));
-        if ($("#empQr2")) $("#empQr2").addEventListener("click", () => {
-          EMPRESA_STATE.showQR = !EMPRESA_STATE.showQR;
+        const qrPc = (abrir) => {
+          EMPRESA_STATE.showQR = abrir;
           const pn = $("#empQrPanel"), ch = $("#empQrChevron");
-          if (pn) pn.hidden = !EMPRESA_STATE.showQR;
-          if (ch) ch.style.transform = EMPRESA_STATE.showQR ? "rotate(180deg)" : "";
-        });
+          if (pn) pn.hidden = !abrir;
+          if (ch) ch.style.transform = abrir ? "rotate(180deg)" : "";
+        };
+        if ($("#empQr2")) $("#empQr2").addEventListener("click", () => qrPc(!EMPRESA_STATE.showQR));
+        if ($("#empQrCerrarBtn")) $("#empQrCerrarBtn").addEventListener("click", () => qrPc(false));
+        if ($("#empQrFondo")) $("#empQrFondo").addEventListener("click", () => qrPc(false));
         pintarBioEmpresa(app, ev);   // palomas de biometría (solo estado, sin puntaje)
       };
       await paint();
