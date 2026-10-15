@@ -101,7 +101,7 @@
       <div id="bioi-cons"></div>
       <div id="bioi-esc"><video playsinline autoplay muted></video>
         <svg viewBox="0 0 300 400" aria-hidden="true"><defs><mask id="bioi-m"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="black"/></mask></defs>
-          <rect width="300" height="400" fill="#ffffff" mask="url(#bioi-m)"/><ellipse id="bioi-ovalo" cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="3" stroke-dasharray="7 7"/></svg>
+          <rect width="300" height="400" fill="#ffffff" mask="url(#bioi-m)"/><ellipse id="bioi-ovalo" cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="5"/></svg>
         <div id="bioi-guia"><div class="borde"></div>
           <div class="cab"><svg viewBox="0 0 92 92"><g class="craneo"><ellipse class="oreja i" cx="20" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse class="oreja d" cx="72" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse cx="46" cy="48" rx="26" ry="31" fill="#fcd34d"/></g><g class="cara"><circle cx="37" cy="42" r="3.6" fill="#111827"/><circle cx="55" cy="42" r="3.6" fill="#111827"/><path d="M46 46 l-4 11 h8z" fill="#b45309"/><path d="M38 63 q8 5 16 0" stroke="#111827" stroke-width="2.6" fill="none" stroke-linecap="round"/></g></svg></div></div>
         <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
@@ -141,7 +141,7 @@
       const f = ui.$("bioi-fl"), g = ui.$("bioi-guia"); f.className = ""; g.className = "";
       ui.$("bioi-esc").classList.remove("ok-giro");
       const ovalo = ui.$("bioi-ovalo");
-      ovalo.style.stroke = "#0f172a"; ovalo.style.strokeWidth = "3"; ovalo.style.filter = "";
+      ovalo.style.stroke = "#0f172a"; ovalo.style.strokeWidth = "5"; ovalo.style.filter = "";
       const lado = paso === "giro_izquierda" ? "izq" : paso === "giro_derecha" ? "der" : "";
       if (lado) { f.className = lado; f.querySelector("b").innerHTML = FLECHA; }
       // 2.º intento o más: guía reforzada (borde que destella y cabeza animada abajo).
@@ -162,7 +162,7 @@
     const pintarProgresoGiro = d => {
       const o = ui.$("bioi-ovalo");
       if (!d || d.movimiento !== true) {
-        o.style.stroke = "#0f172a"; o.style.strokeWidth = "3"; o.style.filter = "";
+        o.style.stroke = "#0f172a"; o.style.strokeWidth = "5"; o.style.filter = "";
         return;
       }
       if (d.contrario) {
@@ -174,7 +174,7 @@
       const hue = 48 + (142 - 48) * p;
       const color = `hsl(${hue} 88% 45%)`;
       o.style.stroke = color;
-      o.style.strokeWidth = String(4 + 3 * p);
+      o.style.strokeWidth = String(5 + 2 * p);
       o.style.filter = `drop-shadow(0 0 ${4 + 7 * p}px ${color})`;
     };
 
