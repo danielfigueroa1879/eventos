@@ -19,7 +19,9 @@
   const esperar = n => new Promise(r => setTimeout(r, n));
   // Misma forma que la flecha de antes (cuerpo grueso y cabeza corta), pero ROJA.
   const FLECHA = '<svg viewBox="0 0 84 60" aria-hidden="true"><path d="M0 13H56V0L84 30 56 60V47H0Z" fill="#dc2626"/></svg>';
-  const FACE_ID = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M22 8H14a6 6 0 0 0-6 6v8M42 8h8a6 6 0 0 1 6 6v8M22 56H14a6 6 0 0 1-6-6v-8M42 56h8a6 6 0 0 0 6-6v-8" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M22 27v-3M42 27v-3M32 23v13c0 3-2 5-5 5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path d="M22 43c3 4 7 6 10 6s7-2 10-6" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>';
+  // Ícono estilo Face ID (dibujado en SVG: se ve igual en todos los celulares). Marco fijo + rasgos que se
+  // desplazan hacia el lado de la flecha durante el giro.
+  const FACE_ID = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M22 8H14a6 6 0 0 0-6 6v8M42 8h8a6 6 0 0 1 6 6v8M22 56H14a6 6 0 0 1-6-6v-8M42 56h8a6 6 0 0 0 6-6v-8" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><g class="fid-cara"><path d="M22 27v-3M42 27v-3M32 23v13c0 3-2 5-5 5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path d="M22 43c3 4 7 6 10 6s7-2 10-6" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></g></svg>';
   const INSTR = { frente: "Mira al frente", giro_izquierda: "Gira la cabeza hacia la flecha ⬅", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
 
   async function api(cuerpo, timeoutMs = 25000, keepalive = false) {
@@ -56,7 +58,7 @@
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
       #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#0f172a;font-weight:800;font-size:18px;background:linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,0))}
-      #bioi-cta{position:absolute;left:0;right:0;bottom:14px;text-align:center;color:#0f172a;font-size:50px;font-weight:900;text-shadow:0 0 8px #fff}#bioi-cta svg{width:52px;height:52px;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 6px #fff)}
+      #bioi-cta{position:absolute;left:0;right:0;bottom:78px;text-align:center;color:#0f172a;font-size:50px;font-weight:900;text-shadow:0 0 8px #fff}#bioi-cta svg{width:52px;height:52px;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 6px #fff)}
       #bioi-fl{position:absolute;top:50%;transform:translateY(-50%);display:none;flex-direction:column;align-items:center;gap:4px;color:#ea580c;text-shadow:0 0 6px #fff;pointer-events:none}
       /* Flecha dibujada (SVG), ROJA y del mismo grosor a ambos lados y en todos los intentos (antes era
          un carácter que cada celular dibujaba distinto). La izquierda es la misma flecha espejada. */
@@ -81,17 +83,16 @@
       #bioi-guia.izq .borde{left:0;background:linear-gradient(to right,rgba(245,158,11,.85),rgba(245,158,11,0))}
       #bioi-guia.der .borde{right:0;background:linear-gradient(to left,rgba(245,158,11,.85),rgba(245,158,11,0))}
       /* Cabeza guía ABAJO (debajo del óvalo, sin tapar el rostro): gira hacia el lado de la flecha. */
-      #bioi-guia .cab{position:absolute;bottom:6px;left:50%;width:66px;height:66px;margin-left:-33px;background:rgba(15,23,42,.7);border-radius:50%;border:2px solid #facc15}
-      #bioi-guia .cab svg{width:100%;height:100%;overflow:visible}
-      #bioi-guia.izq .cara{animation:bioiCabI 1.6s ease-in-out infinite}#bioi-guia.der .cara{animation:bioiCabD 1.6s ease-in-out infinite}
-      #bioi-guia .oreja{opacity:0}#bioi-guia.izq .oreja.d{animation:bioiOreja 1.6s ease-in-out infinite}#bioi-guia.der .oreja.i{animation:bioiOreja 1.6s ease-in-out infinite}
-      #bioi-guia.izq .craneo{animation:bioiCrI 1.6s ease-in-out infinite}#bioi-guia.der .craneo{animation:bioiCrD 1.6s ease-in-out infinite}
+      /* Ícono Face ID: centrado ABAJO del óvalo, visible en todos los pasos y en todos los intentos.
+         Gira (rasgos hacia la flecha) en el paso de giro y se pone VERDE al capturar / giro correcto. */
+      #bioi-fid{position:absolute;bottom:8px;left:50%;width:60px;height:60px;margin-left:-30px;color:#0f172a;background:#fff;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.18);padding:4px;pointer-events:none;transition:color .2s}
+      #bioi-fid svg{position:static;width:100%;height:100%;display:block;overflow:visible}
+      #bioi-fid.izq .fid-cara{animation:bioiFidI 1.6s ease-in-out infinite}#bioi-fid.der .fid-cara{animation:bioiFidD 1.6s ease-in-out infinite}
+      #bioi-fid.ok{color:#16a34a;animation:bioiFidOk .35s ease-out}#bioi-fid.ok .fid-cara{animation:none}
+      @keyframes bioiFidI{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(-7px)}100%{transform:translateX(0)}}
+      @keyframes bioiFidD{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(7px)}100%{transform:translateX(0)}}
+      @keyframes bioiFidOk{50%{transform:scale(1.15)}}
       @keyframes bioiDest{50%{opacity:.25}}
-      @keyframes bioiCabI{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(-12px)}100%{transform:translateX(0)}}
-      @keyframes bioiCabD{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(12px)}100%{transform:translateX(0)}}
-      @keyframes bioiCrI{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(-3px)}100%{transform:translateX(0)}}
-      @keyframes bioiCrD{0%,15%{transform:translateX(0)}45%,85%{transform:translateX(3px)}100%{transform:translateX(0)}}
-      @keyframes bioiOreja{0%,15%{opacity:0}45%,85%{opacity:1}100%{opacity:0}}
       #bioi-msg{font-size:14px;text-align:center;max-width:420px;min-height:20px;background:rgba(255,255,255,.88);padding:6px 12px;border-radius:10px}#bioi-msg:empty{background:none}
       #bioi-btns{display:flex;gap:10px;width:100%;max-width:420px}
       #bioi-btns button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:1.5px solid #0f172a;background:#fff;color:#0f172a}
@@ -104,8 +105,8 @@
         <svg viewBox="0 0 300 400" aria-hidden="true"><defs><mask id="bioi-m"><rect width="300" height="400" fill="white"/><ellipse cx="150" cy="180" rx="100" ry="132" fill="black"/></mask></defs>
           <rect width="300" height="400" fill="#ffffff" mask="url(#bioi-m)"/><ellipse id="bioi-ovalo" cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="5"/></svg>
         <div id="bioi-guia"><div class="borde"></div>
-          <div class="cab"><svg viewBox="0 0 92 92"><g class="craneo"><ellipse class="oreja i" cx="20" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse class="oreja d" cx="72" cy="49" rx="5" ry="8" fill="#f59e0b"/><ellipse cx="46" cy="48" rx="26" ry="31" fill="#fcd34d"/></g><g class="cara"><circle cx="37" cy="42" r="3.6" fill="#111827"/><circle cx="55" cy="42" r="3.6" fill="#111827"/><path d="M46 46 l-4 11 h8z" fill="#b45309"/><path d="M38 63 q8 5 16 0" stroke="#111827" stroke-width="2.6" fill="none" stroke-linecap="round"/></g></svg></div></div>
-        <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
+</div>
+        <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-fid">${FACE_ID}</div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
       <div id="bioi-msg"></div>
       <div id="bioi-btns"><button id="bioi-no">Cancelar</button><button id="bioi-si" class="p">Continuar</button></div>`;
     document.head.appendChild(st); document.body.appendChild(c);
@@ -145,6 +146,7 @@
       ovalo.style.stroke = "#0f172a"; ovalo.style.strokeWidth = "5"; ovalo.style.filter = "";
       const lado = paso === "giro_izquierda" ? "izq" : paso === "giro_derecha" ? "der" : "";
       if (lado) { f.className = lado; f.querySelector("b").innerHTML = FLECHA; }
+      ui.$("bioi-fid").className = lado;   // Face ID: gira hacia la flecha (o queda de frente)
       // 2.º intento o más: guía reforzada (borde que destella y cabeza animada abajo).
       if (lado && reintento) {
         g.className = lado;
@@ -197,7 +199,7 @@
             ui.$("bioi-esc").classList.add("ok-giro");
             ui.$("bioi-ins").textContent = "✓ Giro correcto";
             ui.$("bioi-fl").querySelector("span").textContent = "¡Bien!";
-            ui.$("bioi-cta").textContent = "✓ BIEN";
+            ui.$("bioi-cta").textContent = "✓ BIEN"; ui.$("bioi-fid").className = "ok";
             msg("Mantén la posición y la mirada hacia la cámara");
             try { navigator.vibrate && navigator.vibrate(120); } catch (_) { }
             await esperar(350);
@@ -247,7 +249,7 @@
       await new Promise(res => { if (ui.video.readyState >= 2) res(); else ui.video.onloadeddata = () => res(); });
       ui.$("bioi-ins").textContent = "Encuadra tu rostro dentro del óvalo";
       msg(reintento
-        ? "Esta vez: primero mira al frente; cuando se ilumine un lado, GIRA la cabeza hacia ese lado (como la carita de abajo) y quédate así hasta ver el ícono de verificación facial."
+        ? "Esta vez: primero mira al frente; cuando se ilumine un lado, GIRA la cabeza hacia ese lado (como el ícono de abajo) y quédate así hasta ver el ícono de verificación facial."
         : "Con buena luz y de frente. Cuando estés listo, pulsa el botón.");
       if (!(await elegir(ui, "Estoy listo", "Cancelar"))) { cerrar(); return { cancelado: true }; }
       ui.$("bioi-no").disabled = true;
@@ -284,7 +286,7 @@
         imgs.push(cv.toDataURL("image/jpeg", 0.85).split(",")[1]);
         // La captura de FRENTE es también la foto de ingreso (mismo proceso que la foto normal: WebP 3:4).
         if (pasos[i] === "frente" && !fotoBlob) { try { fotoBlob = await fotoDesde(v); } catch (_) { fotoBlob = null; } }
-        ui.$("bioi-cta").innerHTML = FACE_ID; await esperar(250);
+        ui.$("bioi-cta").textContent = ""; ui.$("bioi-fid").className = "ok"; await esperar(350);
       }
       cerrar();
       if (!fotoBlob) return null;   // no se pudo generar la foto: se usa la foto normal
