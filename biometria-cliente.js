@@ -284,7 +284,7 @@
         imgs.push(cv.toDataURL("image/jpeg", 0.85).split(",")[1]);
         // La captura de FRENTE es también la foto de ingreso (mismo proceso que la foto normal: WebP 3:4).
         if (pasos[i] === "frente" && !fotoBlob) { try { fotoBlob = await fotoDesde(v); } catch (_) { fotoBlob = null; } }
-        ui.$("bioi-cta").innerHTML = FACE_ID; await esperar(250);
+        ui.$("bioi-cta").innerHTML = FACE_ID; await esperar(1200);
       }
       cerrar();
       if (!fotoBlob) return null;   // no se pudo generar la foto: se usa la foto normal
