@@ -836,7 +836,15 @@
     html[data-theme="dark"] .evHeaderBox { background: #12212e; }
     /* Vista empresa en PC: banner verde FIJO arriba, a todo el ancho (ver ajustarEmpBanner). */
     @media (min-width: 768px) {
-      #empBanner { position: fixed !important; top: 0; left: 0; right: 0; z-index: 45; border-radius: 0; border-width: 0; padding-left: 1.5rem; padding-right: 1.5rem; }
+      /* Banda más baja (~70 px) y el contenido (logo, texto y "100") alineado con los recuadros de abajo
+         (columna de 62rem centrada): el relleno lateral calcula ese margen. */
+      #empBanner { position: fixed !important; top: 0; left: 0; right: 0; z-index: 45; border-radius: 0; border-width: 0;
+        padding: .45rem max(1rem, calc((100% - 62rem) / 2)); gap: .75rem; }
+      #empBanner > a img { width: 3rem; height: 3rem; }
+      #empBanner > img { width: 3.6rem; height: 3.6rem; }
+      #empBanner .text-xs { font-size: .62rem; line-height: 1.2; }
+      #empBanner h1 { font-size: 1.1rem; line-height: 1.25; }
+      #empBanner .text-sm { font-size: .78rem; line-height: 1.2; }
     }
     /* PC: el banner del evento queda pegado arriba y ocupa TODO el ancho del área principal
        (anula el relleno de #main: md:p-6 = 1.5rem), sin bordes redondeados. Celular: sin cambios. */
