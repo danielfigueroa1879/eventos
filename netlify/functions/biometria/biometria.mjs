@@ -10,7 +10,9 @@
 //   { accion: "estado", pin, rut }                                   -> enrolado / últimos intentos (sin plantilla)
 //   { accion: "borrar", pin, rut }                                   -> elimina la plantilla de ese RUT
 // INGRESO con interruptor encendido (SIN PIN). La MISMA captura de frente es la foto de ingreso y la
-// imagen biométrica. Primer ingreso de un RUT = enrolamiento automático; los siguientes = verificación.
+// imagen biométrica. Si el RUT YA tiene plantilla, se verifica automáticamente. Si NO tiene plantilla,
+// el flujo automático NUNCA crea una: la primera plantilla exige el flujo de enrolamiento con PIN admin.
+// Así conocer/usar un RUT y crear una asistencia reciente no permite apropiarse de su identidad biométrica.
 //   { accion: "desafio_auto", rut }                                  -> { modo, pasos: [frente, 1 giro], token }
 //   { accion: "procesar_auto", rut, asistencia_id, token, consentimiento: true, imagenes: [jpeg base64 x2] }
 //      (asistencia de ese RUT creada hace < 15 min; nunca se escribe en "asistencias")
@@ -264,16 +266,27 @@ export default async (req) => {
       }
       if (previo && (!p || !p.activo)) return json({ ok: true, resultado: "vida_ok", bloqueado: false, tiempos: tiempos() });
       if (!p || !p.activo) {
-        // Primer ingreso: ENROLAMIENTO AUTOMÁTICO con la captura de frente (solo si superó la prueba de vida).
+        // SEGURIDAD DE IDENTIDAD: el flujo SIN PIN nunca crea la primera plantilla.
+        // Una asistencia reciente demuestra presencia en el flujo, pero NO propiedad del RUT.
+        // Permitir auto-enrolamiento aquí haría posible que alguien que conozca/use un RUT ajeno
+        // se apropie de su identidad biométrica. La primera plantilla solo se crea mediante
+        // accion="enrolar", que exige PIN admin más arriba. La asistencia NO se bloquea.
         if (!vida.ok || !frente) {
-          await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "RECHAZADO", detalle: { motivos: vida.motivos, medidas: vida.medidas }, duracion_ms: ms(performance.now() - t0) });
-          return json({ ok: true, resultado: "sin_enrolar", tiempos: tiempos() });
+          await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "RECHAZADO", detalle: { motivos: vida.motivos, medidas: vida.medidas, primera_plantilla_requiere_admin: true }, duracion_ms: ms(performance.now() - t0) });
+          return json({ ok: true, resultado: "sin_enrolar", requiere_admin: true, tiempos: tiempos() });
         }
-        const ahora = new Date().toISOString();
-        const fila = { rut, plantilla: L.cifrarPlantilla(cfg.k, rut, frente.emb), modelo: L.MODELO, version: p ? p.version + 1 : 1, muestras: 1, fecha_enrolamiento: ahora, consentimiento_fecha: ahora, enrolado_por: "auto-ingreso", activo: true };
-        await registrarIntento(cfg, { ...base, tipo: "enrolamiento", estado: "ENROLADO", detalle: { medidas: vida.medidas, version: fila.version }, duracion_ms: ms(performance.now() - t0) });
-        await sbFetch(cfg, "/rest/v1/guardias_biometria?on_conflict=rut", { method: "POST", headers: { prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(fila) });
-        return json({ ok: true, resultado: "enrolado", tiempos: tiempos() });
+        await registrarIntento(cfg, {
+          ...base,
+          tipo: "enrolamiento",
+          estado: "PENDIENTE_ADMIN",
+          detalle: {
+            motivo: "primera plantilla requiere enrolamiento autorizado con PIN admin",
+            medidas: vida.medidas,
+            primera_plantilla_requiere_admin: true
+          },
+          duracion_ms: ms(performance.now() - t0)
+        });
+        return json({ ok: true, resultado: "sin_enrolar", requiere_admin: true, tiempos: tiempos() });
       }
       // Ingresos siguientes: VERIFICACIÓN 1:1 contra la plantilla del RUT.
       const score = frente ? +L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb).toFixed(4) : null;
