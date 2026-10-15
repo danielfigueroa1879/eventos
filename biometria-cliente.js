@@ -183,14 +183,18 @@
 
     async function esperarGiroVerde(paso) {
       const direccion = paso === "giro_izquierda" ? "izquierda" : "derecha";
-      const limite = Date.now() + 6500;
-      let consecutivos = 0, huboRespuesta = false;
-      while (Date.now() < limite) {
+      // AHORRO DE SERVIDOR: máximo 8 consultas por giro, una cada ~0,7 s (antes ~17, cada 0,35 s).
+      // Si el servidor no responde bien (error, límite), se deja de consultar y se usa la espera simple.
+      const limite = Date.now() + 6500, MAX_CONSULTAS = 8;
+      let consecutivos = 0, huboRespuesta = false, consultas = 0;
+      while (Date.now() < limite && consultas < MAX_CONSULTAS) {
         let r;
+        consultas++;
         try {
           r = await api({ accion: "pose_live", rut, direccion, imagen: frameLive() }, 4500);
           huboRespuesta = true;
         } catch (_) { r = null; }
+        if (!r || r.status !== 200) return huboRespuesta && consultas > 1 ? false : null;
         if (r && r.status === 200 && r.d) pintarProgresoGiro(r.d);
         if (r && r.status === 200 && r.d && r.d.listo) {
           consecutivos++;
@@ -206,7 +210,7 @@
             return true;
           }
         } else consecutivos = 0;
-        await esperar(350);
+        await esperar(700);
       }
       return huboRespuesta ? false : null; // null = guía live no disponible; usar fallback antiguo
     }
