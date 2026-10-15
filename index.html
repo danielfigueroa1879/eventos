@@ -3340,7 +3340,8 @@
     <div class="md:hidden brand-bg text-white flex items-center justify-between px-4 py-3">
       <button id="hamb" class="text-3xl leading-none ml-1" aria-label="Abrir menú">☰</button>
       <div class="font-bold flex items-center gap-2"><img src="images/logo-os10-original.webp" class="w-7 h-7 rounded-full bg-white/90" alt="OS10">CONTROL EVENTOS</div>
-      <div class="w-6"></div>
+      <!-- Opciones del evento abierto (mismo panel ☰ de PC). Invisible si no hay evento seleccionado. -->
+      <button id="menuEvTop" type="button" class="w-8 h-8 -mr-1 flex items-center justify-center invisible" aria-label="Opciones del evento" title="Opciones del evento"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     </div>
 
     <!-- Fondo oscuro del drawer (solo móvil) -->
@@ -3874,6 +3875,8 @@
     async function renderMain() {
       const main = $("#main"); if (!main) return;
       const ev = eventosVisibles().find(e => e.id === ADMIN_STATE.selected);
+      const menuTop = $("#menuEvTop");
+      if (menuTop) { menuTop.classList.toggle("invisible", !ev); menuTop.onclick = ev ? () => abrirMenuEvento(ev) : null; }
       if (!ev) { main.innerHTML = `<div class="card p-8 text-center text-slate-500"><div class="text-4xl mb-2">📋</div>${ADMIN_STATE.eventos.length ? "Selecciona un evento de la lista para ver el detalle." : "Crea un evento para comenzar."}</div>`; return; }
       const asist = await Data.listAsistencias(ev.id);
       const fotoEv = fotoDeEvento(ev, ADMIN_STATE.fotoIngreso);   // foto de ingreso de ESTE evento
@@ -4044,8 +4047,6 @@
         <div id="qrbox" class="bg-white p-1.5 rounded-lg border border-slate-200"></div>
         ${qrBotonesHTML(ev, { conLink: true })}
       </div>
-      <!-- Celular: las opciones del evento se abren en el mismo panel lateral ☰ de PC (los botones originales quedan ocultos y el panel los usa). -->
-      <button id="menuEvMovil" type="button" class="md:hidden w-full mt-3 btn btn-ghost h-11 text-sm font-bold text-slate-700 flex items-center justify-center gap-2 rounded-xl" aria-label="Opciones del evento"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Opciones del evento</button>
       <div id="admQrAcciones" class="hidden gap-2 mt-3 flex-wrap justify-center">
         <button id="toggleFotoQR" type="button" role="switch" aria-checked="${fotoEv ? 'true' : 'false'}" title="Activar/desactivar la foto de verificación al registrar el ingreso en ESTE evento (los demás no cambian)"
           class="btn text-sm px-4 py-2.5 font-bold shadow-md rounded-xl inline-flex items-center gap-2 border transition-colors ${fotoEv ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300'}">
@@ -4212,7 +4213,6 @@
       const bef = $("#expFotos"); if (bef) bef.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       $("#compartir").addEventListener("click", () => modalCompartir(ev, asistMostrada));
       if ($("#menuEv")) $("#menuEv").addEventListener("click", () => abrirMenuEvento(ev));
-      if ($("#menuEvMovil")) $("#menuEvMovil").addEventListener("click", () => abrirMenuEvento(ev));
       const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
       const bvt = $("#verificarTodosBtn"); if (bvt) bvt.addEventListener("click", () => { try { verificarTodosAsistido(ev, filas); } catch (_) {} });
