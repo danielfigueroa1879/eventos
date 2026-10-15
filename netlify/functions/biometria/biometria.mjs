@@ -107,6 +107,13 @@ async function exigirPin(cfg, pin) {
   pinesOk.set(h, Date.now() + PIN_OK_MS);
 }
 const enc = encodeURIComponent;
+// Límite simple en memoria para la guía en vivo (pose_live): evita una consulta a Supabase por cuadro.
+const POSE_MAX_MIN = 40, poseUso = new Map();
+function limitePose(rut) {
+  const ahora = Date.now(), u = poseUso.get(rut);
+  if (!u || ahora - u.desde > 60000) { poseUso.set(rut, { desde: ahora, n: 1 }); if (poseUso.size > 5000) poseUso.clear(); return; }
+  if (++u.n > POSE_MAX_MIN) throw new ErrorCliente("Demasiadas consultas. Espera unos segundos.", 429);
+}
 const leerPlantilla = async (cfg, rut) => (await sbFetch(cfg, `/rest/v1/guardias_biometria?select=rut,plantilla,modelo,version,muestras,fecha_enrolamiento,activo&rut=eq.${enc(rut)}&limit=1`))[0] || null;
 async function registrarIntento(cfg, fila) {
   try { await sbFetch(cfg, "/rest/v1/biometria_intentos", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify(fila) }); return true; }
@@ -235,7 +242,8 @@ export default async (req) => {
     // No intenta medir la dirección de las pupilas: con YuNet solo validamos giro de cabeza,
     // cantidad de rostros y tamaño/encuadre del rostro.
     if (b.accion === "pose_live") {
-      await exigirLimite(cfg, rut);
+      // Límite en memoria (sin consultar Supabase en cada cuadro): máx. 40 por minuto por RUT e instancia.
+      limitePose(rut);
       const m = await cargarModelos();
       const im = decodificar(m.v, b.imagen);
       const caras = await m.v.detectar(m.det, im);
