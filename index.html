@@ -910,6 +910,24 @@
       #empResumenPanel > .grid .text-lg { font-size: .95rem; line-height: 1.15; }
       #empResumenPanel > .grid .text-\[11px\] { font-size: .64rem; line-height: 1.1; }
     }
+    /* VISTA EMPRESA (PC ≥1280 px): las opciones van en una columna a la izquierda (como el panel admin)
+       y las tablas usan todo el ancho que queda. Pantallas más chicas: barra de botones arriba, como antes. */
+    @media (min-width: 1280px) {
+      .min-h-screen:has(#empBarra) { max-width: none !important; padding-left: 16.75rem !important; padding-right: 1.25rem !important; }
+      #empBarra { position: fixed; left: 0; top: var(--empBanH, 58px); bottom: 0; width: 15.5rem; z-index: 30;
+        flex-direction: column !important; align-items: stretch !important; flex-wrap: nowrap !important; gap: .45rem !important;
+        background: #fff; border-right: 1px solid #e2e8f0; padding: 1rem .8rem; box-shadow: 2px 0 10px rgba(15, 23, 42, .05); margin: 0 !important; overflow-y: auto; }
+      #empBarra::before { content: "OPCIONES"; font-size: .68rem; font-weight: 700; letter-spacing: .12em; color: #94a3b8; padding: 0 .35rem .2rem; }
+      #empBarra .btn { width: 100%; justify-content: flex-start !important; font-size: .85rem !important; padding: .55rem .7rem !important; border-radius: .7rem; box-shadow: none !important; }
+      #empBarra .btn .ico:last-child:not(:first-child) { margin-left: auto; opacity: .5; }
+      #empTurnoInfo, #empTurnoInfo * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; }
+      #empTurnoInfo { margin: .9rem 0 0 !important; flex: 0 0 auto !important; justify-content: flex-start; align-items: flex-start !important; line-height: 1.35; padding: .65rem .75rem !important; border-radius: .7rem; font-size: .8rem !important; }
+      html[data-theme="dark"] #empBarra { background: #0f172a; border-color: #1e293b; }
+    }
+    @media (min-width: 1280px) and (max-width: 1439px) {
+      #empTotales > span { font-size: .68rem !important; padding: .3rem .25rem !important; }
+      #empTotales > span b { font-size: .9rem !important; margin-right: .2rem !important; }
+    }
     /* Tablets y PC angostos: los totales pasan a una segunda fila, a todo el ancho del recuadro. */
     @media (min-width: 768px) and (max-width: 1599px) {
       div:has(> #admTotales) { flex-wrap: wrap !important; }
@@ -8925,7 +8943,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
               <span class="hidden md:inline-block ml-0.5 align-middle px-2 py-0.5 rounded-lg border border-green-200 bg-green-50 text-sm" title="Ingresados / esperados"><b class="text-green-700">${filasG.length}</b><span class="text-slate-400 font-normal"> / ${total || "—"}</span></span></span>
             <!-- PC: totales del turno vigente dentro del recuadro (reemplazan el recuadro de resumen de arriba) -->
             <span class="hidden md:flex flex-1 items-center justify-center gap-1.5 flex-wrap" id="empTotales">
-              ${[["Guardias Total", filasG.length, "azul"], ["Vigentes", cont("VIGENTE"), "verde"], ["Prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo"], ["Sin curso", cont("SIN_CURSO"), "rojo"], ["Supervisores", nSupE, "celeste"], ["SPD", contarSpdAprobados(ev, filasG), "spd"]]
+              ${[["Total", filasG.length, "azul"], ["Vigentes", cont("VIGENTE"), "verde"], ["Prórroga", cont("VENCIDO_CON_PRORROGA"), "amarillo"], ["Sin curso", cont("SIN_CURSO"), "rojo"], ["Superv.", nSupE, "celeste"], ["SPD", contarSpdAprobados(ev, filasG), "spd"]]
                 .map(([l, n, c]) => `<span class="b-${c} rounded-lg px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap"><b class="text-sm font-extrabold">${n}</b> ${l}</span>`).join("")}
             </span>
             <span class="barMovil flex items-center gap-1 sm:gap-1.5 flex-nowrap">
