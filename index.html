@@ -2367,7 +2367,8 @@
       const btn = $("#scrollTopBtn");
       if (!btn) return;
       const scroller = () => document.scrollingElement || document.documentElement;
-      const onScroll = () => { btn.classList.toggle("show", (window.scrollY || scroller().scrollTop || 0) > 300); };
+      let visible = null;   // solo se toca la clase cuando cambia (cada cambio de clase despierta a Tailwind)
+      const onScroll = () => { const v = (window.scrollY || scroller().scrollTop || 0) > 300; if (v !== visible) { visible = v; btn.classList.toggle("show", v); } };
       window.addEventListener("scroll", onScroll, { passive: true });
       btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
       onScroll();
@@ -4234,6 +4235,7 @@
       const qrPanel = $("#qrPanel"), qrChevron = $("#qrChevron");
       const qrAbrir = abrir => {
         ADMIN_STATE.showQR = abrir;
+        if (abrir) asegurarQR(ev);
         qrPanel.hidden = !abrir;
         qrChevron.style.transform = abrir ? "rotate(180deg)" : "";
       };
@@ -4244,7 +4246,7 @@
       if (!window._admQrEsc) { window._admQrEsc = true; document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("admQrFondo") && ADMIN_STATE.showQR) { const b = document.getElementById("admQrCerrarBtn"); if (b) b.click(); } }); }
 
       // QR (con logo O.S.10 al centro y margen blanco)
-      montarQR($("#qrbox"), ev);
+      if (ADMIN_STATE.showQR) montarQR($("#qrbox"), ev);   // si no, se dibuja al abrirlo (ahorra tiempo en cada repintado)
       if ($("#qrDl")) $("#qrDl").addEventListener("click", () => dlQR(ev));
       if ($("#qrPr")) $("#qrPr").addEventListener("click", () => prQR(ev));
       if ($("#qrCp")) $("#qrCp").addEventListener("click", () => { navigator.clipboard.writeText(guardLinkVigente(ev)).then(() => toast("Link copiado")); });
@@ -4318,7 +4320,7 @@
       $("#editEv").addEventListener("click", () => modalNuevoEvento(ev));
       // Interruptor "Biometría" POR EVENTO: columna eventos.biometria (false = solo foto en este evento).
       // Los demás eventos no cambian. El interruptor general sigue siendo config "biometria_piloto".
-      ajustarBanner();
+      cancelAnimationFrame(ajustarBanner._raf); ajustarBanner._raf = requestAnimationFrame(ajustarBanner);
       const btnBioEnr = $("#bioEnrolados"); if (btnBioEnr) btnBioEnr.addEventListener("click", modalEnrolados);
       const btnBioQR = $("#toggleBioQR");
       if (btnBioQR) btnBioQR.addEventListener("click", () => {
@@ -4744,7 +4746,8 @@
     }
     // VISTA EMPRESA (PC): el banner verde queda FIJO arriba y a todo el ancho de la página. Como sale del
     // flujo, un espaciador con su misma altura evita que tape el contenido. Celular sin cambios.
-    function ajustarEmpBanner() {
+    function ajustarEmpBanner() { cancelAnimationFrame(ajustarEmpBanner._raf); ajustarEmpBanner._raf = requestAnimationFrame(ajustarEmpBannerYa); }
+    function ajustarEmpBannerYa() {
       const b = document.getElementById("empBanner"), sp = document.getElementById("empBannerSp");
       if (!b || !sp) return;
       sp.style.height = (b.offsetHeight + (window.matchMedia("(min-width: 768px)").matches ? 8 : 10)) + "px";
@@ -5020,7 +5023,7 @@
             ? `<span class="relative w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" ${FOTO_EMPRESA_ATTR} style="background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}"></span>`
             : `<span class="w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
           // Admin: <img> normal (puede ampliarla y descargarla, sin límite de tiempo).
-          : `<span data-foto="${esc(a.id)}" class="w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400 active:opacity-70" title="Ver foto de ingreso"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover"></span>`)
+          : `<span data-foto="${esc(a.id)}" class="w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400 active:opacity-70" title="Ver foto de ingreso"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover" loading="lazy" decoding="async"></span>`)
         : `<span class="w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
       <span class="flex-1 min-w-0">
         <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${bioM}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
@@ -5311,12 +5314,23 @@
 
     /* ---- QR descargar / imprimir ---- */
     function qrCanvasDataURL() { const c = $("#qrbox canvas"); if (c) return c.toDataURL("image/png"); const img = $("#qrbox img"); return img ? img.src : null; }
-    function dlQR(ev) { const url = qrCanvasDataURL(); if (!url) return; const a = document.createElement("a"); a.href = url; a.download = "QR-" + ev.slug + ".png"; a.click(); }
+    // El QR se dibuja solo cuando hace falta (al abrirlo o al descargar/imprimir): si recién se
+    // monta, se espera un instante a que se pinte el logo del centro.
+    function asegurarQR(ev) { const c = $("#qrbox"); if (!c || c.firstChild) return false; montarQR(c, ev); return true; }
+    function dlQR(ev) {
+      const nuevo = asegurarQR(ev);
+      setTimeout(() => { const url = qrCanvasDataURL(); if (!url) return; const a = document.createElement("a"); a.href = url; a.download = "QR-" + ev.slug + ".png"; a.click(); }, nuevo ? 400 : 0);
+    }
     function prQR(ev) {
-      const url = qrCanvasDataURL(); if (!url) return; const w = window.open("", "_blank");
-      w.document.write(`<html><head><title>QR ${esc(ev.nombre_evento)}</title></head><body style="text-align:center;font-family:sans-serif;padding:40px">
+      const nuevo = asegurarQR(ev);
+      const w = window.open("", "_blank");   // se abre al tiro (dentro del clic) para que no lo bloquee el navegador
+      if (!w) return;
+      setTimeout(() => {
+        const url = qrCanvasDataURL(); if (!url) { w.close(); return; }
+        w.document.write(`<html><head><title>QR ${esc(ev.nombre_evento)}</title></head><body style="text-align:center;font-family:sans-serif;padding:40px">
    <h2>${esc(ev.nombre_evento)}</h2><p>Empresa: ${esc(ev.empresa)}</p><img src="${url}" style="width:300px"/><p style="font-size:12px;color:#666">Escanee para registrar su ingreso</p>
    <script>window.onload=()=>{window.print()}<\/script></body></html>`); w.document.close();
+      }, nuevo ? 400 : 0);
     }
 
     /* =========================================================================
@@ -9075,7 +9089,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         };
         autoRepliegue("empToggleResumen", "empResumenPanel", "empResumenChevron", "showResumen");
         autoRepliegue("empToggleQR", "empQrPanel", "empQrChevron", "showQR");
-        montarQR($("#qrbox"), ev);
+        if (EMPRESA_STATE.showQR) montarQR($("#qrbox"), ev);   // si no, se dibuja al abrirlo
+        if ($("#empToggleQR")) $("#empToggleQR").addEventListener("click", () => { if (EMPRESA_STATE.showQR) asegurarQR(ev); });
         if ($("#qrDl")) $("#qrDl").addEventListener("click", () => dlQR(ev));
         if ($("#qrPr")) $("#qrPr").addEventListener("click", () => prQR(ev));
         // Detalle del guardia (solo lectura) al tocar una fila en celular
@@ -9099,6 +9114,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         if ($("#empHist2")) $("#empHist2").addEventListener("click", () => modalHistorialTurnos(ev));
         const qrPc = (abrir) => {
           EMPRESA_STATE.showQR = abrir;
+          if (abrir) asegurarQR(ev);
           const pn = $("#empQrPanel"), ch = $("#empQrChevron");
           if (pn) pn.hidden = !abrir;
           if (ch) ch.style.transform = abrir ? "rotate(180deg)" : "";
