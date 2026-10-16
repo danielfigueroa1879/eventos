@@ -4921,11 +4921,11 @@
         ? (modo === "empresa"
           // Empresa: la foto NO se puede descargar/guardar (fondo CSS, sin <img>).
           ? (fotoEmpresaVigente(a)
-            ? `<span class="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" ${FOTO_EMPRESA_ATTR} style="background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}"></span>`
-            : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
+            ? `<span class="relative w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true" ${FOTO_EMPRESA_ATTR} style="background-image:url('${esc(a.foto_url)}');${FOTO_EMPRESA_CSS}"></span>`
+            : `<span class="w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`)
           // Admin: <img> normal (puede ampliarla y descargarla, sin límite de tiempo).
-          : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400" aria-hidden="true"><img src="${esc(a.foto_url)}" alt="" class="w-full h-full object-cover"></span>`)
-        : `<span class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
+          : `<span data-foto="${esc(a.id)}" class="w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-emerald-400 active:opacity-70" title="Ver foto de ingreso"><img src="${esc(a.foto_url)}" alt="Foto de ingreso" class="w-full h-full object-cover"></span>`)
+        : `<span class="w-[38px] h-[38px] rounded-full overflow-hidden flex-shrink-0 ring-1 ring-black/5" aria-hidden="true">${avatarSVG(avSexo, a.rut)}</span>`}
       <span class="flex-1 min-w-0">
         <span class="gName block text-[13px] truncate flex items-center">${esc(nomLista)}${bioM}${dup ? ' <span class="text-red-600 ml-1" title="Duplicado">⚠</span>' : ''}${sup}${spd}${inf}${dobleT}${pend}</span>
         <span class="block text-[11px] text-slate-500 truncate">${segunda}</span>
@@ -5052,7 +5052,6 @@
       ${detalleFila("", a.es_supervisor ? "Fecha Resolución" : "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
       ${esSup ? "" : detalleFila("", "Vigencia", badge(v))}
       ${esSup ? "" : detalleFila("", "SIGES", esc(v.siges || "—"))}
-      ${telHTML}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
       ${(() => { const mp = empresa ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap; return (a.puesto_id && mp && mp[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<button data-goto-puesto="${esc(a.puesto_id)}" class="font-semibold text-indigo-600 underline decoration-dotted cursor-pointer" title="Ver en el mapa">${esc(mp[a.puesto_id])} ›</button>`) : ""; })()}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
@@ -5082,13 +5081,12 @@
       <p class="text-[11px] text-slate-500 mt-1">Pasa al guardia de un turno a otro (ej: de Noche a Día).</p>
     </div>`;
     })() : ""}
-    ${empresa ? "" : `<div class="flex justify-center gap-8 mt-4 mb-1">
+    <div class="text-sm mt-2">${telHTML}</div>
+    ${empresa ? "" : `<div class="flex justify-center gap-24 mt-4 mb-1">
       <button id="dg_edit" class="text-slate-600 hover:text-green-700 flex flex-col items-center text-xs gap-1"><span class="text-xl">✎</span>Editar</button>
       <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
-    </div>`}
-    <button id="dg_close" class="btn btn-ghost w-full mt-${empresa ? "1" : "2"}">Cerrar</button>`);
+    </div>`}`);
       $("#dg_x").addEventListener("click", closeModal);
-      $("#dg_close").addEventListener("click", closeModal);
       // Ver la foto de ingreso ampliada (solo vista admin).
       const dgFoto = $("#dg_foto_btn");
       // Al cerrar la foto se vuelve al detalle del guardia (no se cierra todo).
