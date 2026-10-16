@@ -930,9 +930,9 @@
     @media (min-width: 768px) {
       #main > .evHeaderBox { margin: -1.5rem -1.5rem .75rem; border-radius: 0; padding: .45rem 1.5rem; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); align-items: center; overflow: hidden; box-sizing: border-box; }
       /* Misma altura que el recuadro verde del menú (se ajusta por JS) y texto compacto para que quepa. */
-      #main > .evHeaderBox h1 { font-size: 1.02rem; line-height: 1.25; }
-      #main > .evHeaderBox .text-sm { font-size: .72rem; line-height: 1.25; }
-      #main > .evHeaderBox .text-xs { font-size: .66rem; line-height: 1.25; }
+      #main > .evHeaderBox h1 { font-size: .98rem; line-height: 1.2; }
+      #main > .evHeaderBox .text-sm { font-size: .68rem; line-height: 1.2; }
+      #main > .evHeaderBox .text-xs { font-size: .62rem; line-height: 1.2; }
       #main > .evHeaderBox .mt-0\.5 { margin-top: 0; }
     }
 
@@ -3369,7 +3369,7 @@
           <div class="text-xs md:text-[11px] opacity-80">O.S.10 Coquimbo</div>
         </div>
         <button id="cerrarMenu" class="md:hidden text-white text-2xl leading-none px-1" aria-label="Cerrar menú">✕</button>
-        <img src="images/aniversario1.webp" class="w-11 h-11 object-contain hidden md:block" alt="Centenario">
+        <img src="images/aniversario1.webp" class="w-[52px] h-[52px] object-contain hidden md:block" alt="Centenario">
       </div>
       <div class="p-3" id="adminSide">
         <!-- Acciones plegables (ahorra espacio): Nuevo evento y Archivo. #deployBox es el marco verde. -->
@@ -4671,11 +4671,17 @@
     function ajustarBanner() {
       const b = document.getElementById("evBanner"), v = document.getElementById("sbBrand");
       if (!b) return;
-      b.style.height = ""; if (v) v.style.height = "";
+      b.style.height = ""; b.style.minHeight = ""; if (v) v.style.height = "";
       if (!v || !window.matchMedia("(min-width: 768px)").matches) return;
-      // Simétricos: los dos toman la altura del que necesite más (sin cortar texto).
+      // Simétricos: los dos toman la altura del que necesite más. El banner nunca queda con alto fijo
+      // (solo mínimo), así el texto no se corta aunque la letra cargue después o cambie el zoom.
       const h = Math.max(v.offsetHeight, b.offsetHeight);
-      if (h) { b.style.height = h + "px"; v.style.height = h + "px"; }
+      if (h) { b.style.minHeight = h + "px"; v.style.height = h + "px"; }
+      if (!b._ro && window.ResizeObserver && b.firstElementChild) {
+        let ultimo = 0;
+        b._ro = new ResizeObserver(() => { const a = b.firstElementChild.offsetHeight; if (a !== ultimo) { ultimo = a; requestAnimationFrame(ajustarBanner); } });
+        b._ro.observe(b.firstElementChild);
+      }
     }
     window.addEventListener("resize", () => ajustarBanner());
     // ENROLADOS (solo admin con PIN): totales y lista de guardias con plantilla facial. Se consulta SOLO al
