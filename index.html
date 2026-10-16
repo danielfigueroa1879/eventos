@@ -4364,9 +4364,11 @@
     }
     function chip(label, n, color) { return `<div class="rounded-lg py-1.5 b-${color}"><div class="text-lg font-bold leading-tight">${n}</div><div class="text-[11px] font-semibold">${label}</div></div>`; }
     // Filtra en vivo el listado de guardias (móvil y escritorio) sin re-renderizar
+    // Sin distinguir tildes ("maria" encuentra "María") ni puntos del RUT ("12.345.678" encuentra "12345678").
+    const normBusqueda = t => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\./g, "").trim();
     function filtrarLista() {
-      const q = (ADMIN_STATE.search || "").toLowerCase().trim();
-      document.querySelectorAll("#main [data-search]").forEach(el => { el.hidden = !!q && !el.dataset.search.includes(q); });
+      const q = normBusqueda(ADMIN_STATE.search);
+      document.querySelectorAll("#main [data-search]").forEach(el => { el.hidden = !!q && !normBusqueda(el.dataset.search).includes(q); });
     }
 
     /* ---- Estadísticas y gráficas por evento ---- */
