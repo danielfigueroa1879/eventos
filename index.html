@@ -873,9 +873,16 @@
       #admTotales > span b { font-size: .95rem; margin-right: .2rem; }
       #admControles { width: auto !important; flex-shrink: 0; gap: .4rem; }
       /* Buscador y los 2 botones: angostos y del MISMO ancho. */
-      #admControles #buscar, #admControles .btn { width: 9.5rem; flex: 0 0 9.5rem; height: 2rem; }
-      #admControles #buscar { font-size: .74rem; padding-left: .5rem; padding-right: .25rem; }
-      #admControles .btn { font-size: .74rem; padding-left: .35rem; padding-right: .35rem; gap: .25rem; }
+      #admControles #buscar, #admControles .btn { width: 7.5rem; flex: 0 0 7.5rem; height: 2rem; }
+      #admControles #buscar { font-size: .7rem; padding-left: .45rem; padding-right: .2rem; }
+      #admControles .btn { font-size: .68rem; padding-left: .2rem; padding-right: .2rem; gap: .2rem; letter-spacing: -.01em; }
+      /* Botones del encabezado del evento: misma altura; los de texto mismo ancho y los de ícono cuadrados. */
+      #evBanner > div:last-child { gap: .4rem; }
+      #evBanner > div:last-child > .btn { height: 2.25rem; padding: 0 !important; border-radius: .75rem; box-shadow: none; }
+      #lockTopBtn, #btnCuentaOS10Top { width: 6.5rem; font-size: .72rem !important; gap: .3rem; }
+      #expExcel, #expPDF, #expFotos, #compartir, #menuEv { width: 2.25rem; display: inline-flex; align-items: center; justify-content: center; }
+      #expExcel, #expPDF { font-size: .68rem; }
+      #compartir svg, #menuEv svg { width: 18px; height: 18px; }
       /* En PC el QR se abre AL FRENTE, centrado, con fondo oscuro y botón "Cerrar". */
       #empQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(560px, 92vw); max-height: 90vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
       #empQrFondo { position: fixed; inset: 0; z-index: 54; background: rgba(15, 23, 42, .55); display: none; }
@@ -4109,7 +4116,7 @@
             .map(([l, n, c]) => `<span class="b-${c} rounded-lg font-semibold whitespace-nowrap" title="${l}"><b class="font-extrabold">${n}</b> ${l}</span>`).join("")}
         </div>
         <div id="admControles" class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto justify-end min-w-0">
-          <input id="buscar" type="search" class="fld h-9 py-1.5 text-sm min-w-0 basis-full sm:basis-auto sm:flex-none sm:w-auto sm:max-w-xs${buscaMovilAbierto ? "" : " hidden sm:block"}" placeholder="Buscar RUT o nombre" value="${esc(ADMIN_STATE.search)}"/>
+          <input id="buscar" type="search" class="fld h-9 py-1.5 text-sm min-w-0 basis-full sm:basis-auto sm:flex-none sm:w-auto sm:max-w-xs${buscaMovilAbierto ? "" : " hidden sm:block"}" placeholder="RUT o nombre…" value="${esc(ADMIN_STATE.search)}"/>
           <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar guardia</button>
           <button id="verificarTodosBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-white rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="background:#0f5323;" title="Verificar todos los guardias uno por uno (asistido con Zosepcar)">✅ Verificar todos</button>
         </div>
