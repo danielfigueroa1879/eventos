@@ -833,6 +833,7 @@
 
     /* Recuadro del encabezado del evento (detrás del nombre) */
     .evHeaderBox { background: #eef1f5; }
+    @media (max-width: 639px) { #admControles:has(> #buscar.hidden) { display: none; } }
     /* PANEL ADMIN (celular y PC): sin la pestaña "QR y estado del evento"; el QR se abre al frente
        desde el menú de opciones del evento (☰ → Ver código QR). */
     #admQrCard:has(#qrPanel[hidden]) { display: none; }
@@ -843,6 +844,24 @@
     body:has(#qrPanel:not([hidden])) #admQrFondo { display: block !important; }
     #admQrCerrar { display: flex !important; }
     html[data-theme="dark"] .evHeaderBox { background: #12212e; }
+    /* Vista empresa en CELULAR: banda verde fija arriba (como el admin) con un engranaje ⚙ que abre las
+       opciones (distribución, QR, historial y resumen); así el listado de guardias queda a la vista. */
+    @media (max-width: 767px) {
+      #empBanner { position: fixed !important; top: 0; left: 0; right: 0; z-index: 45; border-radius: 0 !important; border-width: 0 !important;
+        padding: .45rem .5rem .45rem .9rem !important; gap: .65rem !important; min-height: 4rem; }
+      #empBanner > a img { width: 2.6rem; height: 2.6rem; }
+      #empBanner .text-xs { font-size: .58rem; line-height: 1.15; letter-spacing: .08em; }
+      #empBanner h1 { font-size: 1.02rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #empBanner .text-sm { font-size: .7rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #empBanner > img { display: none !important; }
+      #empResWrap, #empToggleQR, #empDistWrap { display: none !important; }
+      #empQrCard:has(#empQrPanel[hidden]) { display: none; }
+      #empQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(560px, 92vw); max-height: 88vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
+      #empQrFondo { position: fixed; inset: 0; z-index: 54; background: rgba(15, 23, 42, .55); display: none !important; }
+      body:has(#empQrPanel:not([hidden])) #empQrFondo { display: block !important; }
+      #empQrCerrar { display: flex !important; }
+      #empQrPanel { border-top: 0; }
+    }
     /* Vista empresa en PC: banner verde FIJO arriba, a todo el ancho (ver ajustarEmpBanner). */
     @media (min-width: 768px) {
       /* Banda más baja (~70 px) y el contenido (logo, texto y "100") alineado con los recuadros de abajo
@@ -3360,7 +3379,7 @@
     // Estado propio de la VISTA EMPRESA (solo lectura). Se conserva entre repintados en tiempo real.
     // Ambos paneles arrancan abiertos y se repliegan solos a los 7 s (igual que el Resumen del admin).
     // En PC el QR parte cerrado (se abre con "QR y Estado del Evento" de la barra); en celular, abierto como siempre.
-    let EMPRESA_STATE = { showQR: !(window.matchMedia && window.matchMedia("(min-width: 768px)").matches), showResumen: true };
+    let EMPRESA_STATE = { showQR: false, showResumen: true };
 
     async function renderAdmin() {
       VER_FOTOS = true;   // solo el administrador recibe y ve las fotos de ingreso
@@ -4004,7 +4023,10 @@
       const registroAbierto = ev.registro_abierto === true;
       // Celular: el buscador se abre con la lupa (queda abierto si ya hay una búsqueda escrita).
       const buscaMovilAbierto = !!ADMIN_STATE.buscaMovil || !!(ADMIN_STATE.search || "").trim();
-      const lockBtnHTML = (id, cls) => `<button id="${id}" class="btn btn-ghost ${cls} h-9 !py-0 px-2.5 sm:px-3 text-xs font-extrabold items-center justify-center gap-1 whitespace-nowrap${registroAbierto ? " text-green-700" : ""}" title="${registroAbierto ? "Edición ABIERTA — los guardias pueden corregir sus datos. Toca para CERRAR." : "Edición CERRADA — los guardias no pueden modificar sus datos. Toca para ABRIR."}">${registroAbierto ? "Abierto" : "Cerrado"}</button>`;
+      const candado = registroAbierto
+        ? `<svg class="sm:hidden" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`
+        : `<svg class="sm:hidden" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+      const lockBtnHTML = (id, cls) => `<button id="${id}" aria-label="${registroAbierto ? "Edición abierta" : "Edición cerrada"}" class="btn btn-ghost ${cls} ${id === "lockMovilBtn" ? "h-8 sm:h-9 !px-2 sm:!px-3" : "h-9 px-2.5 sm:px-3"} !py-0 text-xs font-extrabold items-center justify-center gap-1 whitespace-nowrap${registroAbierto ? " text-green-700" : ""}" title="${registroAbierto ? "Edición ABIERTA — los guardias pueden corregir sus datos. Toca para CERRAR." : "Edición CERRADA — los guardias no pueden modificar sus datos. Toca para ABRIR."}">${id === "lockMovilBtn" ? candado + `<span class="hidden sm:inline">${registroAbierto ? "Abierto" : "Cerrado"}</span>` : (registroAbierto ? "Abierto" : "Cerrado")}</button>`;
 
       main.innerHTML = `
     <div class="flex items-start justify-between gap-2 mb-3 rounded-xl p-3 evHeaderBox" id="evBanner">
@@ -4122,10 +4144,12 @@
             ${ADMIN_STATE.turnoFiltro !== "all" && turnosMap[ADMIN_STATE.turnoFiltro] ? `<span class="text-indigo-600 font-normal text-xs ml-0.5">${esc(turnosMap[ADMIN_STATE.turnoFiltro].etiquetaLarga)}</span>` : ""}
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 md:hidden">
-            <button id="lupaMovil" class="btn btn-ghost h-9 !py-0 !px-2.5 flex items-center justify-center sm:hidden${buscaMovilAbierto ? " text-green-700" : ""}" title="Buscar guardia por RUT o nombre" aria-label="Buscar guardia" aria-expanded="${buscaMovilAbierto}"${buscaMovilAbierto ? ' style="border-color:#15803d;background:#f0fdf4"' : ""}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></button>
+            <button id="consultarMovil" type="button" class="btn h-8 sm:h-9 !py-0 !px-2 text-xs font-extrabold text-[#0f5323] bg-emerald-50 rounded-lg flex items-center justify-center gap-1 whitespace-nowrap" style="border:1.5px solid #0f5323 !important" title="Consultar guardia en Zosepcar" aria-label="Consultar guardia"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="7" r="4"/><path d="M10.3 15H7a4 4 0 0 0-4 4v2"/><circle cx="17" cy="17" r="3"/><path d="m21 21-1.9-1.9"/></svg><span class="hidden sm:inline">Consultar</span></button>
+            <button id="verificarMovil" type="button" class="btn h-8 sm:h-9 !py-0 !px-2 text-xs font-extrabold text-white rounded-lg flex items-center justify-center gap-1 whitespace-nowrap" style="background:#0f5323" title="Verificar todos los guardias uno por uno (asistido con Zosepcar)" aria-label="Verificar todos"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg><span class="hidden sm:inline">Verificar</span></button>
+            <button id="lupaMovil" class="btn btn-ghost h-8 sm:h-9 !py-0 !px-2 flex items-center justify-center sm:hidden${buscaMovilAbierto ? " text-green-700" : ""}" title="Buscar guardia por RUT o nombre" aria-label="Buscar guardia" aria-expanded="${buscaMovilAbierto}"${buscaMovilAbierto ? ' style="border-color:#15803d;background:#f0fdf4"' : ""}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></button>
             ${lockBtnHTML("lockMovilBtn", "flex")}
-            <button id="cuentaMovil" class="btn btn-ghost h-9 !py-0 px-2.5 sm:px-3 text-xs font-extrabold flex items-center justify-center gap-1 whitespace-nowrap" title="Informe Cuenta O.S.10">Cuenta</button>
-            <button id="compartirMovil" class="btn btn-ghost h-9 !py-0 !px-2.5 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
+            <button id="cuentaMovil" class="btn btn-ghost h-8 sm:h-9 !py-0 !px-2 sm:!px-3 text-xs font-extrabold flex items-center justify-center gap-1 whitespace-nowrap" title="Informe Cuenta O.S.10" aria-label="Cuenta O.S.10"><svg class="sm:hidden" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h8"/></svg><span class="hidden sm:inline">Cuenta</span></button>
+            <button id="compartirMovil" class="btn btn-ghost h-8 sm:h-9 !py-0 !px-2 flex items-center justify-center" title="Compartir (PDF o Excel)" aria-label="Compartir"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/></svg></button>
           </div>
         </div>
         <!-- PC/tablet: totales del turno dentro del recuadro (reemplazan el recuadro "Resumen de acreditaciones") -->
@@ -4135,8 +4159,8 @@
         </div>
         <div id="admControles" class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto justify-end min-w-0">
           <input id="buscar" type="search" class="fld h-9 py-1.5 text-sm min-w-0 basis-full sm:basis-auto sm:flex-none sm:w-auto sm:max-w-xs${buscaMovilAbierto ? "" : " hidden sm:block"}" placeholder="${window.matchMedia("(min-width: 768px)").matches ? "Buscar…" : "RUT o nombre…"}" title="Buscar por RUT o nombre" value="${esc(ADMIN_STATE.search)}"/>
-          <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar<span class="md:hidden"> guardia</span></button>
-          <button id="verificarTodosBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-white rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 transition-all" style="background:#0f5323;" title="Verificar todos los guardias uno por uno (asistido con Zosepcar)">✅ Verificar<span class="md:hidden"> todos</span></button>
+          <button id="consultarGuardiaBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-[#0f5323] bg-emerald-50 hover:bg-emerald-100 rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 hidden md:flex items-center justify-center gap-1 transition-all" style="border: 1.5px solid #0f5323 !important;" title="Consultar guardia en Zosepcar">🔎 Consultar<span class="md:hidden"> guardia</span></button>
+          <button id="verificarTodosBtn" class="btn h-9 text-sm px-3 sm:px-3.5 font-extrabold text-white rounded-xl shadow-sm whitespace-nowrap flex-shrink-0 hidden md:flex items-center justify-center gap-1 transition-all" style="background:#0f5323;" title="Verificar todos los guardias uno por uno (asistido con Zosepcar)">✅ Verificar<span class="md:hidden"> todos</span></button>
         </div>
       </div>
       ${turnosBar ? `<div class="px-3 pt-3">${turnosBar}</div>` : ""}
@@ -4247,6 +4271,9 @@
       const bcm = $("#compartirMovil"); if (bcm) bcm.addEventListener("click", () => modalCompartir(ev, asistMostrada));
       const bcg = $("#consultarGuardiaBtn"); if (bcg) bcg.addEventListener("click", modalConsultarGuardia);
       const bvt = $("#verificarTodosBtn"); if (bvt) bvt.addEventListener("click", () => { try { verificarTodosAsistido(ev, filas); } catch (_) {} });
+      // Celular: botones compactos en la fila de íconos; hacen lo mismo que los de PC.
+      if ($("#consultarMovil")) $("#consultarMovil").addEventListener("click", () => { if (bcg) bcg.click(); });
+      if ($("#verificarMovil")) $("#verificarMovil").addEventListener("click", () => { if (bvt) bvt.click(); });
       const btnCerrar = $("#cerrarPartido");
       if (btnCerrar) btnCerrar.addEventListener("click", () => {
         if (!asist.length) { toast("No hay guardias en este partido para archivar", false); return; }
@@ -4616,19 +4643,49 @@
     // MENÚ LATERAL DEL EVENTO (PC, admin): botón ☰ junto a Compartir. Agrupa TODAS las opciones del
     // recuadro "QR y estado del evento". Cada opción solo "presiona" el botón original del panel, así se
     // usa exactamente la misma lógica (confirmaciones, PIN, etc.) y nada se duplica.
-    function abrirMenuEvento(ev) {
+    const ICO_ENGRANAJE = '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>';
+    // VISTA EMPRESA (celular): panel lateral ⚙ con las opciones que antes ocupaban la pantalla
+    // (distribución, QR y estado, historial de turnos) y el resumen de guardias ingresados.
+    function abrirMenuEmpresa(ev, o) {
       const prev = document.getElementById("menuEvCapa"); if (prev) prev.remove();
-      const orig = id => document.getElementById(id);
-      const limpio = el => (el ? el.textContent : "").replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+/, "").replace(/\s+/g, " ").trim();
-      const item = (id, ic, texto, extra) => {
-        const el = orig(id); if (!el || el.classList.contains("hidden")) return "";
-        return `<button type="button" data-menu-ev="${id}" class="menuEv-item${extra && extra.peligro ? " peligro" : ""}">${ic}<span class="flex-1 text-left">${esc(texto || limpio(el))}</span>${extra && extra.estado != null ? `<span class="menuEv-sw${extra.estado ? " on" : ""}"><i></i></span>` : ""}</button>`;
-      };
-      const sw = id => { const el = orig(id); return el ? el.getAttribute("aria-checked") === "true" : null; };
-      const grupo = (titulo, html) => html.trim() ? `<div class="menuEv-grupo"><div class="menuEv-tit">${titulo}</div>${html}</div>` : "";
+      const resumen = document.getElementById("empResumenPanel");
+      const pct = o.total ? Math.min(100, Math.round(o.ingresados * 100 / o.total)) : 0;
+      const btn = (k, ic, t) => `<button type="button" data-emp-op="${k}" class="menuEv-item">${ic}<span class="flex-1 text-left">${t}</span></button>`;
       const capa = document.createElement("div");
       capa.id = "menuEvCapa";
-      capa.innerHTML = `<style>
+      capa.innerHTML = `<style>${MENU_EV_CSS}</style>
+      <div class="fondo"></div>
+      <aside class="panel" role="dialog" aria-label="Opciones">
+        <div class="cab"><div class="flex-1 min-w-0"><div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Opciones</div><div class="font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</div><div class="text-xs text-slate-500 truncate">${esc(ev.empresa || "")}</div></div>
+          <button type="button" id="menuEvX" class="menuEv-item" style="width:auto;padding:.4rem" aria-label="Cerrar">${ICO.cerrar}</button></div>
+        <div class="cuerpo">
+          <div class="menuEv-grupo"><div class="menuEv-tit">Evento</div>
+            ${btn("dist", ICO.mapa, "Distribución de facciones")}${btn("qr", ICO.qr, "QR y estado del evento")}${o.usaT ? btn("hist", ICO.carpeta, "Historial de turnos") : ""}</div>
+          <div class="menuEv-grupo"><div class="menuEv-tit">Guardias ingresados</div>
+            <div class="px-2 pt-1 pb-2">
+              <div class="flex items-center justify-between mb-1.5"><span class="text-sm font-semibold text-slate-700">Progreso</span><span class="text-lg font-bold text-green-700">${o.ingresados}<span class="text-sm text-slate-400"> / ${o.total || "—"}</span></span></div>
+              <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="brand-bg h-2.5 rounded-full" style="width:${pct}%"></div></div>
+              <div class="grid grid-cols-3 gap-1.5 mt-3 text-center">${resumen ? (resumen.querySelector(".grid") || {}).innerHTML || "" : ""}</div>
+            </div></div>
+        </div>
+      </aside>`;
+      document.body.appendChild(capa);
+      try { const ref = document.getElementById("empBanner"); if (ref && ref.offsetHeight) capa.querySelector(".cab").style.height = ref.offsetHeight + "px"; } catch (_) { }
+      requestAnimationFrame(() => capa.classList.add("abierto"));
+      const cerrar = () => { capa.classList.remove("abierto"); document.removeEventListener("keydown", onKey); setTimeout(() => capa.remove(), 220); };
+      const onKey = e => { if (e.key === "Escape") cerrar(); };
+      document.addEventListener("keydown", onKey);
+      capa.querySelector(".fondo").addEventListener("click", cerrar);
+      capa.querySelector("#menuEvX").addEventListener("click", cerrar);
+      capa.querySelectorAll("[data-emp-op]").forEach(b => b.addEventListener("click", () => {
+        const k = b.dataset.empOp; cerrar();
+        if (k === "dist") abrirDistribucion(ev);
+        else if (k === "qr") o.qr();
+        else if (k === "hist") modalHistorialTurnos(ev);
+      }));
+    }
+    // Estilos del panel lateral de opciones (admin ☰/⚙ y vista empresa ⚙).
+    const MENU_EV_CSS = `
         #menuEvCapa{position:fixed;inset:0;z-index:80}
         #menuEvCapa .fondo{position:absolute;inset:0;background:rgba(15,23,42,.45);opacity:0;transition:opacity .2s}
         #menuEvCapa .panel{position:absolute;top:0;right:0;bottom:0;width:min(360px,92vw);background:#fff;box-shadow:-16px 0 40px -12px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease-out}
@@ -4645,7 +4702,20 @@
         .menuEv-sw i{position:absolute;top:.15rem;left:.15rem;width:.9rem;height:.9rem;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
         .menuEv-sw.on{background:#16a34a}.menuEv-sw.on i{left:1.05rem}
         html[data-theme="dark"] #menuEvCapa .panel{background:#0f172a}html[data-theme="dark"] .menuEv-item{color:#e2e8f0}html[data-theme="dark"] .menuEv-item:hover{background:#1e293b}
-      </style>
+      `;
+    function abrirMenuEvento(ev) {
+      const prev = document.getElementById("menuEvCapa"); if (prev) prev.remove();
+      const orig = id => document.getElementById(id);
+      const limpio = el => (el ? el.textContent : "").replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]+/, "").replace(/\s+/g, " ").trim();
+      const item = (id, ic, texto, extra) => {
+        const el = orig(id); if (!el || el.classList.contains("hidden")) return "";
+        return `<button type="button" data-menu-ev="${id}" class="menuEv-item${extra && extra.peligro ? " peligro" : ""}">${ic}<span class="flex-1 text-left">${esc(texto || limpio(el))}</span>${extra && extra.estado != null ? `<span class="menuEv-sw${extra.estado ? " on" : ""}"><i></i></span>` : ""}</button>`;
+      };
+      const sw = id => { const el = orig(id); return el ? el.getAttribute("aria-checked") === "true" : null; };
+      const grupo = (titulo, html) => html.trim() ? `<div class="menuEv-grupo"><div class="menuEv-tit">${titulo}</div>${html}</div>` : "";
+      const capa = document.createElement("div");
+      capa.id = "menuEvCapa";
+      capa.innerHTML = `<style>${MENU_EV_CSS}</style>
       <div class="fondo"></div>
       <aside class="panel" role="dialog" aria-label="Opciones del evento">
         <div class="cab"><div class="flex-1 min-w-0"><div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Opciones del evento</div><div class="font-bold text-slate-800 truncate">${esc(ev.nombre_evento)}</div><div class="text-xs text-slate-500 truncate">${esc(ev.empresa || "")}</div></div>
@@ -4679,7 +4749,7 @@
     function ajustarEmpBanner() {
       const b = document.getElementById("empBanner"), sp = document.getElementById("empBannerSp");
       if (!b || !sp) return;
-      sp.style.height = window.matchMedia("(min-width: 768px)").matches ? (b.offsetHeight + 8) + "px" : "";
+      sp.style.height = (b.offsetHeight + (window.matchMedia("(min-width: 768px)").matches ? 8 : 10)) + "px";
       document.documentElement.style.setProperty("--empBanH", b.offsetHeight + "px");
       // Las imágenes del banner cargan después y cambian su alto: se vuelve a medir cuando cambia.
       if (!b._ro && window.ResizeObserver) { b._ro = new ResizeObserver(() => ajustarEmpBanner()); b._ro.observe(b); }
@@ -8881,6 +8951,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
         </div>
         <img src="images/aniversario1.webp" class="w-20 h-20 object-contain flex-shrink-0 hidden sm:block relative" alt="Centenario">
+        <button id="empMenuBtn" type="button" class="md:hidden relative flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-xl text-white active:bg-white/15" aria-label="Opciones" title="Opciones"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO_ENGRANAJE}</svg></button>
       </div>
       <div class="hidden md:flex items-center gap-2 mt-0 flex-wrap" id="empBarra">
         <button id="empDist2" class="btn bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-sm text-sm px-4 py-1.5 font-semibold">${ICO.mapa} Distribución de Facciones ${ICO.flecha}</button>
@@ -8888,7 +8959,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         ${usaT ? `<button id="empHist2" class="btn bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-sm text-sm px-4 py-1.5 font-semibold" title="Turnos anteriores archivados (Excel y PDF de cada turno)">${ICO.carpeta} Historial de turnos${nTurnosHist ? ` <span class="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">${nTurnosHist}</span>` : ""}</button>` : ""}
         ${(() => { const tn = usaT ? calcularTurno(new Date().toISOString(), ev) : null, txt = eventoTipoTexto(ev).replace(/\s*\(d[ií]a\/noche\)/i, "") + (tn ? " · " + tn.etiqueta : ""); return `<span id="empTurnoInfo" class="ml-auto text-sm font-semibold text-slate-700 bg-slate-100/95 border border-slate-200 rounded-xl px-3 py-1.5 whitespace-nowrap" title="${esc(txt)}">${ICO.reloj}<span class="truncate">${esc(txt)}</span></span>`; })()}
       </div>
-      <div class="mt-3 md:hidden"><button id="empDist" class="btn btn-p w-full relative flex items-center justify-center gap-2">🗺️ Distribución de facciones <svg class="absolute right-4" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button></div>
+      <div id="empDistWrap" class="mt-3 md:hidden"><button id="empDist" class="btn btn-p w-full relative flex items-center justify-center gap-2">🗺️ Distribución de facciones <svg class="absolute right-4" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button></div>
       <div id="empQrFondo" class="hidden md:block" aria-hidden="true"></div>
       <div class="card mt-2 overflow-hidden" id="empQrCard">
         <button id="empToggleQR" class="md:hidden w-full px-3 py-1.5 flex items-center justify-between text-sm font-semibold text-slate-700">
@@ -9037,6 +9108,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         if ($("#empQr2")) $("#empQr2").addEventListener("click", () => qrPc(!EMPRESA_STATE.showQR));
         if ($("#empQrCerrarBtn")) $("#empQrCerrarBtn").addEventListener("click", () => qrPc(false));
         if ($("#empQrFondo")) $("#empQrFondo").addEventListener("click", () => qrPc(false));
+        if ($("#empMenuBtn")) $("#empMenuBtn").addEventListener("click", () => abrirMenuEmpresa(ev, { qr: () => qrPc(true), usaT, total, ingresados: filasG.length }));
         pintarBioEmpresa(app, ev);   // palomas de biometría (solo estado, sin puntaje)
       };
       await paint();
