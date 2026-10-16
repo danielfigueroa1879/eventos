@@ -4690,32 +4690,59 @@
       const lista = d.lista || [];
       let nombres = {};
       try { (await Data.guardiasPorRut(lista.map(x => x.rut))).forEach(g => { nombres[g.rut] = ((g.nombres || "") + " " + (g.apellidos || "")).trim(); }); } catch (_) { }
-      const tile = (n, t, c) => `<div class="rounded-xl p-2 text-center" style="background:${c}"><div class="text-xl font-extrabold text-slate-800">${n}</div><div class="text-[11px] font-semibold text-slate-600 leading-tight">${t}</div></div>`;
-      const fila = x => `<div data-enr="${esc(x.rut)}" class="flex items-center gap-2 py-2 border-b border-slate-100 text-sm">
-          <div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">${esc(nombres[x.rut] || "—")}</div><div class="text-xs text-slate-500 font-mono">${esc(x.rut)} · ${esc(fechaFmt(String(x.fecha || "").slice(0, 10)))}</div></div>
-          <button data-enr-reset="${esc(x.rut)}" class="btn btn-ghost text-xs px-2 py-1" title="Borra su plantilla: se vuelve a enrolar en su próximo ingreso">Restablecer</button></div>`;
-      openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">🧬 Guardias enrolados</h2>
-        <p class="text-xs text-slate-500 mb-3">Con verificación facial registrada. Solo administrador.</p>
-        <div class="grid grid-cols-3 gap-2 mb-2">${tile(d.enrolados || 0, "Enrolados", "#dbeafe")}${tile(d.nuevos_7d || 0, "Nuevos (7 días)", "#dcfce7")}${tile(d.verificados_7d || 0, "Verificados (7 días)", "#e0e7ff")}</div>
-        <div class="grid grid-cols-2 gap-2 mb-3">${tile(d.no_coincide_7d || 0, "⛔ No coincide (7 días)", "#fee2e2")}${tile(d.vida_fallida_7d || 0, "🔄 Prueba de vida fallida (7 días)", "#fef3c7")}</div>
-        <input id="enrBuscar" class="fld text-sm mb-2" placeholder="Buscar por RUT o nombre…">
-        <div id="enrLista" style="max-height:45vh;overflow:auto">${lista.length ? lista.map(fila).join("") : `<div class="text-center text-slate-400 py-4 text-sm">Aún no hay guardias enrolados.</div>`}</div>
-        <button id="enrCerrar" class="btn btn-ghost w-full mt-3">Cerrar</button>`);
-      $("#enrCerrar").addEventListener("click", closeModal);
-      $("#enrBuscar").addEventListener("input", e => {
-        const q = e.target.value.trim().toLowerCase();
-        document.querySelectorAll("#enrLista [data-enr]").forEach(el => { const r = el.dataset.enr; el.style.display = !q || r.toLowerCase().includes(q) || (nombres[r] || "").toLowerCase().includes(q) ? "" : "none"; });
-      });
-      document.querySelectorAll("#enrLista [data-enr-reset]").forEach(b => b.addEventListener("click", async () => {
+      // Ventana ANCHA y compacta, pensada para miles de enrolados: totales en una franja, tabla numerada con
+      // encabezado fijo, orden (recientes / A–Z), buscador sin tildes y un único listener para "Restablecer".
+      const tile = (n, t, c) => `<div class="rounded-lg px-2 py-1.5 text-center" style="background:${c}"><div class="text-lg font-extrabold text-slate-800 leading-tight">${n}</div><div class="text-[10.5px] font-semibold text-slate-600 leading-tight">${t}</div></div>`;
+      const items = lista.map(x => ({ rut: x.rut, fecha: String(x.fecha || ""), nom: nombres[x.rut] || "" }));
+      items.forEach(x => { x.q = normBusqueda(x.rut + " " + x.nom); });
+      const porRut = new Map(items.map(x => [x.rut, x]));
+      let orden = "recientes";
+      const pintar = () => {
+        const v = orden === "az" ? [...items].sort((a, b) => (a.nom || "~").localeCompare(b.nom || "~", "es")) : items;
+        $("#enrTbody").innerHTML = v.map((x, k) => `<tr data-enr="${esc(x.rut)}" class="border-b border-slate-100 hover:bg-slate-50">
+            <td class="py-1 pl-2 pr-1 text-right text-slate-400 tabular-nums">${k + 1}</td>
+            <td class="py-1 px-2 min-w-0"><div class="font-semibold text-slate-800 truncate">${esc(x.nom || "—")}</div><div class="sm:hidden text-[11px] font-mono text-slate-500">${esc(x.rut)} · ${esc(fechaFmt(x.fecha.slice(0, 10)))}</div></td>
+            <td class="py-1 px-2 font-mono text-slate-600 whitespace-nowrap hidden sm:table-cell">${esc(x.rut)}</td>
+            <td class="py-1 px-2 text-slate-500 whitespace-nowrap hidden sm:table-cell">${esc(fechaFmt(x.fecha.slice(0, 10)))}</td>
+            <td class="py-1 pl-1 pr-2 text-right"><button data-enr-reset="${esc(x.rut)}" class="text-[11px] font-semibold text-slate-500 hover:text-red-600 border border-slate-200 rounded-md px-1.5 py-0.5" title="Restablecer: borra su plantilla y se vuelve a enrolar en su próximo ingreso" aria-label="Restablecer"><span class="hidden sm:inline">Restablecer</span><span class="sm:hidden">↺</span></button></td></tr>`).join("");
+        filtrar();
+      };
+      const filtrar = () => {
+        const q = normBusqueda($("#enrBuscar").value); let n = 0;
+        document.querySelectorAll("#enrTbody [data-enr]").forEach(el => { const x = porRut.get(el.dataset.enr); const ok = !q || (x && x.q.includes(q)); el.style.display = ok ? "" : "none"; if (ok) n++; });
+        $("#enrCuenta").textContent = q ? `${n} de ${items.length}` : `${items.length} enrolado${items.length === 1 ? "" : "s"}`;
+      };
+      openModalWide(`<div class="flex items-start justify-between gap-3 mb-2">
+          <div><h2 class="font-bold text-lg text-slate-800 leading-tight">🧬 Guardias enrolados</h2><p class="text-xs text-slate-500">Con verificación facial registrada. Solo administrador.</p></div>
+          <button id="enrX" class="btn btn-ghost px-2.5 py-1 text-sm" aria-label="Cerrar">✕</button></div>
+        <style>.enrThR{width:2.5rem}@media (min-width:640px){.enrThR{width:6.25rem}}</style>
+        <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5 mb-2">${tile(d.enrolados || 0, "Enrolados", "#dbeafe")}${tile(d.nuevos_7d || 0, "Nuevos (7 días)", "#dcfce7")}${tile(d.verificados_7d || 0, "Verificados (7 días)", "#e0e7ff")}${tile(d.no_coincide_7d || 0, "⛔ No coincide (7 días)", "#fee2e2")}${tile(d.vida_fallida_7d || 0, "🔄 Vida fallida (7 días)", "#fef3c7")}</div>
+        <div class="flex items-center gap-2 mb-1.5">
+          <input id="enrBuscar" type="search" class="fld text-sm h-9 py-1 flex-1 min-w-0" placeholder="Buscar por RUT o nombre…">
+          <select id="enrOrden" class="fld text-sm h-9 py-1 w-auto flex-shrink-0" title="Orden de la lista"><option value="recientes">Más recientes</option><option value="az">Nombre A–Z</option></select>
+        </div>
+        <div id="enrCuenta" class="text-[11px] text-slate-500 mb-1"></div>
+        ${items.length ? `<div class="border border-slate-200 rounded-lg overflow-auto" style="max-height:calc(92vh - 260px);min-height:180px">
+          <table class="w-full text-[13px] table-fixed">            <thead class="sticky top-0 bg-slate-100 text-slate-600 text-[11px] uppercase tracking-wide"><tr><th class="py-1.5 pl-2 pr-1 text-right" style="width:2.75rem">#</th><th class="py-1.5 px-2 text-left">Nombre</th><th class="py-1.5 px-2 text-left hidden sm:table-cell" style="width:7.25rem">RUT</th><th class="py-1.5 px-2 text-left hidden sm:table-cell" style="width:6.5rem">Enrolado</th><th class="enrThR"></th></tr></thead>
+            <tbody id="enrTbody"></tbody></table></div>` : `<div class="text-center text-slate-400 py-6 text-sm">Aún no hay guardias enrolados.</div>`}`);
+      $("#modalBox").classList.replace("max-w-5xl", "max-w-4xl");
+      $("#enrX").addEventListener("click", closeModal);
+      if (items.length) pintar(); else filtrar();
+      $("#enrBuscar").addEventListener("input", filtrar);
+      $("#enrOrden").addEventListener("change", e => { orden = e.target.value; pintar(); });
+      const tb = $("#enrTbody");
+      if (tb) tb.addEventListener("click", async ev => {
+        const b = ev.target.closest("[data-enr-reset]"); if (!b) return;
         const rut = b.dataset.enrReset;
         if (!confirm(`¿Restablecer la verificación facial de ${nombres[rut] || rut}? Se volverá a enrolar en su próximo ingreso.`)) return;
         b.disabled = true;
         try {
           const r = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "borrar", pin, rut }) });
           if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || ("HTTP " + r.status));
-          b.closest("[data-enr]").remove(); toast("Plantilla restablecida.");
+          const k = items.findIndex(x => x.rut === rut); if (k >= 0) items.splice(k, 1); porRut.delete(rut);
+          pintar(); toast("Plantilla restablecida.");
         } catch (e) { b.disabled = false; toast("No se pudo restablecer: " + (e.message || e), "danger", 4000); }
-      }));
+      });
     }
     // RETENCIÓN BIOMÉTRICA (60 días): la función borra los intentos con más de 60 días y las plantillas de
     // guardias sin ingresos en 60 días. Requiere el PIN de esta pestaña; si falla, se reintenta la próxima vez.
