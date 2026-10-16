@@ -930,9 +930,9 @@
     @media (min-width: 768px) {
       #main > .evHeaderBox { margin: -1.5rem -1.5rem .75rem; border-radius: 0; padding: .45rem 1.5rem; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); align-items: center; overflow: hidden; box-sizing: border-box; }
       /* Misma altura que el recuadro verde del menú (se ajusta por JS) y texto compacto para que quepa. */
-      #main > .evHeaderBox h1 { font-size: 1.15rem; line-height: 1.3; }
-      #main > .evHeaderBox .text-sm { font-size: .78rem; line-height: 1.3; }
-      #main > .evHeaderBox .text-xs { font-size: .7rem; line-height: 1.3; }
+      #main > .evHeaderBox h1 { font-size: 1.02rem; line-height: 1.25; }
+      #main > .evHeaderBox .text-sm { font-size: .72rem; line-height: 1.25; }
+      #main > .evHeaderBox .text-xs { font-size: .66rem; line-height: 1.25; }
       #main > .evHeaderBox .mt-0\.5 { margin-top: 0; }
     }
 
@@ -3362,11 +3362,11 @@
 
     <!-- Sidebar / Drawer -->
     <aside id="sidebar" class="bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 w-80 max-w-[92%] -translate-x-full transition-transform duration-300 overflow-y-auto shadow-2xl md:static md:translate-x-0 md:w-72 md:max-w-none md:min-h-screen md:overflow-visible md:shadow-none md:transition-none md:z-auto">
-      <div id="sbBrand" class="brand-bg text-white h-16 px-4 md:h-auto md:p-4 flex items-center gap-3">
+      <div id="sbBrand" class="brand-bg text-white h-16 px-4 md:h-auto md:px-4 md:py-2.5 flex items-center gap-3">
         <img src="images/logo-os10-original.webp" class="w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/90" alt="OS10">
         <div class="flex-1">
-          <div class="font-bold text-lg leading-tight">CONTROL EVENTOS</div>
-          <div class="text-xs opacity-80">Fiestas Patrias · O.S.10 Coquimbo</div>
+          <div class="font-bold text-lg md:text-[14px] md:whitespace-nowrap leading-tight">CONTROL EVENTOS</div>
+          <div class="text-xs md:text-[11px] opacity-80">O.S.10 Coquimbo</div>
         </div>
         <button id="cerrarMenu" class="md:hidden text-white text-2xl leading-none px-1" aria-label="Cerrar menú">✕</button>
         <img src="images/aniversario1.webp" class="w-11 h-11 object-contain hidden md:block" alt="Centenario">
@@ -4671,7 +4671,11 @@
     function ajustarBanner() {
       const b = document.getElementById("evBanner"), v = document.getElementById("sbBrand");
       if (!b) return;
-      b.style.height = (v && window.matchMedia("(min-width: 768px)").matches && v.offsetHeight) ? v.offsetHeight + "px" : "";
+      b.style.height = ""; if (v) v.style.height = "";
+      if (!v || !window.matchMedia("(min-width: 768px)").matches) return;
+      // Simétricos: los dos toman la altura del que necesite más (sin cortar texto).
+      const h = Math.max(v.offsetHeight, b.offsetHeight);
+      if (h) { b.style.height = h + "px"; v.style.height = h + "px"; }
     }
     window.addEventListener("resize", () => ajustarBanner());
     // ENROLADOS (solo admin con PIN): totales y lista de guardias con plantilla facial. Se consulta SOLO al
