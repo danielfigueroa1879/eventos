@@ -7,3 +7,7 @@
     "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
     "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs",
   ]
+
+# Aviso por correo "comenzaron los ingresos" (lo llama un disparador de Supabase; ver supabase-aviso-ingreso.sql).
+[functions.aviso-ingreso]
+  node_bundler = "esbuild"

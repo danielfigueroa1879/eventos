@@ -1,9 +1,10 @@
 {
   "name": "eventos-os10",
   "private": true,
-  "description": "Dependencias SOLO de la función del piloto biométrico (netlify/functions/biometria). El sitio no usa build.",
+  "description": "Dependencias SOLO de las funciones de Netlify (biometría: jpeg-js, onnxruntime-web; aviso por correo: nodemailer). El sitio no usa build.",
   "dependencies": {
     "jpeg-js": "0.4.4",
+    "nodemailer": "10.0.13",
     "onnxruntime-web": "1.30.0"
   }
 }
