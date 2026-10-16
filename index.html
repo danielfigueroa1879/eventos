@@ -832,7 +832,7 @@
     }
 
     /* Recuadro del encabezado del evento (detrás del nombre) */
-    .evHeaderBox { background: #F3FDF6; }
+    .evHeaderBox { background: #eef1f5; }
     /* PANEL ADMIN (celular y PC): sin la pestaña "QR y estado del evento"; el QR se abre al frente
        desde el menú de opciones del evento (☰ → Ver código QR). */
     #admQrCard:has(#qrPanel[hidden]) { display: none; }
@@ -4523,7 +4523,7 @@
           const d = await resp.json(); ids.forEach(id => { memo.r[id] = (d.resultados || {})[id] || null; }); memo.t = Date.now();
         } catch (e) { aviso("sin conexión con la función", false); return; }
       }
-      const ICON = { "VERIFICADO": ["✔✔", "#2563eb"], "ENROLADO": ["✔", "#2563eb"], "REVISIÓN MANUAL": ["⚠", "#d97706"], "NO COINCIDE": ["✖", "#dc2626"], "RECHAZADO": ["–", "#94a3b8"] };
+      const ICON = { "VERIFICADO": [PALOMA.doble, AZUL_PALOMA], "ENROLADO": [PALOMA.simple, AZUL_PALOMA], "REVISIÓN MANUAL": ["⚠", "#d97706"], "NO COINCIDE": ["✖", "#dc2626"], "RECHAZADO": ["–", "#94a3b8"] };
       marcas.forEach(m => {
         const r = memo.r[m.dataset.bio]; if (!r) { m.innerHTML = ""; return; }
         const [ic, col] = ICON[r.estado] || ["?", "#94a3b8"];
@@ -4536,6 +4536,12 @@
         clearTimeout(memo.tmr); memo.tmr = setTimeout(() => { if (root.isConnected) pintarBioPiloto(root); }, 10000);
       } else if (!ids.some(id => memo.r[id] === null)) memo.reint = 0;
     }
+    // Palomas de biometría estilo WhatsApp (azul #53bdeb): doble = verificado, simple = enrolado.
+    const PALOMA = (() => {
+      const svg = d => `<svg viewBox="0 0 17 11" width="18" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle" aria-hidden="true">${d}</svg>`;
+      return { doble: svg('<path d="M1.2 5.8 4.4 9 10.6 1.6"/><path d="M7.4 7.9 8.5 9l6.2-7.4"/>'), simple: svg('<path d="M3.2 5.8 6.4 9l6.2-7.4"/>') };
+    })();
+    const AZUL_PALOMA = "#53bdeb";
     // VISTA EMPRESA: mismas señales que el admin (✔✔ ✔ ⚠ ✖), pero solo el estado: sin score, RUT ni
     // restablecer. La función responde únicamente ingresos del evento del slug. Memo 60 s; reintenta
     // (máx. 12 × 10 s) los ingresos recientes cuya biometría aún no termina.
@@ -4551,7 +4557,7 @@
           const d = await resp.json(); ids.forEach(id => { BIO_EMP.r[id] = (d.resultados || {})[id] || null; }); BIO_EMP.t = Date.now();
         } catch (_) { return; }
       }
-      const ICON = { "VERIFICADO": ["✔✔", "#2563eb", "Identidad verificada"], "ENROLADO": ["✔", "#2563eb", "Primer ingreso: rostro registrado"], "REVISIÓN MANUAL": ["⚠", "#d97706", "Revisión manual"], "NO COINCIDE": ["✖", "#dc2626", "El rostro no coincide"] };
+      const ICON = { "VERIFICADO": [PALOMA.doble, AZUL_PALOMA, "Identidad verificada"], "ENROLADO": [PALOMA.simple, AZUL_PALOMA, "Primer ingreso: rostro registrado"], "REVISIÓN MANUAL": ["⚠", "#d97706", "Revisión manual"], "NO COINCIDE": ["✖", "#dc2626", "El rostro no coincide"] };
       marcas.forEach(m => {
         const r = BIO_EMP.r[m.dataset.bioE], x = r && ICON[r.estado];
         m.innerHTML = x ? `<span style="margin-left:4px;font-weight:900;color:${x[1]};font-size:13px;letter-spacing:-2px;vertical-align:middle" title="Biometría (orientativa): ${esc(x[2])}">${x[0]}</span>` : "";
@@ -4609,7 +4615,8 @@
         #menuEvCapa .fondo{position:absolute;inset:0;background:rgba(15,23,42,.45);opacity:0;transition:opacity .2s}
         #menuEvCapa .panel{position:absolute;top:0;right:0;bottom:0;width:min(360px,92vw);background:#fff;box-shadow:-16px 0 40px -12px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease-out}
         #menuEvCapa.abierto .fondo{opacity:1}#menuEvCapa.abierto .panel{transform:none}
-        #menuEvCapa .cab{display:flex;align-items:flex-start;gap:.75rem;padding:1rem 1.1rem;border-bottom:1px solid #e2e8f0}
+        #menuEvCapa .cab{display:flex;align-items:center;gap:.75rem;padding:.6rem 1.1rem;border-bottom:1px solid #e2e8f0;background:#eef1f5;box-sizing:border-box;flex-shrink:0}
+        html[data-theme="dark"] #menuEvCapa .cab{background:#12212e;border-color:#1e293b}
         #menuEvCapa .cuerpo{flex:1;overflow:auto;padding:.5rem .6rem 1rem}
         .menuEv-grupo{padding:.4rem 0;border-bottom:1px solid #f1f5f9}.menuEv-grupo:last-child{border-bottom:0}
         .menuEv-tit{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;padding:.45rem .6rem .25rem}
@@ -4634,6 +4641,11 @@
         </div>
       </aside>`;
       document.body.appendChild(capa);
+      // La cabecera del menú toma la MISMA altura que el banner del evento (PC) o la barra verde (celular).
+      try {
+        const ref = window.matchMedia("(min-width: 768px)").matches ? document.getElementById("evBanner") : (document.getElementById("hamb") || {}).parentElement;
+        if (ref && ref.offsetHeight) capa.querySelector(".cab").style.height = ref.offsetHeight + "px";
+      } catch (_) { }
       requestAnimationFrame(() => capa.classList.add("abierto"));
       const cerrar = () => { capa.classList.remove("abierto"); document.removeEventListener("keydown", onKey); setTimeout(() => capa.remove(), 220); };
       const onKey = e => { if (e.key === "Escape") cerrar(); };
