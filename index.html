@@ -5050,8 +5050,6 @@
     <div class="text-sm">
       ${detalleFila("", "RUT", `<button id="dg_rut" type="button" data-rut="${esc(a.rut)}" class="font-mono text-base font-bold text-slate-800 active:opacity-60 inline-flex items-center gap-1" title="Tocar para copiar el RUT">${esc(a.rut)} <span class="text-slate-400 text-xs">⧉</span></button>`)}
       ${detalleFila("", a.es_supervisor ? "Fecha Resolución" : "Fecha de curso (examen)", esc(fechaFmt(g.fecha_ultimo_examen)))}
-      ${esSup ? "" : detalleFila("", "Vigencia", badge(v))}
-      ${esSup ? "" : detalleFila("", "SIGES", esc(v.siges || "—"))}
       ${eventoUsaTurnos(ev) ? detalleFila("🕑", "Turno", tn ? `${esc(tn.etiqueta)} <span class="text-slate-400 font-normal">(${esc(tn.rango)})</span>` : "—") : ""}
       ${(() => { const mp = empresa ? EMPRESA_STATE._puestosMap : ADMIN_STATE._puestosMap; return (a.puesto_id && mp && mp[a.puesto_id]) ? detalleFila("📍", "Puesto / Facción", `<button data-goto-puesto="${esc(a.puesto_id)}" class="font-semibold text-indigo-600 underline decoration-dotted cursor-pointer" title="Ver en el mapa">${esc(mp[a.puesto_id])} ›</button>`) : ""; })()}
       ${detalleFila("🕓", "Ingreso", esc(horaFmt(a.hora_ingreso)))}
@@ -5070,16 +5068,18 @@
     ${(!empresa && a.id && eventoUsaTurnos(ev)) ? (() => {
       const ciclo = turnosDelCiclo(ev, a.hora_ingreso);
       if (ciclo.length < 2) return "";
+      // Plegado por defecto: se abre con la flecha (chevron).
       return `<div class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2">
-      <label class="text-xs font-semibold text-indigo-800 flex items-center gap-1 mb-1">Cambiar turno</label>
-      <div class="flex gap-2">
+      <button id="dg_turno_tg" type="button" aria-expanded="false" class="w-full flex items-center justify-between text-xs font-semibold text-indigo-800">Cambiar turno
+        <svg id="dg_turno_chev" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div id="dg_turno_box" hidden><div class="flex gap-2 mt-1.5">
         <select id="dg_turno" class="fld fld-sm flex-1">
           ${ciclo.map(t => `<option value="${t.clave}" ${t.actual ? "selected" : ""}>${esc(t.fecha)} · ${esc(t.etiqueta)} · ${esc(t.rango)}</option>`).join("")}
         </select>
         <button id="dg_turno_ok" class="btn btn-p text-sm px-3 flex-shrink-0">Cambiar</button>
       </div>
       <p class="text-[11px] text-slate-500 mt-1">Pasa al guardia de un turno a otro (ej: de Noche a Día).</p>
-    </div>`;
+    </div></div>`;
     })() : ""}
     <div class="text-sm mt-2">${telHTML}</div>
     ${empresa ? "" : `<div class="flex justify-center gap-24 mt-4 mb-1">
@@ -5087,6 +5087,8 @@
       <button id="dg_del" class="text-slate-600 hover:text-red-600 flex flex-col items-center text-xs gap-1"><span class="text-xl">🗑</span>Quitar</button>
     </div>`}`);
       $("#dg_x").addEventListener("click", closeModal);
+      const tgT = $("#dg_turno_tg");
+      if (tgT) tgT.addEventListener("click", () => { const box = $("#dg_turno_box"), ab = box.hidden; box.hidden = !ab; tgT.setAttribute("aria-expanded", String(ab)); $("#dg_turno_chev").style.transform = ab ? "rotate(180deg)" : ""; });
       // Ver la foto de ingreso ampliada (solo vista admin).
       const dgFoto = $("#dg_foto_btn");
       // Al cerrar la foto se vuelve al detalle del guardia (no se cierra todo).
