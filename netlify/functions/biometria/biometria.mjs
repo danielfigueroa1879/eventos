@@ -215,17 +215,29 @@ export default async (req) => {
     if (b.accion === "resumen") {
       await exigirPin(cfg, b.pin);
       const hace7 = new Date(Date.now() - 7 * 86400000).toISOString();
+      // Intentos de TODO el período guardado (máx. 60 días, ver "purgar"): totales de 7 días y, por
+      // guardia, cuántos intentos tuvo con prueba de vida fallida, rostro que no coincide y verificados.
       const [plant, ints] = await Promise.all([
         sbFetch(cfg, `/rest/v1/guardias_biometria?select=rut,fecha_enrolamiento&activo=is.true&order=fecha_enrolamiento.desc&limit=10000`),
-        sbFetch(cfg, `/rest/v1/biometria_intentos?select=estado,liveness_ok&fecha=gte.${enc(hace7)}&limit=50000`)]);
-      const cuenta = f => ints.filter(f).length;
+        sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,estado,liveness_ok,fecha&limit=50000`)]);
+      const ints7 = ints.filter(x => x.fecha >= hace7);
+      const cuenta = f => ints7.filter(f).length;
+      const porRut = new Map();
+      ints.forEach(x => {
+        if (!x.rut) return;
+        const c = porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 };
+        if (x.liveness_ok === false) c.vf++;
+        if (x.estado === L.ESTADOS.NO) c.nc++;
+        if (x.estado === L.ESTADOS.OK) c.ok++;
+        porRut.set(x.rut, c);
+      });
       return json({ ok: true,
         enrolados: plant.length,
         nuevos_7d: plant.filter(x => x.fecha_enrolamiento >= hace7).length,
         verificados_7d: cuenta(x => x.estado === L.ESTADOS.OK),
         no_coincide_7d: cuenta(x => x.estado === L.ESTADOS.NO),
         vida_fallida_7d: cuenta(x => x.liveness_ok === false),
-        lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento })) });
+        lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento, ...(porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 }) })) });
     }
 
     // ----- Panel admin -> retención de 60 días (solo PIN) -----
