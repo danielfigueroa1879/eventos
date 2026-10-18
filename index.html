@@ -2362,6 +2362,52 @@
       paint();
     }
 
+    /* ---- ACTUALIZACIÓN AUTOMÁTICA: las pestañas que quedan abiertas (panel admin, vista empresa, celular
+       del guardia) toman la versión nueva sin que nadie tenga que recargar. Cada 5 min y al volver a la
+       pestaña se consulta SOLO la cabecera de la página (HEAD, sin descargarla). Si cambió, se recarga
+       solo cuando es seguro: sin nada a medio hacer (ventanas abiertas, cámara, texto escrito).
+       Si no es seguro, aparece un aviso "Actualizar" y se reintenta cada minuto. ---- */
+    (function initAutoActualizar() {
+      if (!window.fetch || location.protocol === "file:") return;
+      let firma = null, pendiente = false, aviso = null;
+      const leer = async () => {
+        const r = await fetch(location.pathname || "/", { method: "HEAD", cache: "no-store" });
+        return r.ok ? (r.headers.get("etag") || r.headers.get("last-modified") || "") : "";
+      };
+      const ocupado = () => {
+        const visible = el => el && el.offsetParent !== null;
+        if (visible(document.getElementById("modal")) && document.getElementById("modal").style.display !== "none") return true;
+        if (document.getElementById("bioi-capa") || document.getElementById("menuEvCapa") || document.getElementById("distOverlay") || document.getElementById("procIngreso")) return true;
+        const a = document.activeElement;
+        if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return true;
+        // Formulario del guardia con datos escritos (RUT, teléfono…): no se pierde lo que lleva.
+        return [...document.querySelectorAll("#app input[type=text], #app input[type=tel], #app input:not([type]), #app textarea")].some(i => i.id !== "buscar" && i.value && i.value.trim());
+      };
+      const aplicar = () => {
+        if (!ocupado()) { location.reload(); return; }
+        if (!aviso) {
+          aviso = document.createElement("button");
+          aviso.type = "button";
+          aviso.textContent = "🔄 Hay una actualización · Toca para actualizar";
+          aviso.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;background:#0f5323;color:#fff;font-weight:700;font-size:13px;padding:10px 16px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.25);border:0";
+          aviso.addEventListener("click", () => location.reload());
+          document.body.appendChild(aviso);
+        }
+      };
+      const revisar = async () => {
+        if (pendiente) { aplicar(); return; }
+        try {
+          const f = await leer(); if (!f) return;
+          if (firma === null) { firma = f; return; }
+          if (f !== firma) { pendiente = true; aplicar(); }
+        } catch (_) { /* sin conexión: se reintenta en la próxima revisión */ }
+      };
+      revisar();
+      setInterval(revisar, 5 * 60 * 1000);
+      setInterval(() => { if (pendiente) aplicar(); }, 60 * 1000);
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) revisar(); else if (pendiente && !ocupado()) location.reload(); });
+    })();
+
     /* ---- Botón "subir": chevron que aparece al bajar y vuelve al inicio ---- */
     (function initScrollTop() {
       const btn = $("#scrollTopBtn");
