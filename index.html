@@ -2508,7 +2508,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=20"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=21"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
@@ -2662,8 +2662,16 @@
             if (terminado) { try { s.getTracks().forEach(t => t.stop()); } catch (_) {} return; }
             stream = s; video.srcObject = s;
             video.onloadedmetadata = () => { video.play().catch(() => {}); const shot = $("#cap_shot"); if (shot) shot.disabled = false; };
+            try { const pr = video.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (_) {}
           })
-          .catch(err => { console.warn("getUserMedia:", err); usarArchivo(); });
+          .catch(err => { console.warn("getUserMedia:", err); if (!terminado) usarArchivo(); });
+        // Si en 8 s la cámara no muestra imagen (navegador dentro de WhatsApp/Instagram, permiso trabado,
+        // etc.), se ofrece "Tomar / elegir foto", que abre la cámara del teléfono y siempre funciona.
+        setTimeout(() => {
+          if (terminado || shotBlob || $("#cap_file") || (video.readyState >= 2 && video.videoWidth > 0)) return;   // ya hay imagen, foto o selector de archivo
+          try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+          stream = null; usarArchivo();
+        }, 8000);
       });
     }
     /* ---- MARCA DE AGUA sobre la foto de ingreso ----
