@@ -7,8 +7,7 @@
    API:
      await BioIngreso.capturar({ rut, fotoDesde })   // ANTES de crear la asistencia
         -> null                       (no aplica / sin cámara / servicio caído: usar la foto normal)
-        -> { rechazado: true }        (no aceptó la verificación facial: siguió sin marcar la casilla
-                                        tras 3 avisos) -> NO se registra el ingreso
+        (consentimiento de un toque: el botón "Acepto y continúo"; sin pulsarlo no se registra el ingreso)
         -> { cancelado: true }        (canceló la cámara: no ingresa, igual que hoy)
         -> { fotoBlob, token, imagenes }   (fotoBlob = foto de ingreso WebP, igual que la normal)
      await BioIngreso.procesar({ rut, asistenciaId, token, imagenes })   // DESPUÉS de subir la foto
@@ -219,29 +218,16 @@
     }
 
     try {
-      // 1) Consentimiento OBLIGATORIO: sin aceptarlo no se puede ingresar. 4 veces "Continuar" sin
-      //    marcar la casilla -> { rechazado: true } y la app NO registra el ingreso.
+      // 1) Consentimiento de UN TOQUE: texto breve y un solo botón "Acepto y continúo". Pulsarlo es la
+      //    aceptación expresa (sin casilla ni avisos). Si no la pulsa, no sigue y no se registra el ingreso.
       const t0 = textos(false);
       ui.capa.classList.add("cons");
       ui.$("bioi-cons").innerHTML = `<div class="cab">🔒 <span id="bioi-ctit">${t0.tit}</span></div><div class="cue">
-        <p>Tu foto de ingreso se usará también para <span id="bioi-acc">${t0.acc}</span> una plantilla biométrica cifrada de tu rostro, solo para verificar tu identidad en los ingresos a eventos.</p>
-        <p>No se usa para identificar a otras personas y puedes pedir su eliminación al administrador.</p>
-        <small>Ley N° 19.628 y Ley N° 21.719 (datos sensibles).</small>
-        <label id="bioi-chk"><input type="checkbox" id="bioi-acepto"><span>Acepto la verificación facial</span></label>
-        <div id="bioi-aviso"></div></div>`;
-      ui.$("bioi-acepto").addEventListener("change", () => { ui.$("bioi-chk").classList.remove("mal"); ui.$("bioi-aviso").classList.remove("on"); });
+        <p>Tu foto de ingreso se usará para verificar tu identidad (verificación facial), solo en los ingresos a eventos.</p>
+        <small>Ley N° 19.628 y Ley N° 21.719. Puedes pedir su eliminación al administrador.</small></div>`;
       ui.$("bioi-no").style.display = "none";
-      pDesafio.then(x => { if (x.status === 200 && x.d.modo === "enrolamiento") { const t = textos(true); ui.$("bioi-ctit").textContent = t.tit; ui.$("bioi-acc").textContent = t.acc; } });
-      let intentos = 0;
-      for (;;) {
-        await elegir(ui, "Continuar", "");
-        if (ui.$("bioi-acepto").checked) break;
-        intentos++;
-        if (intentos >= 4) { cerrar(); return { rechazado: true }; }   // 4.ª vez sin aceptar: no ingresa
-        const av = ui.$("bioi-aviso"); av.classList.remove("on"); void av.offsetWidth;   // reinicia la animación
-        av.textContent = `⚠ Para ingresar debes aceptar la verificación facial: marca la casilla.${intentos === 3 ? " (último aviso)" : ""}`;
-        av.classList.add("on"); ui.$("bioi-chk").classList.add("mal");
-      }
+      pDesafio.then(x => { if (x.status === 200 && x.d.modo === "enrolamiento") { ui.$("bioi-ctit").textContent = textos(true).tit; } });
+      await elegir(ui, "Acepto y continúo", "");
       ui.$("bioi-no").style.display = "";
       // ¿Aplica? (403/503 = no participa o servicio no configurado -> foto normal).
       if (!r) { msg("Preparando…"); await pDesafio; }
