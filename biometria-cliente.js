@@ -239,7 +239,24 @@
       try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false }); }
       catch (_) { cerrar(); return null; }   // sin cámara o sin permiso: se usa la foto normal
       ui.video.srcObject = stream;
-      await new Promise(res => { if (ui.video.readyState >= 2) res(); else ui.video.onloadeddata = () => res(); });
+      // Se pide reproducir explícitamente (no basta "autoplay": algunos celulares lo bloquean y la imagen
+      // queda en blanco). Si en 4 s no hay imagen, se pide un toque ("Activar cámara"), que el navegador
+      // siempre permite. Si aun así no hay imagen, se sigue con la foto normal (nunca se queda trabado).
+      const hayImagen = () => ui.video.readyState >= 2 && ui.video.videoWidth > 0;
+      const esperarImagen = ms => new Promise(res => {
+        if (hayImagen()) return res(true);
+        const fin = setTimeout(() => res(hayImagen()), ms);
+        const ok = () => { if (hayImagen()) { clearTimeout(fin); res(true); } };
+        ui.video.onloadeddata = ok; ui.video.onplaying = ok; ui.video.onloadedmetadata = ok;
+      });
+      const reproducir = () => { try { const pr = ui.video.play(); if (pr && pr.catch) pr.catch(() => { }); } catch (_) { } };   // sin esperar: play() puede quedar pendiente
+      reproducir();
+      if (!(await esperarImagen(4000))) {
+        msg("Toca «Activar cámara» para ver tu imagen.");
+        if (!(await elegir(ui, "Activar cámara", "Cancelar"))) { cerrar(); return { cancelado: true }; }
+        reproducir();
+        if (!(await esperarImagen(5000))) { cerrar(); return null; }   // cámara sin imagen: foto normal
+      }
       ui.$("bioi-ins").textContent = "Encuadra tu rostro dentro del óvalo";
       msg(reintento
         ? "Esta vez: primero mira al frente; cuando se ilumine un lado, GIRA la cabeza hacia ese lado (como el ícono de abajo) y quédate así hasta ver el ícono de verificación facial."
