@@ -236,8 +236,14 @@
       ui.capa.classList.remove("cons");   // cámara: el recuadro del óvalo es BLANCO (ilumina el rostro)
       ui.$("bioi-cons").style.display = "none"; ui.$("bioi-esc").style.display = "block";
       ui.$("bioi-no").textContent = "Cancelar"; msg("Abriendo cámara…");
-      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false }); }
-      catch (_) { cerrar(); return null; }   // sin cámara o sin permiso: se usa la foto normal
+      // Algunos navegadores (p. ej. el de WhatsApp/Instagram al abrir el link) nunca responden al pedido de
+      // cámara: si en 8 s no hay respuesta se sigue con la foto normal en vez de quedar en blanco.
+      try {
+        let vencido = false;
+        const pedido = navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
+        pedido.then(s2 => { if (vencido) try { s2.getTracks().forEach(t => t.stop()); } catch (_) { } }, () => { });
+        stream = await Promise.race([pedido, esperar(8000).then(() => { vencido = true; throw new Error("sin respuesta de la cámara"); })]);
+      } catch (_) { cerrar(); return null; }   // sin cámara, sin permiso o sin respuesta: se usa la foto normal
       ui.video.srcObject = stream;
       // Se pide reproducir explícitamente (no basta "autoplay": algunos celulares lo bloquean y la imagen
       // queda en blanco). Si en 4 s no hay imagen, se pide un toque ("Activar cámara"), que el navegador
