@@ -2363,7 +2363,7 @@
     }
 
     /* ---- ACTUALIZACIÓN AUTOMÁTICA: las pestañas que quedan abiertas (panel admin, vista empresa, celular
-       del guardia) toman la versión nueva sin que nadie tenga que recargar. Cada 5 min y al volver a la
+       del guardia) toman la versión nueva sin que nadie tenga que recargar. Cada 1 min y al volver a la
        pestaña se consulta SOLO la cabecera de la página (HEAD, sin descargarla). Si cambió, se recarga
        solo cuando es seguro: sin nada a medio hacer (ventanas abiertas, cámara, texto escrito).
        Si no es seguro, aparece un aviso "Actualizar" y se reintenta cada minuto. ---- */
@@ -2403,8 +2403,8 @@
         } catch (_) { /* sin conexión: se reintenta en la próxima revisión */ }
       };
       revisar();
-      setInterval(revisar, 5 * 60 * 1000);
-      setInterval(() => { if (pendiente) aplicar(); }, 60 * 1000);
+      setInterval(revisar, 60 * 1000);   // cada minuto (solo una cabecera HEAD: no consume datos)
+      setInterval(() => { if (pendiente) aplicar(); }, 20 * 1000);
       document.addEventListener("visibilitychange", () => { if (!document.hidden) revisar(); else if (pendiente && !ocupado()) location.reload(); });
     })();
 
