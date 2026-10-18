@@ -7,7 +7,8 @@
    API:
      await BioIngreso.capturar({ rut, fotoDesde })   // ANTES de crear la asistencia
         -> null                       (no aplica / sin cámara / servicio caído: usar la foto normal)
-        (si no marca el consentimiento: "Debes aceptar" hasta 3 veces; a la 4.ª -> null = foto normal sin biometría)
+        -> { rechazado: true }        (no aceptó la verificación facial: siguió sin marcar la casilla
+                                        tras 3 avisos) -> NO se registra el ingreso
         -> { cancelado: true }        (canceló la cámara: no ingresa, igual que hoy)
         -> { fotoBlob, token, imagenes }   (fotoBlob = foto de ingreso WebP, igual que la normal)
      await BioIngreso.procesar({ rut, asistenciaId, token, imagenes })   // DESPUÉS de subir la foto
@@ -218,8 +219,8 @@
     }
 
     try {
-      // 1) Consentimiento: una casilla. Sin marcarla, "Debes aceptar" (hasta 3 veces); a la 4.ª vez se
-      //    sigue SOLO con la foto normal (sin biometría): se devuelve null y la app usa la foto de siempre.
+      // 1) Consentimiento OBLIGATORIO: sin aceptarlo no se puede ingresar. 4 veces "Continuar" sin
+      //    marcar la casilla -> { rechazado: true } y la app NO registra el ingreso.
       const t0 = textos(false);
       ui.capa.classList.add("cons");
       ui.$("bioi-cons").innerHTML = `<div class="cab">🔒 <span id="bioi-ctit">${t0.tit}</span></div><div class="cue">
@@ -236,9 +237,9 @@
         await elegir(ui, "Continuar", "");
         if (ui.$("bioi-acepto").checked) break;
         intentos++;
-        if (intentos >= 4) { cerrar(); return null; }   // 4.ª vez sin aceptar: solo la foto normal
+        if (intentos >= 4) { cerrar(); return { rechazado: true }; }   // 4.ª vez sin aceptar: no ingresa
         const av = ui.$("bioi-aviso"); av.classList.remove("on"); void av.offsetWidth;   // reinicia la animación
-        av.textContent = `⚠ Debes marcar la casilla para continuar.${intentos === 3 ? " (último aviso)" : ""}`;
+        av.textContent = `⚠ Para ingresar debes aceptar la verificación facial: marca la casilla.${intentos === 3 ? " (último aviso)" : ""}`;
         av.classList.add("on"); ui.$("bioi-chk").classList.add("mal");
       }
       ui.$("bioi-no").style.display = "";
