@@ -2362,6 +2362,28 @@
       paint();
     }
 
+    // Aviso cuando la cámara no funciona en el navegador actual (p. ej. el link se abrió dentro de WhatsApp).
+    function avisoSinCamara() {
+      const enApp = /WhatsApp|Instagram|FBAN|FBAV|FB_IAB|Line\/|Messenger|wv\)/i.test(navigator.userAgent || "");
+      openModal(`<div class="text-center">
+        <div class="text-4xl mb-2">📷</div>
+        <h2 class="font-bold text-lg text-slate-800 mb-1">No se pudo abrir la cámara</h2>
+        <p class="text-sm text-slate-600 mb-3">${enApp ? "Abriste el link dentro de una aplicación (como WhatsApp) que no permite usar la cámara." : "Este navegador no permitió usar la cámara."} Para registrar tu ingreso con verificación facial:</p>
+        <ol class="text-left text-sm text-slate-700 space-y-1.5 mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <li><b>1.</b> Escanea el <b>código QR</b> del evento con la <b>cámara de tu teléfono</b>.</li>
+          <li><b>2.</b> O abre este link en <b>Chrome</b> (Android) o <b>Safari</b> (iPhone).</li>
+          <li><b>3.</b> Si el teléfono pregunta, <b>permite el uso de la cámara</b>.</li>
+        </ol>
+        <button id="scCopiar" class="btn btn-p w-full mb-2">📋 Copiar link para abrir en Chrome / Safari</button>
+        <button id="scCerrar" class="btn btn-ghost w-full">Entendido</button></div>`);
+      $("#scCerrar").addEventListener("click", closeModal);
+      $("#scCopiar").addEventListener("click", () => {
+        const url = location.href;
+        (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast("Link copiado. Pégalo en Chrome o Safari.", true, 4000))
+          .catch(() => { prompt("Copia este link y ábrelo en Chrome o Safari:", url); });
+      });
+    }
+
     /* ---- ACTUALIZACIÓN AUTOMÁTICA: las pestañas que quedan abiertas (panel admin, vista empresa, celular
        del guardia) toman la versión nueva sin que nadie tenga que recargar. Cada 1 min y al volver a la
        pestaña se consulta SOLO la cabecera de la página (HEAD, sin descargarla). Si cambió, se recarga
@@ -2508,7 +2530,7 @@
     async function leerBioRuts() { try { return bioRutsDe(await Data.getConfig("biometria_piloto")); } catch (_) { return new Set(); } }
     function cargarBioCliente() {
       if (window.BioIngreso) return Promise.resolve();
-      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=21"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+      return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "biometria-cliente.js?v=22"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
     }
     // PANTALLA DE PROCESO del ingreso (en vez de cambiar el texto del botón): pasos con su estado.
     // pasos: lista de claves; paso(k) marca k en curso y los anteriores como listos; cerrar() la quita.
@@ -3281,6 +3303,9 @@
             const bio = await capturaBiometrica(formatRut(rut.value), bioVidaFallos > 0);   // 2.º intento: guía reforzada
             if (bio && bio.cancelado) { toast("Necesitas tomar la foto para completar tu ingreso.", false, 3500); return; }
             if (bio && bio.rechazado) { toast("Para registrar tu ingreso debes aceptar la verificación facial.", "danger", 5000); return; }
+            // La cámara no abrió o no dio imagen (típico al abrir el link DENTRO de WhatsApp/Instagram): no se
+            // registra sin enrolarse; se explica cómo abrir la página bien.
+            if (bio && bio.sinCamara) { avisoSinCamara(); return; }
             if (bio && bio.fotoBlob) {
               fotoBlob = bio.fotoBlob; bioPend = bio.token ? bio : null;
               // RUT YA ENROLADO: se verifica ANTES de registrar. Si el rostro no corresponde (otra persona),

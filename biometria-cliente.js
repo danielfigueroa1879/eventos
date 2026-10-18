@@ -9,6 +9,8 @@
         -> null                       (no aplica / sin cámara / servicio caído: usar la foto normal)
         (consentimiento de un toque: el botón "Acepto y continúo"; sin pulsarlo no se registra el ingreso)
         -> { cancelado: true }        (canceló la cámara: no ingresa, igual que hoy)
+        -> { sinCamara: true }        (la cámara no abre o no da imagen, p. ej. link abierto dentro de WhatsApp:
+                                        NO ingresa; la app le indica escanear el QR con la cámara del teléfono)
         -> { fotoBlob, token, imagenes }   (fotoBlob = foto de ingreso WebP, igual que la normal)
      await BioIngreso.procesar({ rut, asistenciaId, token, imagenes })   // DESPUÉS de subir la foto
 */
@@ -129,7 +131,8 @@
   }
 
   async function capturar({ rut, fotoDesde, reintento }) {
-    if (!rut || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
+    if (!rut) return null;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return { sinCamara: true };   // navegador sin cámara (p. ej. dentro de una app)
     // ¿Aplica? (403/503 = no participa o servicio no configurado -> foto normal). Empieza a cargar los modelos.
     precalentar(rut);
     // VELOCIDAD: la pantalla de consentimiento se muestra AL TIRO; el desafío se pide en paralelo.
@@ -243,7 +246,7 @@
         const pedido = navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
         pedido.then(s2 => { if (vencido) try { s2.getTracks().forEach(t => t.stop()); } catch (_) { } }, () => { });
         stream = await Promise.race([pedido, esperar(8000).then(() => { vencido = true; throw new Error("sin respuesta de la cámara"); })]);
-      } catch (_) { cerrar(); return null; }   // sin cámara, sin permiso o sin respuesta: se usa la foto normal
+      } catch (_) { cerrar(); return { sinCamara: true }; }   // sin cámara, sin permiso o sin respuesta: NO ingresa sin enrolarse
       ui.video.srcObject = stream;
       // Se pide reproducir explícitamente (no basta "autoplay": algunos celulares lo bloquean y la imagen
       // queda en blanco). Si en 4 s no hay imagen, se pide un toque ("Activar cámara"), que el navegador
@@ -261,7 +264,7 @@
         msg("Toca «Activar cámara» para ver tu imagen.");
         if (!(await elegir(ui, "Activar cámara", "Cancelar"))) { cerrar(); return { cancelado: true }; }
         reproducir();
-        if (!(await esperarImagen(5000))) { cerrar(); return null; }   // cámara sin imagen: foto normal
+        if (!(await esperarImagen(5000))) { cerrar(); return { sinCamara: true }; }   // cámara sin imagen: NO ingresa sin enrolarse
       }
       ui.$("bioi-ins").textContent = "Encuadra tu rostro dentro del óvalo";
       msg(reintento
