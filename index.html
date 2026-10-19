@@ -2257,7 +2257,7 @@
               const c = document.createElement("canvas"); c.width = 120; c.height = 160;
               const k = Math.max(120 / bmp.width, 160 / bmp.height), w = bmp.width * k, h = bmp.height * k;
               c.getContext("2d").drawImage(bmp, (120 - w) / 2, (160 - h) / 2, w, h);
-              return await new Promise(r => c.toBlob(r, "image/webp", 0.55));
+              return await blobLiviano(c, 0.55);
             } catch (e) { console.warn("miniatura:", e && e.message); return null; }
           };
           // VELOCIDAD: si el navegador ya generó la foto en WebP, la miniatura también será WebP: se crea
@@ -2527,6 +2527,15 @@
     function blobToDataURL(blob) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); }); }
 
     // Dibuja la fuente (video o <img>) recortada a retrato 3:4, a 480 px de alto como máximo, y devuelve un Blob WebP.
+    // Imagen liviana desde un canvas: WebP; si el navegador no sabe crear WebP (iPhone/Safari devuelve un
+    // PNG ~10 veces más pesado), se usa JPEG. Así la foto pesa ~20–40 KB en todos los teléfonos.
+    function blobLiviano(c, calidad) {
+      const a = (tipo, q) => new Promise(res => {
+        if (c.toBlob) c.toBlob(res, tipo, q);
+        else { try { fetch(c.toDataURL(tipo, q)).then(r => r.blob()).then(res, () => res(null)); } catch (_) { res(null); } }
+      });
+      return a("image/webp", calidad).then(b => (b && b.type === "image/webp") ? b : a("image/jpeg", Math.min(0.75, calidad + 0.15)).then(j => j || b));
+    }
     function _fotoWebpDesde(source, sw, sh) {
       return new Promise((resolve, reject) => {
         try {
@@ -2543,9 +2552,7 @@
           ctx.imageSmoothingQuality = "high";
           // La cámara frontal se ve en espejo en pantalla, pero se guarda la imagen REAL (sin espejo).
           ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, outW, outH);
-          const done = (blob) => { if (blob) resolve(blob); else reject(new Error("No se pudo convertir la foto")); };
-          if (c.toBlob) c.toBlob(done, "image/webp", 0.5);
-          else { const u = c.toDataURL("image/webp", 0.5); fetch(u).then(r => r.blob()).then(resolve).catch(reject); }
+          blobLiviano(c, 0.5).then(b => b ? resolve(b) : reject(new Error("No se pudo convertir la foto")), reject);
         } catch (e) { reject(e); }
       });
     }
