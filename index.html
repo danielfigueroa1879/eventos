@@ -2362,6 +2362,37 @@
       paint();
     }
 
+    /* ---- FOTOS PENDIENTES (mala señal): si la foto de ingreso no alcanza a subir, queda guardada EN EL
+       TELÉFONO (IndexedDB) y se reenvía sola: al volver la señal, al reabrir la página o cada minuto,
+       hasta 3 h después del ingreso (plazo que acepta el servidor). Al lograrlo se borra del teléfono. ---- */
+    const FotoCola = (() => {
+      const abrir = () => new Promise((res, rej) => { const r = indexedDB.open("os10_fotos", 1); r.onupgradeneeded = () => r.result.createObjectStore("pend", { keyPath: "asisId" }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      const tx = async (modo, fn) => { const db = await abrir(); return new Promise((res, rej) => { const t = db.transaction("pend", modo); const st = t.objectStore("pend"); const out = fn(st); t.oncomplete = () => { db.close(); res(out && out.result); }; t.onerror = () => { db.close(); rej(t.error); }; }); };
+      return {
+        poner: (asisId, evId, blob) => tx("readwrite", st => st.put({ asisId, evId, blob, t: Date.now() })).catch(() => { }),
+        quitar: asisId => tx("readwrite", st => st.delete(asisId)).catch(() => { }),
+        todas: () => tx("readonly", st => st.getAll()).catch(() => []),
+      };
+    })();
+    const FOTO_COLA_MAX_MS = 3 * 60 * 60 * 1000 - 5 * 60 * 1000;
+    let reenviandoFotos = false;
+    async function reenviarFotosPendientes() {
+      if (reenviandoFotos || !window.indexedDB || navigator.onLine === false) return;
+      reenviandoFotos = true;
+      try {
+        for (const f of await FotoCola.todas() || []) {
+          if (!f || !f.blob || Date.now() - f.t > FOTO_COLA_MAX_MS) { if (f) await FotoCola.quitar(f.asisId); continue; }
+          try { await Data.subirFotoIngreso(f.evId, f.asisId, f.blob); await FotoCola.quitar(f.asisId); toast("📸 Foto de ingreso enviada.", true, 2500); }
+          catch (e) { if (e && e.status >= 400 && e.status < 500) await FotoCola.quitar(f.asisId); }   // ya tiene foto / plazo vencido: se descarta
+        }
+      } finally { reenviandoFotos = false; }
+    }
+    if (window.indexedDB) {
+      window.addEventListener("online", () => setTimeout(reenviarFotosPendientes, 1500));
+      setTimeout(reenviarFotosPendientes, 4000);
+      setInterval(reenviarFotosPendientes, 60 * 1000);
+    }
+
     // Aviso cuando la cámara no funciona en el navegador actual (p. ej. el link se abrió dentro de WhatsApp).
     function avisoSinCamara() {
       const enApp = /WhatsApp|Instagram|FBAN|FBAV|FB_IAB|Line\/|Messenger|wv\)/i.test(navigator.userAgent || "");
@@ -3278,6 +3309,11 @@
         // el aviso aparece igual (toast) en la pantalla que esté abierta.
         if (pFoto) pFoto.then(ok => {
           const fe = $("#fotoEstado");
+          if (ok === "pendiente") {   // sin señal: la foto quedó guardada en el teléfono y se enviará sola
+            if (fe) { fe.style.color = "#b45309"; fe.textContent = "📶 Señal débil: la foto quedó guardada en el teléfono y se enviará sola cuando haya señal."; }
+            toast("Tu ingreso quedó registrado. La foto se enviará sola cuando haya señal.", false, 4500);
+            return;
+          }
           if (fe) { fe.style.color = ok ? "#15803d" : "#dc2626"; fe.textContent = ok ? "✓ Foto guardada" : "⚠ Tu ingreso quedó registrado, pero la foto no se pudo guardar."; }
           if (!ok) toast("Tu ingreso quedó registrado, pero la foto no se pudo guardar.", "danger", 4500);
         });
@@ -3373,11 +3409,12 @@
           const fb = fotoBlob, b = bioPend; fotoBlob = null; bioPend = null;
           // 2b) Foto (WebP HD) a la asistencia recién creada. Mejor esfuerzo: un reintento si falla la red.
           const pFoto = !fb ? null : (async () => {
+            if (USING_SUPABASE && window.indexedDB) await FotoCola.poner(asis.id, ev.id, fb);   // respaldo en el teléfono por si se corta la señal
             for (let i = 0; i < 2; i++) {
-              try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fb), TIMEOUT_MS); if (u) asis.foto_url = u; return true; }
-              catch (e) { console.error("foto:", e); if ((e && e.status >= 400 && e.status < 500) || i === 1) return false; await new Promise(r => setTimeout(r, 1500)); }
+              try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fb), TIMEOUT_MS); if (u) asis.foto_url = u; FotoCola.quitar(asis.id); return true; }
+              catch (e) { console.error("foto:", e); if (e && e.status >= 400 && e.status < 500) { FotoCola.quitar(asis.id); return false; } if (i === 1) return "pendiente"; await new Promise(r => setTimeout(r, 1500)); }
             }
-            return false;
+            return "pendiente";
           })();
           // 2c) BIOMETRÍA (en paralelo): vincular la verificación previa, o enrolar/verificar con las capturas.
           if (b) (async () => {

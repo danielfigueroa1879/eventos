@@ -87,7 +87,7 @@ const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
 // - "creada" es la hora del SERVIDOR de Supabase en que se creó la asistencia (columna agregada por
 //   supabase-cierre.sql). Solo los ingresos recién hechos reciben enlace. Si la base aún no tiene esa
 //   columna, se consulta sin ella y no se aplica el plazo.
-const SUBIDA_PLAZO_MS = 15 * 60 * 1000;
+const SUBIDA_PLAZO_MS = 3 * 60 * 60 * 1000;   // 3 h: con mala señal la foto se reenvía desde el teléfono más tarde
 async function asistenciaParaSubir(evId, asisId) {
   const pedir = cols => fetch(`${SUPABASE_URL}/rest/v1/asistencias?select=${cols}&id=eq.${asisId}&evento_id=eq.${evId}&limit=1`,
     { headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
