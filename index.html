@@ -1633,6 +1633,28 @@
     // Se guardan en eventos.dotacion.horario = { inicio, fin } y eventos.dotacion.citacion = "HH:MM"
     // (no requiere columnas nuevas). Los eventos CON turnos no los usan.
     const esHoraHM = x => typeof x === "string" && /^\d{2}:\d{2}$/.test(x);
+    // Hora escrita en formato 24 h ("9" → "09:00", "930" → "09:30", "1500" → "15:00", "23:5" → "23:05").
+    // Devuelve "HH:MM", "" si está vacía, o null si no es una hora válida.
+    function hora24(v) {
+      const t = String(v || "").trim();
+      if (!t) return "";
+      const m = /^(\d{1,2})(?::?(\d{1,2}))?(?::\d{2})?$/.exec(t.includes(":") ? t : (t.length > 2 ? t.slice(0, t.length - 2) + ":" + t.slice(-2) : t));
+      if (!m) return null;
+      const h = +m[1], mi = m[2] == null ? 0 : +m[2];
+      return h <= 23 && mi <= 59 ? String(h).padStart(2, "0") + ":" + String(mi).padStart(2, "0") : null;
+    }
+    // Campos de hora 24 h (sin AM/PM): solo números, agrega ":" al escribir y completa al salir del campo.
+    function prepararHoras24(raiz) {
+      raiz.querySelectorAll("input.hora24").forEach(inp => {
+        inp.addEventListener("input", () => {
+          let d = inp.value.replace(/[^\d]/g, "");
+          if (/^[3-9]/.test(d)) d = "0" + d;      // "9" → "09…" (las horas van de 00 a 23)
+          d = d.slice(0, 4);
+          inp.value = d.length > 2 ? d.slice(0, 2) + ":" + d.slice(2) : d;
+        });
+        inp.addEventListener("blur", () => { const h = hora24(inp.value); if (h) inp.value = h; });
+      });
+    }
     function horarioEv(ev) {
       if (!ev || eventoUsaTurnos(ev)) return null;
       const h = ev.dotacion && typeof ev.dotacion === "object" ? ev.dotacion.horario : null;
@@ -8582,14 +8604,14 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
               <option value="custom">Otra…</option>
             </select>
           </div>
-          <div class="m_tcfg">${L("Inicio 1er")}<input id="m_tini" type="time" class="fld fld-sm" value="${edit ? esc(ev.turno_inicio || TURNO_INICIO_DEFAULT) : TURNO_INICIO_DEFAULT}"/></div>
+          <div class="m_tcfg">${L("Inicio 1er")}<input id="m_tini" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit ? esc(hora24(ev.turno_inicio) || TURNO_INICIO_DEFAULT) : TURNO_INICIO_DEFAULT}"/></div>
         </div>
         <div id="m_turno_custom_wrap" hidden>${L("Horas por turno")}<input id="m_turno_custom" type="number" min="1" max="24" step="1" inputmode="numeric" class="fld fld-sm" placeholder="Ej: 10"/></div>
         <div id="m_horario_wrap" hidden>
           <div class="grid grid-cols-2 gap-1.5 mt-1.5">
-            <div>${L("Horario desde (opcional)")}<input id="m_hini" type="time" class="fld fld-sm" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).inicio) : ""}"/></div>
-            <div>${L("Hasta")}<input id="m_hfin" type="time" class="fld fld-sm" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).fin) : ""}"/></div>
-            <div class="col-span-2">${L("Citación guardias (opcional)")}<input id="m_hcit" type="time" class="fld fld-sm" value="${edit && citacionEv(ev) ? esc(citacionEv(ev)) : ""}"/></div>
+            <div>${L("Horario desde (opcional)")}<input id="m_hini" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).inicio) : ""}"/></div>
+            <div>${L("Hasta")}<input id="m_hfin" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).fin) : ""}"/></div>
+            <div class="col-span-2">${L("Citación guardias (opcional)")}<input id="m_hcit" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && citacionEv(ev) ? esc(citacionEv(ev)) : ""}"/></div>
           </div>
           <p class="text-[11px] text-slate-500 mt-1">Una sola jornada, sin turnos. Ej: partido 15:00 a 17:00 con citación 12:00, o evento 23:00 a 05:00 (termina al día siguiente). Déjalo vacío si no tiene horario fijo.</p>
         </div>
@@ -8607,6 +8629,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       { const _mb = $("#modalBox"); if (_mb) { _mb.classList.remove("p-5"); _mb.classList.add("p-3", "sm:p-4", "pb-0", "sm:pb-0"); } const _mo = $("#modal"); if (_mo) { _mo.style.alignItems = "flex-start"; if (window.innerWidth < 640) _mo.style.padding = "8px"; } }
       // QR rotativo: por defecto activo si el evento usa turnos (o según lo ya guardado al editar).
       $("#m_qr_rot").checked = edit ? qrRotativo(ev) : true;
+      prepararHoras24($("#modalBox"));
 
       // Otros cargos de la dotación (texto libre + cantidad por turno)
       const otrosBox = $("#m_otros");
@@ -8674,10 +8697,13 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         let turnoHoras = selTurno.value === "custom" ? parseInt(customInput.value) : parseInt(selTurno.value);
         if (!(turnoHoras > 0)) turnoHoras = TURNO_HORAS_DEFAULT;
         turnoHoras = Math.min(24, Math.max(1, turnoHoras));
-        const turnoInicio = ($("#m_tini").value || TURNO_INICIO_DEFAULT);
+        const tIni = hora24($("#m_tini").value);
+        if (usaTurnos && tIni === null) { toast("Hora de inicio del turno no válida. Usa formato 24 h, ej: 08:00 o 20:00.", false); return; }
+        const turnoInicio = tIni || TURNO_INICIO_DEFAULT;
         const fechaHasta = $("#m_fecha_hasta").value || null;
         if (fecha && fechaHasta && fechaHasta < fecha) { toast("La fecha 'Hasta' no puede ser anterior a 'Desde'", false); return; }
-        const hIni = $("#m_hini").value || "", hFin = $("#m_hfin").value || "", hCit = $("#m_hcit").value || "";
+        const hIni = hora24($("#m_hini").value), hFin = hora24($("#m_hfin").value), hCit = hora24($("#m_hcit").value);
+        if (!usaTurnos && (hIni === null || hFin === null || hCit === null)) { toast("Hora no válida. Usa formato 24 h, ej: 15:00 o 23:00.", false); return; }
         if (!usaTurnos && (!!hIni !== !!hFin)) { toast("Completa el horario: desde y hasta (o deja ambos vacíos).", false); return; }
         if (!usaTurnos && hIni && hIni === hFin) { toast("El horario 'desde' y 'hasta' no pueden ser iguales.", false); return; }
         const otros = [...otrosBox.querySelectorAll(".m_otro")].map(r => ({
