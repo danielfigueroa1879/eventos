@@ -1628,14 +1628,26 @@
     }
 
     // Línea de info del evento (ícono + texto) según su tipo y turnos. Devuelve HTML.
+    // HORARIO ÚNICO (evento sin turnos con una sola jornada, p. ej. 23:00 a 05:00 del día siguiente).
+    // Se guarda en eventos.dotacion.horario = { inicio: "HH:MM", fin: "HH:MM" } (no requiere columnas nuevas).
+    function horarioEv(ev) {
+      if (!ev || esPartido(ev) || eventoUsaTurnos(ev)) return null;
+      const h = ev.dotacion && typeof ev.dotacion === "object" ? ev.dotacion.horario : null;
+      const ok = x => typeof x === "string" && /^\d{2}:\d{2}$/.test(x);
+      return h && ok(h.inicio) && ok(h.fin) ? { inicio: h.inicio, fin: h.fin, cruza: h.fin <= h.inicio } : null;
+    }
+    const horarioTexto = h => `Horario ${h.inicio} a ${h.fin}${h.cruza ? " (día siguiente)" : ""}`;
     function eventoInfoHTML(ev) {
       if (esPartido(ev)) return `<span class="text-emerald-600">⚽ Partido${ev.partido ? ": " + esc(ev.partido) : ""}</span>`;
+      const hu = horarioEv(ev);
+      if (hu) return `<span class="text-indigo-600">🕘 ${esc(horarioTexto(hu))}</span>`;
       if (!eventoUsaTurnos(ev)) return `<span class="text-slate-500">🎫 Sin turnos</span>`;
       return `<span class="text-indigo-600">🕑 ${esc(turnoConfigTexto(ev))}</span>`;
     }
     function eventoTipoTexto(ev) {
       if (esPartido(ev)) return "Partido" + (ev.partido ? ": " + ev.partido : "");
-      return eventoUsaTurnos(ev) ? turnoConfigTexto(ev) : "Sin turnos";
+      const hu = horarioEv(ev);
+      return eventoUsaTurnos(ev) ? turnoConfigTexto(ev) : (hu ? horarioTexto(hu) : "Sin turnos");
     }
 
     /* =========================================================================
@@ -8017,7 +8029,7 @@
 
       const state = {
         fecha: saved.fecha || defaultFecha,
-        hora_inicio: saved.hora_inicio || (ev.turno_inicio ? `${ev.turno_inicio} hrs.` : "20:00 hrs."),
+        hora_inicio: saved.hora_inicio || (horarioEv(ev) ? `${horarioEv(ev).inicio} hrs.` : ev.turno_inicio ? `${ev.turno_inicio} hrs.` : "20:00 hrs."),
         partido_o_nombre: saved.partido_o_nombre || (isPart ? (ev.partido || ev.nombre_evento) : ev.nombre_evento),
         lugar: saved.lugar || (isPart ? "Estadio Francisco Sánchez Rumoroso, Coquimbo." : "Coquimbo."),
 
@@ -8563,6 +8575,13 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           <div class="m_tcfg">${L("Inicio 1er")}<input id="m_tini" type="time" class="fld fld-sm" value="${edit ? esc(ev.turno_inicio || TURNO_INICIO_DEFAULT) : TURNO_INICIO_DEFAULT}"/></div>
         </div>
         <div id="m_turno_custom_wrap" hidden>${L("Horas por turno")}<input id="m_turno_custom" type="number" min="1" max="24" step="1" inputmode="numeric" class="fld fld-sm" placeholder="Ej: 10"/></div>
+        <div id="m_horario_wrap" hidden>
+          <div class="grid grid-cols-2 gap-1.5 mt-1.5">
+            <div>${L("Horario desde (opcional)")}<input id="m_hini" type="time" class="fld fld-sm" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).inicio) : ""}"/></div>
+            <div>${L("Hasta")}<input id="m_hfin" type="time" class="fld fld-sm" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).fin) : ""}"/></div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Una sola jornada, sin turnos. Ej: 23:00 a 05:00 (termina al día siguiente). Déjalo vacío si no tiene horario fijo.</p>
+        </div>
       </div>
       <label class="flex items-center gap-2 text-xs text-slate-700 select-none cursor-pointer px-1" title="El código QR cambia en cada turno (2 horas antes de su inicio) y solo sirve escaneándolo en el lugar.">
         <input type="checkbox" id="m_qr_rot" class="w-4 h-4 flex-shrink-0">
@@ -8617,6 +8636,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         // La configuración de turnos solo si es evento CON turnos
         const conT = !esPart && selTurnosMode.value === "con";
         document.querySelectorAll("#modalBox .m_tcfg").forEach(el => { el.style.visibility = conT ? "" : "hidden"; });
+        $("#m_horario_wrap").hidden = esPart || conT;   // horario único: solo eventos SIN turnos
         customWrap.hidden = !conT || selTurno.value !== "custom";
       };
       selTipo.addEventListener("change", aplicarTipo);
@@ -8645,6 +8665,9 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         const turnoInicio = ($("#m_tini").value || TURNO_INICIO_DEFAULT);
         const fechaHasta = $("#m_fecha_hasta").value || null;
         if (fecha && fechaHasta && fechaHasta < fecha) { toast("La fecha 'Hasta' no puede ser anterior a 'Desde'", false); return; }
+        const hIni = $("#m_hini").value || "", hFin = $("#m_hfin").value || "";
+        if (!usaTurnos && !esPart && (!!hIni !== !!hFin)) { toast("Completa el horario: desde y hasta (o deja ambos vacíos).", false); return; }
+        if (!usaTurnos && !esPart && hIni && hIni === hFin) { toast("El horario 'desde' y 'hasta' no pueden ser iguales.", false); return; }
         const otros = [...otrosBox.querySelectorAll(".m_otro")].map(r => ({
           cargo: (r.querySelector(".m_otro_cargo").value || "").trim(),
           cantidad: parseInt(r.querySelector(".m_otro_cant").value) || 1
@@ -8658,7 +8681,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           tipo: esPart ? "partido" : "evento", partido: esPart ? partidoTxt : null,
           usa_turnos: usaTurnos, turno_horas: turnoHoras, turno_inicio: turnoInicio,
           qr_rotativo: $("#m_qr_rot").checked,
-          dotacion: { supervisores: parseInt($("#m_sup").value) || 0, otros }
+          dotacion: { supervisores: parseInt($("#m_sup").value) || 0, otros, ...(!usaTurnos && !esPart && hIni && hFin ? { horario: { inicio: hIni, fin: hFin } } : {}) }
         };
         const guardar = async (c) => {
           if (edit) { await Data.updateEvento(ev.id, c); }
