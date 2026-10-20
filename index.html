@@ -1665,8 +1665,8 @@
       const c = ev.dotacion && typeof ev.dotacion === "object" ? ev.dotacion.citacion : null;
       return esHoraHM(c) ? c : null;
     }
-    const horarioTexto = h => `Horario ${h.inicio} a ${h.fin}${h.cruza ? " (día siguiente)" : ""}`;
-    const citacionTexto = c => `Citación guardias ${c}`;
+    const horarioTexto = h => `Inicio ${h.inicio} · Término ${h.fin}${h.cruza ? " (día siguiente)" : ""}`;
+    const citacionTexto = c => `Citación GG.SS. ${c}`;
     function eventoInfoHTML(ev) {
       const hu = horarioEv(ev), ci = citacionEv(ev);
       const extra = (hu ? ` · 🕘 ${esc(horarioTexto(hu))}` : "") + (ci ? ` · 👮 ${esc(citacionTexto(ci))}` : "");
@@ -3711,8 +3711,14 @@
         <div class="flex justify-between gap-2"><span class="evResLbl">📅 Fechas</span><span class="font-semibold text-right">${esc(rango)}</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl whitespace-nowrap">${guardiaIcon()} GG.SS. · 🤵 SUP.</span><span class="font-semibold text-right whitespace-nowrap"><span data-reg="${e.id}">…</span>/${esc(e.cantidad_esperada || "—")} · <span data-regsup="${e.id}">…</span>/${dotacionEv(e).supervisores || "—"}</span></div>
         ${(() => { const d = dotacionEv(e); return d.otros.map(o => `<div class="flex justify-between gap-2"><span class="evResLbl">⭐ ${esc(o.cargo)}</span><span class="font-semibold text-right">${esc(o.cantidad || 1)}</span></div>`).join(""); })()}
-        <div class="flex justify-between gap-2"><span class="evResLbl">🕑 Turno actual</span><span class="font-semibold text-right">${turnoTxt}</span></div>
-        <div class="flex justify-between gap-2"><span class="evResLbl">✅ Llegados / turno</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
+        ${(() => {
+          const fila = (l, v) => `<div class="flex justify-between gap-2"><span class="evResLbl">${l}</span><span class="font-semibold text-right">${v}</span></div>`;
+          const hu = horarioEv(e), ci = citacionEv(e);
+          if (eventoUsaTurnos(e) || (!hu && !ci)) return fila("🕑 Turno actual", turnoTxt);
+          return (ci ? fila("👮 Citación GG.SS.", esc(ci) + " hrs.") : "")
+            + (hu ? fila("🕘 Inicio evento", esc(hu.inicio) + " hrs.") + fila("🏁 Término", esc(hu.fin) + " hrs." + (hu.cruza ? " (día sig.)" : "")) : "");
+        })()}
+        <div class="flex justify-between gap-2"><span class="evResLbl">✅ ${eventoUsaTurnos(e) ? "Llegados / turno" : "Llegados"}</span><span class="font-semibold text-right" data-lleg="${e.id}">…</span></div>
         <div class="flex justify-between gap-2"><span class="evResLbl">👨 / 👩</span><span class="font-semibold text-right" data-hm="${e.id}">…</span></div>
       </div>` : "";
         return `<div class="evRow" data-id="${e.id}">
@@ -8609,11 +8615,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         <div id="m_turno_custom_wrap" hidden>${L("Horas por turno")}<input id="m_turno_custom" type="number" min="1" max="24" step="1" inputmode="numeric" class="fld fld-sm" placeholder="Ej: 10"/></div>
         <div id="m_horario_wrap" hidden>
           <div class="grid grid-cols-2 gap-1.5 mt-1.5">
-            <div>${L("Horario desde (opcional)")}<input id="m_hini" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).inicio) : ""}"/></div>
-            <div>${L("Hasta")}<input id="m_hfin" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).fin) : ""}"/></div>
-            <div class="col-span-2">${L("Citación guardias (opcional)")}<input id="m_hcit" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && citacionEv(ev) ? esc(citacionEv(ev)) : ""}"/></div>
+            <div class="col-span-2">${L("Citación guardias (GG.SS.)")}<input id="m_hcit" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && citacionEv(ev) ? esc(citacionEv(ev)) : ""}"/></div>
+            <div>${L("Inicio del evento")}<input id="m_hini" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).inicio) : ""}"/></div>
+            <div>${L("Término del evento")}<input id="m_hfin" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" class="fld fld-sm hora24" value="${edit && horarioEv(ev) ? esc(horarioEv(ev).fin) : ""}"/></div>
           </div>
-          <p class="text-[11px] text-slate-500 mt-1">Una sola jornada, sin turnos. Ej: partido 15:00 a 17:00 con citación 12:00, o evento 23:00 a 05:00 (termina al día siguiente). Déjalo vacío si no tiene horario fijo.</p>
+          <p class="text-[11px] text-slate-500 mt-1">Formato 24 h. Ej. partido: citación 12:00, inicio 14:30, término 16:30. Si termina después de medianoche (ej. 23:00 a 05:00) se entiende día siguiente. Todo es opcional.</p>
         </div>
       </div>
       <label class="flex items-center gap-2 text-xs text-slate-700 select-none cursor-pointer px-1" title="El código QR cambia en cada turno (2 horas antes de su inicio) y solo sirve escaneándolo en el lugar.">
@@ -8704,8 +8710,8 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         if (fecha && fechaHasta && fechaHasta < fecha) { toast("La fecha 'Hasta' no puede ser anterior a 'Desde'", false); return; }
         const hIni = hora24($("#m_hini").value), hFin = hora24($("#m_hfin").value), hCit = hora24($("#m_hcit").value);
         if (!usaTurnos && (hIni === null || hFin === null || hCit === null)) { toast("Hora no válida. Usa formato 24 h, ej: 15:00 o 23:00.", false); return; }
-        if (!usaTurnos && (!!hIni !== !!hFin)) { toast("Completa el horario: desde y hasta (o deja ambos vacíos).", false); return; }
-        if (!usaTurnos && hIni && hIni === hFin) { toast("El horario 'desde' y 'hasta' no pueden ser iguales.", false); return; }
+        if (!usaTurnos && (!!hIni !== !!hFin)) { toast("Completa inicio y término del evento (o deja ambos vacíos).", false); return; }
+        if (!usaTurnos && hIni && hIni === hFin) { toast("El inicio y el término del evento no pueden ser iguales.", false); return; }
         const otros = [...otrosBox.querySelectorAll(".m_otro")].map(r => ({
           cargo: (r.querySelector(".m_otro_cargo").value || "").trim(),
           cantidad: parseInt(r.querySelector(".m_otro_cant").value) || 1
