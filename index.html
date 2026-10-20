@@ -2924,8 +2924,16 @@
     }
     // Momento (ms) del inicio del 1er turno: turno_inicio (HH:MM) sobre la fecha del evento
     // (o una fecha fija si no tiene), en hora local. Igual en el panel y en el teléfono del guardia.
+    // Partidos y eventos SIN turnos con citación (u hora de inicio): una jornada por día, anclada a la
+    // CITACIÓN de los guardias (o al inicio del evento si no hay citación). Así el QR cambia 2 h antes
+    // de la citación. Devuelve "HH:MM" o null (entonces se usa turno_inicio / turno_horas).
+    function qrHoraJornada(ev) {
+      if (!ev || eventoUsaTurnos(ev)) return null;
+      const hu = horarioEv(ev);
+      return citacionEv(ev) || (hu ? hu.inicio : null);
+    }
     function qrAnchorMs(ev) {
-      const p = String(ev.turno_inicio || "08:00").split(":");
+      const p = String(qrHoraJornada(ev) || ev.turno_inicio || "08:00").split(":");
       const hh = parseInt(p[0], 10) || 0, mm = parseInt(p[1], 10) || 0;
       const base = ev.fecha_evento ? new Date(ev.fecha_evento + "T00:00:00") : new Date(2020, 0, 1);
       base.setHours(hh, mm, 0, 0);
@@ -2934,7 +2942,7 @@
     // Número del turno vigente para el QR. Cambia 2 h ANTES del inicio de cada turno.
     function qrTurnoIndex(ev, nowMs) {
       const now = (nowMs == null ? Date.now() : nowMs);
-      const H = Math.min(24, Math.max(1, parseFloat(ev.turno_horas) || 12));
+      const H = qrHoraJornada(ev) ? 24 : Math.min(24, Math.max(1, parseFloat(ev.turno_horas) || 12));
       const periodMs = H * 3600 * 1000;
       return Math.floor((now - qrAnchorMs(ev) + QR_LEAD_MS) / periodMs);
     }
@@ -2951,7 +2959,7 @@
     // Botones bajo el QR (+ aviso si es rotativo). En la empresa se omite el botón "Link".
     function qrBotonesHTML(ev, opts) {
       const conLink = !!(opts && opts.conLink);
-      const nota = qrRotativo(ev) ? `<div class="mt-2 text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 max-w-xs leading-snug">🔒 <b>Código por turno:</b> cambia 2 horas antes de cada turno. Escanéalo en el lugar.</div>` : "";
+      const nota = qrRotativo(ev) ? `<div class="mt-2 text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 max-w-xs leading-snug">${qrHoraJornada(ev) ? `🔒 <b>Código por jornada:</b> cambia 2 horas antes ${citacionEv(ev) ? "de la citación de los GG.SS." : "del inicio del evento"} (${esc(qrHoraJornada(ev))}). Escanéalo en el lugar.` : `🔒 <b>Código por turno:</b> cambia 2 horas antes de cada turno. Escanéalo en el lugar.`}</div>` : "";
       return `<div class="flex gap-2 mt-2 w-full max-w-xs">
         <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
         <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
