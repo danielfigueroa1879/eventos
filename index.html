@@ -2940,7 +2940,15 @@
       return base.getTime();
     }
     // Número del turno vigente para el QR. Cambia 2 h ANTES del inicio de cada turno.
+    // PARTIDOS: el código NO rota con la hora. Queda fijo y cambia solo cuando se modifica el horario
+    // o la citación del partido (el número depende de esos valores).
+    function qrIndexPartido(ev) {
+      const hu = horarioEv(ev), ci = citacionEv(ev);
+      if (!hu && !ci) return 0;
+      return parseInt(qrHash("partido|" + (ci || "") + "|" + (hu ? hu.inicio + "-" + hu.fin : "")).slice(0, 6), 36) % 1000000;
+    }
     function qrTurnoIndex(ev, nowMs) {
+      if (esPartido(ev)) return qrIndexPartido(ev);
       const now = (nowMs == null ? Date.now() : nowMs);
       const H = qrHoraJornada(ev) ? 24 : Math.min(24, Math.max(1, parseFloat(ev.turno_horas) || 12));
       const periodMs = H * 3600 * 1000;
@@ -2959,7 +2967,7 @@
     // Botones bajo el QR (+ aviso si es rotativo). En la empresa se omite el botón "Link".
     function qrBotonesHTML(ev, opts) {
       const conLink = !!(opts && opts.conLink);
-      const nota = qrRotativo(ev) ? `<div class="mt-2 text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 max-w-xs leading-snug">${qrHoraJornada(ev) ? `🔒 <b>Código por jornada:</b> cambia 2 horas antes ${citacionEv(ev) ? "de la citación de los GG.SS." : "del inicio del evento"} (${esc(qrHoraJornada(ev))}). Escanéalo en el lugar.` : `🔒 <b>Código por turno:</b> cambia 2 horas antes de cada turno. Escanéalo en el lugar.`}</div>` : "";
+      const nota = qrRotativo(ev) ? `<div class="mt-2 text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 max-w-xs leading-snug">${esPartido(ev) ? `🔒 <b>Código del partido:</b> cambia solo cuando se modifica el horario o la citación. Escanéalo en el lugar.` : qrHoraJornada(ev) ? `🔒 <b>Código por jornada:</b> cambia 2 horas antes ${citacionEv(ev) ? "de la citación de los GG.SS." : "del inicio del evento"} (${esc(qrHoraJornada(ev))}). Escanéalo en el lugar.` : `🔒 <b>Código por turno:</b> cambia 2 horas antes de cada turno. Escanéalo en el lugar.`}</div>` : "";
       return `<div class="flex gap-2 mt-2 w-full max-w-xs">
         <button id="qrDl" class="btn btn-ghost text-xs flex-1">⬇ PNG</button>
         <button id="qrPr" class="btn btn-ghost text-xs flex-1">🖨 Imprimir</button>
