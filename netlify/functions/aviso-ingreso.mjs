@@ -61,6 +61,16 @@ const usaTurnos = ev => !!ev && ev.tipo !== "partido" && ev.usa_turnos !== false
 function ventana(ev, t) {
   const w = enChile(t);
   if (!usaTurnos(ev)) {
+    // Horario único (p. ej. 23:00 a 05:00 del día siguiente): la jornada empieza 2 h antes del inicio,
+    // así los ingresos de después de medianoche cuentan para la MISMA jornada (un solo correo).
+    const h = ev.tipo !== "partido" && ev.dotacion && ev.dotacion.horario;
+    const hm = x => { const m = /^(\d{2}):(\d{2})$/.exec(String(x || "")); return m ? +m[1] * 60 + +m[2] : null; };
+    const ini = h ? hm(h.inicio) : null, fin = h ? hm(h.fin) : null;
+    if (ini != null && fin != null) {
+      let desde = new Date(desdeChile(w.year, w.month, w.day, 0, 0).getTime() + (ini - 120) * 60000);
+      if (desde > t) desde = new Date(desde.getTime() - 86400000);
+      return { desde, etiqueta: "Horario", rango: h.inicio + "–" + h.fin };
+    }
     return { desde: desdeChile(w.year, w.month, w.day, 0, 0), etiqueta: null, rango: null };
   }
   let H = parseFloat(ev.turno_horas); if (!(H > 0)) H = TURNO_HORAS_DEFAULT; H = Math.min(24, Math.max(1, H));
@@ -92,7 +102,7 @@ export default async (req) => {
   if (isNaN(t.getTime())) return json({ ok: true, enviado: false, motivo: "hora inválida" });
 
   try {
-    const [ev] = await sb(`/rest/v1/eventos?id=eq.${evId}&select=id,nombre_evento,empresa,tipo,usa_turnos,turno_horas,turno_inicio,cantidad_esperada&limit=1`);
+    const [ev] = await sb(`/rest/v1/eventos?id=eq.${evId}&select=id,nombre_evento,empresa,tipo,usa_turnos,turno_horas,turno_inicio,cantidad_esperada,dotacion&limit=1`);
     if (!ev) return json({ ok: true, enviado: false, motivo: "evento no encontrado" });
     const v = ventana(ev, t);
     // ¿Es el PRIMER ingreso de esta ventana? (orden por hora y, en empate, por id: así, aunque entren
@@ -106,22 +116,24 @@ export default async (req) => {
 
     const hc = enChile(t), hora = pad(hc.hour) + ":" + pad(hc.minute), fecha = pad(hc.day) + "/" + pad(hc.month) + "/" + hc.year;
     const sitio = (process.env.URL || "").replace(/\/+$/, "");
-    const turnoTxt = v.etiqueta ? `${v.etiqueta} (${v.rango})` : "";
-    const asunto = `🟢 Comenzaron los ingresos — ${ev.nombre_evento}${v.etiqueta ? " · " + v.etiqueta : ""}`;
+    const esHorario = v.etiqueta === "Horario";
+    const turnoTxt = !v.etiqueta ? "" : esHorario ? v.rango : `${v.etiqueta} (${v.rango})`;
+    const etTurno = esHorario ? "Horario" : "Turno";
+    const asunto = `🟢 Comenzaron los ingresos — ${ev.nombre_evento}${v.etiqueta ? " · " + (esHorario ? "Horario " + v.rango : v.etiqueta) : ""}`;
     const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
   <div style="background:#0f5323;color:#fff;padding:14px 18px;font-weight:bold;font-size:16px">O.S.10 Coquimbo · Control de eventos</div>
   <div style="padding:18px;color:#0f172a;font-size:14px;line-height:1.5">
     <div style="font-size:17px;font-weight:bold;margin-bottom:6px">🟢 Comenzaron los ingresos</div>
     <div><b>Evento:</b> ${esc(ev.nombre_evento)}</div>
     <div><b>Empresa:</b> ${esc(ev.empresa)}</div>
-    ${turnoTxt ? `<div><b>Turno:</b> ${esc(turnoTxt)}</div>` : ""}
+    ${turnoTxt ? `<div><b>${etTurno}:</b> ${esc(turnoTxt)}</div>` : ""}
     <div><b>Primer ingreso:</b> ${fecha}, ${hora}</div>
     ${ev.cantidad_esperada ? `<div><b>Guardias esperados:</b> ${esc(ev.cantidad_esperada)}</div>` : ""}
     ${sitio ? `<div style="margin-top:16px"><a href="${esc(sitio)}/" style="background:#0f5323;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block;font-weight:bold">Abrir el panel</a></div>` : ""}
   </div>
   <div style="padding:10px 18px;background:#f8fafc;color:#64748b;font-size:11px">Aviso automático: se envía solo con el primer ingreso de cada turno.</div>
 </div>`;
-    const texto = `Comenzaron los ingresos\nEvento: ${ev.nombre_evento}\nEmpresa: ${ev.empresa || ""}\n${turnoTxt ? "Turno: " + turnoTxt + "\n" : ""}Primer ingreso: ${fecha}, ${hora}\n${sitio ? sitio + "/" : ""}`;
+    const texto = `Comenzaron los ingresos\nEvento: ${ev.nombre_evento}\nEmpresa: ${ev.empresa || ""}\n${turnoTxt ? etTurno + ": " + turnoTxt + "\n" : ""}Primer ingreso: ${fecha}, ${hora}\n${sitio ? sitio + "/" : ""}`;
 
     const tx = nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
     await tx.sendMail({ from: `"O.S.10 Coquimbo · Eventos" <${user}>`, to: destinos.join(", "), subject: asunto, text: texto, html });
