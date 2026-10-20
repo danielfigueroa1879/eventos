@@ -61,15 +61,22 @@ const usaTurnos = ev => !!ev && ev.tipo !== "partido" && ev.usa_turnos !== false
 function ventana(ev, t) {
   const w = enChile(t);
   if (!usaTurnos(ev)) {
-    // Horario único (p. ej. 23:00 a 05:00 del día siguiente): la jornada empieza 2 h antes del inicio,
+    // Horario único (partido o evento sin turnos; p. ej. 15:00 a 17:00, o 23:00 a 05:00 del día siguiente):
+    // la jornada empieza 2 h antes de la citación de los guardias (o del inicio si no hay citación),
     // así los ingresos de después de medianoche cuentan para la MISMA jornada (un solo correo).
-    const h = ev.tipo !== "partido" && ev.dotacion && ev.dotacion.horario;
+    const d = ev.dotacion && typeof ev.dotacion === "object" ? ev.dotacion : {};
+    const h = d.horario || null;
     const hm = x => { const m = /^(\d{2}):(\d{2})$/.exec(String(x || "")); return m ? +m[1] * 60 + +m[2] : null; };
-    const ini = h ? hm(h.inicio) : null, fin = h ? hm(h.fin) : null;
-    if (ini != null && fin != null) {
-      let desde = new Date(desdeChile(w.year, w.month, w.day, 0, 0).getTime() + (ini - 120) * 60000);
-      if (desde > t) desde = new Date(desde.getTime() - 86400000);
-      return { desde, etiqueta: "Horario", rango: h.inicio + "–" + h.fin };
+    const ini = h ? hm(h.inicio) : null, fin = h ? hm(h.fin) : null, cit = hm(d.citacion);
+    const tieneHorario = ini != null && fin != null;
+    if (tieneHorario || cit != null) {
+      // La citación es ANTES del inicio (si su hora es mayor, fue el día anterior: 22:00 para un 00:30).
+      let ancla = tieneHorario ? ini : cit;
+      if (tieneHorario && cit != null) ancla = cit <= ini ? cit : cit - 1440;
+      let desde = new Date(desdeChile(w.year, w.month, w.day, 0, 0).getTime() + (ancla - 120) * 60000);
+      while (desde > t) desde = new Date(desde.getTime() - 86400000);
+      if (t.getTime() - desde.getTime() >= 86400000) desde = new Date(desde.getTime() + 86400000);
+      return { desde, etiqueta: tieneHorario ? "Horario" : null, rango: tieneHorario ? h.inicio + "–" + h.fin : null, citacion: cit != null ? d.citacion : null };
     }
     return { desde: desdeChile(w.year, w.month, w.day, 0, 0), etiqueta: null, rango: null };
   }
@@ -127,13 +134,14 @@ export default async (req) => {
     <div><b>Evento:</b> ${esc(ev.nombre_evento)}</div>
     <div><b>Empresa:</b> ${esc(ev.empresa)}</div>
     ${turnoTxt ? `<div><b>${etTurno}:</b> ${esc(turnoTxt)}</div>` : ""}
+    ${v.citacion ? `<div><b>Citación guardias:</b> ${esc(v.citacion)}</div>` : ""}
     <div><b>Primer ingreso:</b> ${fecha}, ${hora}</div>
     ${ev.cantidad_esperada ? `<div><b>Guardias esperados:</b> ${esc(ev.cantidad_esperada)}</div>` : ""}
     ${sitio ? `<div style="margin-top:16px"><a href="${esc(sitio)}/" style="background:#0f5323;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block;font-weight:bold">Abrir el panel</a></div>` : ""}
   </div>
   <div style="padding:10px 18px;background:#f8fafc;color:#64748b;font-size:11px">Aviso automático: se envía solo con el primer ingreso de cada turno.</div>
 </div>`;
-    const texto = `Comenzaron los ingresos\nEvento: ${ev.nombre_evento}\nEmpresa: ${ev.empresa || ""}\n${turnoTxt ? etTurno + ": " + turnoTxt + "\n" : ""}Primer ingreso: ${fecha}, ${hora}\n${sitio ? sitio + "/" : ""}`;
+    const texto = `Comenzaron los ingresos\nEvento: ${ev.nombre_evento}\nEmpresa: ${ev.empresa || ""}\n${turnoTxt ? etTurno + ": " + turnoTxt + "\n" : ""}${v.citacion ? "Citación guardias: " + v.citacion + "\n" : ""}Primer ingreso: ${fecha}, ${hora}\n${sitio ? sitio + "/" : ""}`;
 
     const tx = nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
     await tx.sendMail({ from: `"O.S.10 Coquimbo · Eventos" <${user}>`, to: destinos.join(", "), subject: asunto, text: texto, html });
