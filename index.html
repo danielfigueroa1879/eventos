@@ -738,6 +738,13 @@
       gap: .25rem;
     }
     #listaEventos .evRow .evItem { flex: 1 1 auto; min-width: 0; }
+    /* Nombre del evento siempre en una sola línea; si no cabe se corta con "…". */
+    #listaEventos .evName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* PC: al entrar el panel lateral aparece más ancho y a los 30 s se repliega a su ancho normal. */
+    @media (min-width: 768px) {
+      #sidebar { transition: width .4s ease; }
+      #sidebar.sb-ancho { width: 22rem; }
+    }
     /* Línea divisoria entre eventos para que la lista compacta se lea separada */
     #listaEventos .evRow + .evRow { border-top: 1px solid #e2e8f0; padding-top: .25rem; }
     html[data-theme="dark"] #listaEventos .evRow + .evRow { border-top-color: #3a4048; }
@@ -3586,7 +3593,7 @@
     <div id="drawerBk" class="fixed inset-0 bg-black/40 z-40 md:hidden hidden"></div>
 
     <!-- Sidebar / Drawer -->
-    <aside id="sidebar" class="bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 w-80 max-w-[92%] -translate-x-full transition-transform duration-300 overflow-y-auto shadow-2xl md:static md:translate-x-0 md:w-72 md:max-w-none md:min-h-screen md:overflow-visible md:shadow-none md:transition-none md:z-auto">
+    <aside id="sidebar" class="sb-ancho bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 w-80 max-w-[92%] -translate-x-full transition-transform duration-300 overflow-y-auto shadow-2xl md:static md:translate-x-0 md:w-72 md:max-w-none md:min-h-screen md:overflow-visible md:shadow-none md:transition-none md:z-auto">
       <div id="sbBrand" class="brand-bg text-white h-16 px-4 md:h-auto md:px-4 md:py-2.5 flex items-center gap-3">
         <img src="images/logo-os10-original.webp" class="w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/90" alt="OS10">
         <div class="flex-1">
@@ -3660,6 +3667,8 @@
       });
       $("#importar").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalImportar(); });
       $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); sessionStorage.removeItem("os10_admin_pin"); route(); });
+      if (ADMIN_STATE._sbAnchoTimer) clearTimeout(ADMIN_STATE._sbAnchoTimer);
+      ADMIN_STATE._sbAnchoTimer = setTimeout(() => { const sb = $("#sidebar"); if (sb) sb.classList.remove("sb-ancho"); }, 30000);
       const hamb = $("#hamb"), sidebar = $("#sidebar"), drawerBk = $("#drawerBk"), cerrarMenu = $("#cerrarMenu");
       const abrirMenu = () => { sidebar.classList.remove("-translate-x-full"); if (drawerBk) drawerBk.classList.remove("hidden"); };
       window.cerrarDrawer = () => { sidebar.classList.add("-translate-x-full"); if (drawerBk) drawerBk.classList.add("hidden"); };
@@ -3745,7 +3754,7 @@
       <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} pl-1.5 pr-3 py-1.5 border-l-4 flex items-center gap-1.5 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
         <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
         <span class="flex-1 min-w-0">
-          <span class="block font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight">${esc(e.nombre_evento)}</span>
+          <span class="evName block font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight" title="${esc(e.nombre_evento)}">${esc(e.nombre_evento)}</span>
           <span class="block text-[10px] leading-tight truncate ${act ? 'text-green-800/70' : 'text-slate-500'}">${esc(e.empresa)}</span>
         </span>
         ${chevron(e.id, abierto)}
