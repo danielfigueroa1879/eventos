@@ -738,6 +738,9 @@
       gap: .25rem;
     }
     #listaEventos .evRow .evItem { flex: 1 1 auto; min-width: 0; }
+    /* Línea divisoria entre eventos para que la lista compacta se lea separada */
+    #listaEventos .evRow + .evRow { border-top: 1px solid #e2e8f0; padding-top: .25rem; }
+    html[data-theme="dark"] #listaEventos .evRow + .evRow { border-top-color: #3a4048; }
     #listaEventos .evHandle {
       flex: 0 0 auto;
       display: flex;
@@ -3739,7 +3742,7 @@
       </div>` : "";
         return `<div class="evRow" data-id="${e.id}">
       <div class="flex-1 min-w-0">
-      <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} pl-1.5 pr-3 py-1 border-l-4 flex items-center gap-1.5 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
+      <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} pl-1.5 pr-3 py-1.5 border-l-4 flex items-center gap-1.5 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
         <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
         <span class="flex-1 min-w-0">
           <span class="block font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight">${esc(e.nombre_evento)}</span>
