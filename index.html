@@ -3739,12 +3739,11 @@
       </div>` : "";
         return `<div class="evRow" data-id="${e.id}">
       <div class="flex-1 min-w-0">
-      <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} pl-1.5 pr-3 py-2 border-l-4 flex items-center gap-1.5 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
+      <button data-id="${e.id}" class="evItem w-full text-left ${abierto ? 'rounded-t-lg' : 'rounded-lg'} pl-1.5 pr-3 py-1 border-l-4 flex items-center gap-1.5 ${act ? 'bg-green-50 border-green-600 border-y border-r border-y-green-200 border-r-green-200 md:bg-green-100 md:shadow-sm' : 'border-transparent hover:bg-slate-50'}">
         <span class="evHandle" role="button" tabindex="-1" aria-label="Arrastrar para cambiar el orden" title="Mantén presionado y arrastra para cambiar el orden">⠿</span>
         <span class="flex-1 min-w-0">
           <span class="block font-semibold text-sm ${act ? 'text-green-900' : 'text-slate-800'} leading-tight">${esc(e.nombre_evento)}</span>
-          <span class="block text-xs ${act ? 'text-green-800/70' : 'text-slate-500'}">Empresa: ${esc(e.empresa)}</span>
-          <span class="block text-[11px] ${act ? 'text-green-700/70' : 'text-slate-400'} mt-0.5" data-count="${e.id}">…</span>
+          <span class="block text-[10px] leading-tight truncate ${act ? 'text-green-800/70' : 'text-slate-500'}">${esc(e.empresa)}</span>
         </span>
         ${chevron(e.id, abierto)}
       </button>
@@ -3783,13 +3782,13 @@
       habilitarReordenEventos(cont);
       // contadores + resumen del evento expandido
       lista.forEach(async e => {
-        // Contador: consulta liviana. Solo el evento con el resumen abierto pide la ficha completa (H/M).
+        // La tarjeta ya no muestra contadores: solo el evento con el resumen abierto consulta asistencias.
+        if (e.id !== ADMIN_STATE.expandido) return;
         let as = [];
-        try { as = e.id === ADMIN_STATE.expandido ? await Data.listAsistencias(e.id) : await Data.listAsistenciasConteo(e.id); } catch (_) { as = []; }
+        try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
         // Solo los turnos vigentes (igual que el listado); los finalizados están en el historial.
         const asV = asistVigentes(e, as);
         const g = asV.filter(a => !a.es_supervisor), sup = asV.filter(a => a.es_supervisor);
-        const elC = $(`[data-count="${e.id}"]`); if (elC) elC.textContent = `${g.length}/${e.cantidad_esperada || "—"} GG.SS. · ${sup.length}/${dotacionEv(e).supervisores || "—"} SUP.`;
         if (e.id === ADMIN_STATE.expandido) {
           const elR = $(`[data-reg="${e.id}"]`); if (elR) elR.textContent = g.length;
           const elRS = $(`[data-regsup="${e.id}"]`); if (elRS) elRS.textContent = sup.length;
