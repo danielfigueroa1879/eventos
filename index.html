@@ -738,12 +738,12 @@
       gap: .25rem;
     }
     #listaEventos .evRow .evItem { flex: 1 1 auto; min-width: 0; }
-    /* PC: al entrar el panel lateral aparece más ancho (nombres completos) y a los 30 s
-       se repliega a su ancho normal; ahí los nombres van en una sola línea con "…". */
+    /* Nombre del evento siempre en una sola línea; si no cabe se corta con "…". */
+    #listaEventos .evName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* PC: al entrar el panel lateral aparece más ancho y a los 30 s se repliega a su ancho normal. */
     @media (min-width: 768px) {
       #sidebar { transition: width .4s ease; }
       #sidebar.sb-ancho { width: 22rem; }
-      #sidebar:not(.sb-ancho) #listaEventos .evName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
     /* Línea divisoria entre eventos para que la lista compacta se lea separada */
     #listaEventos .evRow + .evRow { border-top: 1px solid #e2e8f0; padding-top: .25rem; }
