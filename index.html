@@ -740,7 +740,7 @@
     #listaEventos .evRow .evItem { flex: 1 1 auto; min-width: 0; }
     /* Nombre del evento siempre en una sola línea; si no cabe se corta con "…". */
     #listaEventos .evName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* PC: al entrar el panel lateral aparece más ancho y a los 30 s se repliega a su ancho normal. */
+    /* PC: el panel lateral queda ancho mientras se trabaja y se repliega tras 30 s sin actividad. */
     @media (min-width: 768px) {
       #sidebar { transition: width .4s ease; }
       #sidebar.sb-ancho { width: 22rem; }
@@ -748,6 +748,10 @@
     /* Línea divisoria entre eventos para que la lista compacta se lea separada */
     #listaEventos .evRow + .evRow { border-top: 1px solid #e2e8f0; padding-top: .25rem; }
     html[data-theme="dark"] #listaEventos .evRow + .evRow { border-top-color: #3a4048; }
+    /* Celular: un poco más de separación entre eventos. */
+    @media (max-width: 767px) {
+      #listaEventos .evRow + .evRow { padding-top: .4rem; margin-top: .4rem; }
+    }
     #listaEventos .evHandle {
       flex: 0 0 auto;
       display: flex;
@@ -3667,8 +3671,20 @@
       });
       $("#importar").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalImportar(); });
       $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); sessionStorage.removeItem("os10_admin_pin"); route(); });
-      if (ADMIN_STATE._sbAnchoTimer) clearTimeout(ADMIN_STATE._sbAnchoTimer);
-      ADMIN_STATE._sbAnchoTimer = setTimeout(() => { const sb = $("#sidebar"); if (sb) sb.classList.remove("sb-ancho"); }, 30000);
+      // PC: cualquier actividad (mouse, teclado, scroll, toque) deja el panel ancho; 30 s sin actividad lo repliega.
+      const sbActividad = () => {
+        const sb = $("#sidebar"); if (!sb) return;
+        sb.classList.add("sb-ancho");
+        if (ADMIN_STATE._sbAnchoTimer) clearTimeout(ADMIN_STATE._sbAnchoTimer);
+        ADMIN_STATE._sbAnchoTimer = setTimeout(() => sb.classList.remove("sb-ancho"), 30000);
+      };
+      if (!ADMIN_STATE._sbActividadOn) {
+        ADMIN_STATE._sbActividadOn = true;
+        let ultimo = 0;
+        const onAct = () => { const t = Date.now(); if (t - ultimo < 1000) return; ultimo = t; sbActividad(); };
+        ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"].forEach(ev => document.addEventListener(ev, onAct, { passive: true }));
+      }
+      sbActividad();
       const hamb = $("#hamb"), sidebar = $("#sidebar"), drawerBk = $("#drawerBk"), cerrarMenu = $("#cerrarMenu");
       const abrirMenu = () => { sidebar.classList.remove("-translate-x-full"); if (drawerBk) drawerBk.classList.remove("hidden"); };
       window.cerrarDrawer = () => { sidebar.classList.add("-translate-x-full"); if (drawerBk) drawerBk.classList.add("hidden"); };
