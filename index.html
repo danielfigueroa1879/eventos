@@ -866,11 +866,9 @@
     @media (max-width: 767px) {
       #empBanner { position: fixed !important; top: 0; left: 0; right: 0; z-index: 45; border-radius: 0 !important; border-width: 0 !important;
         padding: .45rem .5rem .45rem .9rem !important; gap: .65rem !important; min-height: 4rem; }
-      #empBanner > a img { width: 2.6rem; height: 2.6rem; }
       #empBanner .text-xs { font-size: .58rem; line-height: 1.15; letter-spacing: .08em; }
       #empBanner h1 { font-size: 1.02rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       #empBanner .text-sm { font-size: .7rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #empBanner > img { display: none !important; }
       #empResWrap, #empToggleQR, #empDistWrap { display: none !important; }
       #empQrCard:has(#empQrPanel[hidden]) { display: none; }
       #empQrCard { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 55; width: min(560px, 92vw); max-height: 88vh; overflow: auto; margin: 0 !important; box-shadow: 0 25px 60px -10px rgba(0, 0, 0, .5); }
@@ -881,12 +879,10 @@
     }
     /* Vista empresa en PC: banner verde FIJO arriba, a todo el ancho (ver ajustarEmpBanner). */
     @media (min-width: 768px) {
-      /* Banda más baja (~70 px) y el contenido (logo, texto y "100") alineado con los recuadros de abajo
+      /* Banda más baja (~70 px) y el contenido (texto) alineado con los recuadros de abajo
          (columna de 62rem centrada): el relleno lateral calcula ese margen. */
       #empBanner { position: fixed !important; top: 0; left: 0; right: 0; z-index: 45; border-radius: 0; border-width: 0;
         padding: .3rem max(1rem, calc((100% - 62rem) / 2)); gap: .6rem; }
-      #empBanner > a img { width: 2.4rem; height: 2.4rem; }
-      #empBanner > img { width: 3.9rem; height: 3.9rem; margin: -.55rem 0; }
       #empBarra .ico { width: 1.05em; height: 1.05em; display: inline-block; vertical-align: -.17em; flex-shrink: 0; }
       #empBarra .btn, #empBarra > span { display: inline-flex; align-items: center; gap: .4rem; }
       /* Siempre en UNA línea: los botones no se parten y la info del turno se acorta con "…" si no cabe. */
@@ -3130,10 +3126,8 @@
   <div class="min-h-screen flex flex-col items-center p-4">
     <div class="w-full max-w-md">
       <div class="brand-bg rounded-2xl px-4 pt-4 pb-5 text-white text-center shadow-lg relative overflow-hidden border border-white/10">
-        <div class="flex items-center justify-between mb-1 gap-3">
-          <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" title="Ir a os10coquimbo.cl"><img src="images/logo-os10-original.webp" alt="OS10 Coquimbo" class="w-[clamp(24px,10vw,40px)] h-[clamp(24px,10vw,40px)] object-contain drop-shadow rounded-full bg-white/90 -mt-4 mr-2"></a>
-          <img src="images/poli.webp" alt="" class="w-[clamp(30px,12vw,48px)] h-[clamp(30px,12vw,48px)] rounded-full bg-white/20 p-1 ring-2 ring-white/40 ml-11 -mt-2">
-          <img src="images/aniversario1.webp" alt="Centenario" class="w-[clamp(36px,14vw,68px)] h-[clamp(36px,14vw,68px)] object-contain drop-shadow ml-10 -mt-5">
+        <div class="flex items-center justify-center mb-1 gap-3">
+          <img src="images/poli.webp" alt="" class="w-[clamp(30px,12vw,48px)] h-[clamp(30px,12vw,48px)] rounded-full bg-white/20 p-1 ring-2 ring-white/40 -mt-2">
         </div>
         <div class="text-[11px] uppercase tracking-widest opacity-90 font-semibold">Seguridad Privada · O.S.10 Coquimbo</div>
         <h1 class="text-xl font-bold mt-1">${esc(ev.nombre_evento)}</h1>
@@ -3602,13 +3596,11 @@
     <!-- Sidebar / Drawer -->
     <aside id="sidebar" class="bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-50 w-80 max-w-[92%] -translate-x-full transition-transform duration-300 overflow-y-auto shadow-2xl md:static md:translate-x-0 md:w-72 md:max-w-none md:min-h-screen md:overflow-visible md:shadow-none md:transition-none md:z-auto">
       <div id="sbBrand" class="brand-bg text-white h-16 px-4 md:h-auto md:pl-3 md:pr-8 md:py-2.5 flex items-center gap-3 md:gap-2 relative">
-        <img src="images/logo-os10-original.webp" class="w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/90" alt="OS10">
         <div class="flex-1">
           <div class="font-bold text-lg md:text-[14px] md:whitespace-nowrap leading-tight">CONTROL EVENTOS</div>
           <div class="text-xs md:text-[11px] opacity-80">O.S.10 Coquimbo</div>
         </div>
         <button id="cerrarMenu" class="md:hidden text-white text-2xl leading-none px-1" aria-label="Cerrar menú">✕</button>
-        <img src="images/aniversario1.webp" class="w-[44px] h-[44px] object-contain hidden md:block" alt="Centenario">
         <button id="sbOcultar" type="button" class="sbToggle" title="Angostar / ampliar panel" aria-label="Angostar o ampliar panel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
       </div>
       <div class="p-3" id="adminSide">
@@ -9192,13 +9184,11 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       <div id="empBannerSp" aria-hidden="true"></div>
       <div id="empBanner" class="brand-bg rounded-2xl px-5 py-3.5 text-white shadow-lg flex items-center gap-4 relative overflow-hidden border border-white/10">
         ${esPartido(ev) ? `<span aria-hidden="true" class="pointer-events-none select-none absolute left-1/3 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/10 leading-none" style="font-size:8rem">⚽</span>` : ""}
-        <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" title="Ir a os10coquimbo.cl" class="relative flex-shrink-0"><img src="images/logo-os10-original.webp" class="w-14 h-14 rounded-full bg-white/90" alt="OS10 Coquimbo"></a>
         <div class="flex-1 min-w-0 relative">
           <div class="text-xs uppercase tracking-widest opacity-90 font-semibold">${SOLO_VISTA ? `Solo vista · vence ${esc(horaFmt(new Date(venceVista).toISOString()))}` : "Vista de empresa · solo lectura"}</div>
           <h1 class="text-xl font-bold leading-tight">${esc(ev.nombre_evento)}</h1>
           <div class="text-sm opacity-90">Empresa: ${esc(ev.empresa)}</div>
         </div>
-        <img src="images/aniversario1.webp" class="w-20 h-20 object-contain flex-shrink-0 hidden sm:block relative" alt="Centenario">
         <button id="empMenuBtn" type="button" class="md:hidden relative flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-xl text-white active:bg-white/15" aria-label="Opciones" title="Opciones"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO_ENGRANAJE}</svg></button>
       </div>
       <div class="hidden md:flex items-center gap-2 mt-0 flex-wrap" id="empBarra">
