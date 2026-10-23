@@ -529,6 +529,25 @@
       color: #86efac
     }
 
+    /* Tarjeta flotante con el resumen del evento al pasar el mouse (solo PC) */
+    #evHoverCard {
+      position: fixed; z-index: 60; width: 340px; max-width: calc(100vw - 24px);
+      background: #fff; color: #1e293b; border: 1px solid #bbf7d0; border-radius: 14px;
+      box-shadow: 0 18px 40px -12px rgba(15, 83, 35, .35), 0 4px 12px rgba(0, 0, 0, .08);
+      overflow: hidden; pointer-events: none; opacity: 0; transform: translateX(-6px);
+      transition: opacity .15s ease, transform .15s ease;
+    }
+    #evHoverCard.on { opacity: 1; transform: none; }
+    #evHoverCard .hcHead { background: #0f5323; color: #fff; padding: 10px 14px; }
+    #evHoverCard .hcBody { padding: 10px 14px 12px; font-size: 13px; }
+    #evHoverCard .hcRow { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; }
+    #evHoverCard .hcRow:last-child { border-bottom: 0; }
+    #evHoverCard .hcLbl { color: #64748b; white-space: nowrap; }
+    #evHoverCard .hcVal { font-weight: 600; text-align: right; }
+    html[data-theme="dark"] #evHoverCard { background: #16191d; color: #e7f6ec; border-color: #1f5133; }
+    html[data-theme="dark"] #evHoverCard .hcRow { border-bottom-color: #2a2f36; }
+    html[data-theme="dark"] #evHoverCard .hcLbl { color: #94a3b8; }
+
     @media (max-width: 767px) {
       .row-mujer {
         background: #fefdfd
@@ -3794,6 +3813,7 @@
       // Tocar el asa (puntitos) no selecciona el evento: solo sirve para arrastrar/ordenar.
       cont.querySelectorAll(".evHandle").forEach(ha => ha.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }));
       habilitarReordenEventos(cont);
+      habilitarHoverResumen(cont);
       // contadores + resumen del evento expandido
       lista.forEach(async e => {
         // La tarjeta ya no muestra contadores: solo el evento con el resumen abierto consulta asistencias.
@@ -3814,6 +3834,83 @@
           const elHM = $(`[data-hm="${e.id}"]`); if (elHM) elHM.textContent = `${c.h} H · ${c.m} M${sup.length ? " · " + sup.length + " sup." : ""}`;
         }
       });
+    }
+
+    // Resumen GRANDE del evento al pasar el mouse sobre su tarjeta en la barra lateral (solo PC con mouse).
+    // Los conteos de asistencia se consultan al pasar el mouse y se recuerdan 60 s.
+    const HOVER_CONTEOS = new Map();
+    function habilitarHoverResumen(cont) {
+      if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+      let card = $("#evHoverCard");
+      if (!card) { card = document.createElement("div"); card.id = "evHoverCard"; card.setAttribute("role", "tooltip"); document.body.appendChild(card); }
+      card.classList.remove("on");   // la lista se volvió a dibujar: la fila bajo el mouse ya no existe
+      let timer = null, actual = null;
+      const ocultar = () => { clearTimeout(timer); actual = null; card.classList.remove("on"); };
+      const fila = (l, v) => `<div class="hcRow"><span class="hcLbl">${l}</span><span class="hcVal">${v}</span></div>`;
+      const posicionar = (row) => {
+        const r = row.getBoundingClientRect(), ch = card.offsetHeight, cw = card.offsetWidth;
+        let left = r.right + 12;
+        if (left + cw > window.innerWidth - 12) left = Math.max(12, r.left - cw - 12);
+        const top = Math.min(Math.max(12, r.top + r.height / 2 - ch / 2), window.innerHeight - ch - 12);
+        card.style.left = left + "px"; card.style.top = Math.max(12, top) + "px";
+      };
+      const pintar = (e, row, c) => {
+        const rango = e.fecha_evento ? (fechaFmt(e.fecha_evento) + (e.fecha_hasta && e.fecha_hasta !== e.fecha_evento ? " al " + fechaFmt(e.fecha_hasta) : "")) : "—";
+        const hu = horarioEv(e), ci = citacionEv(e), d = dotacionEv(e);
+        const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
+        const lugar = [e.direccion, e.comuna].filter(Boolean).join(", ");
+        const cnt = v => c ? v : "…";
+        card.innerHTML = `<div class="hcHead">
+            <div class="font-bold text-[15px] leading-snug">${esc(e.nombre_evento)}</div>
+            <div class="text-[12px] opacity-80">${esc(e.empresa || "—")}</div>
+          </div>
+          <div class="hcBody">
+            ${lugar ? fila("📍 Lugar", esc(lugar)) : ""}
+            ${fila("📅 Fechas", esc(rango))}
+            ${fila("📄 Resol. DD.FF.", esc(e.resol_numero || "—") + (e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""))}
+            ${fila("🏷️ Tipo", esc(eventoTipoCorto(e)) + (esPartido(e) && e.partido ? ": " + esc(e.partido) : ""))}
+            ${eventoUsaTurnos(e)
+              ? fila("🕑 Turnos", esc(turnoConfigTexto(e))) + fila("⏱️ Turno actual", tnNow ? `${esc(tnNow.etiqueta)} (${esc(tnNow.rango)})` : "—")
+              : (hu ? fila("🕘 Hora evento", `${esc(hu.inicio)} a ${esc(hu.fin)} hrs.${hu.cruza ? " (día sig.)" : ""}`) : fila("🕘 Hora evento", "—"))}
+            ${ci ? fila("👮 Citación GG.SS.", esc(ci) + " hrs.") : ""}
+            ${fila(`${guardiaIcon()} Guardias`, `${cnt(c && c.g)} / ${esc(e.cantidad_esperada || "—")}`)}
+            ${fila("🤵 Supervisores", `${cnt(c && c.s)} / ${d.supervisores || "—"}`)}
+            ${d.otros.map(o => fila("⭐ " + esc(o.cargo), esc(o.cantidad || 1))).join("")}
+            ${fila("👨 / 👩", c ? `${c.h} H · ${c.m} M` : "…")}
+            ${fila("📁 Estado", eventoArchivado(e) ? "Archivado" : "Activo")}
+          </div>`;
+        posicionar(row);
+      };
+      cont.querySelectorAll(".evRow").forEach(row => {
+        const nom = row.querySelector(".evName"); if (nom) nom.removeAttribute("title");   // evita el tooltip nativo encima
+        row.addEventListener("mouseenter", () => {
+          if (ADMIN_STATE._reordenando) return;
+          clearTimeout(timer);
+          timer = setTimeout(async () => {
+            const e = (ADMIN_STATE.eventos || []).find(x => x.id === row.dataset.id);
+            if (!e || ADMIN_STATE._reordenando) return;
+            actual = e.id;
+            const cache = HOVER_CONTEOS.get(e.id);
+            const fresco = cache && Date.now() - cache.t < 60000 ? cache : null;
+            pintar(e, row, fresco);
+            card.classList.add("on");
+            if (fresco) return;
+            let as = [];
+            try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
+            const asV = asistVigentes(e, as);
+            const g = asV.filter(a => !a.es_supervisor), hm = contarHM(g);
+            const c = { t: Date.now(), g: g.length, s: asV.length - g.length, h: hm.h, m: hm.m };
+            HOVER_CONTEOS.set(e.id, c);
+            if (actual === e.id && row.isConnected) pintar(e, row, c);
+          }, 250);
+        });
+        row.addEventListener("mouseleave", ocultar);
+        row.addEventListener("pointerdown", ocultar);
+      });
+      if (!card.dataset.wired) {
+        card.dataset.wired = "1";
+        window.addEventListener("scroll", () => card.classList.remove("on"), true);
+      }
     }
 
     // Permite al administrador reordenar los eventos arrastrando el asa (los puntos ⠿)
