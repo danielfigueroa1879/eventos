@@ -5878,43 +5878,79 @@
       descargarArchivo(xlsxToFile(wb, "Resumen-Fiestas-Patrias.xlsx"));
     }
 
-    // --- Excel de TODOS los eventos (en el orden del panel) con los datos de la empresa ---
-    function xlsFileEventos(eventos, conteos) {
-      const cols = ["N°", "Evento", "Empresa", "Dirección", "Comuna", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
+    // --- Columnas comunes del listado de eventos (Excel y PDF) ---
+    // "Hora evento" = horario único (inicio a término) o la configuración de turnos;
+    // "Citación GG.SS." = hora a la que deben presentarse los guardias.
+    const EV_EXP_COLS = ["N°", "Evento", "Empresa", "Dirección", "Comuna", "Tipo", "Hora evento", "Citación GG.SS.", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
+    const EV_EXP_IZQ = [1, 2, 3, 4, 10];   // columnas alineadas a la izquierda
+    const EV_EXP_TOT = 13;                 // columnas antes de los totales (Esperados/Registrados/Supervisores)
+    function eventoTipoCorto(ev) {
+      if (esPartido(ev)) return "Partido";
+      return eventoUsaTurnos(ev) ? "Con turnos" : "Sin turnos";
+    }
+    function eventoHoraTexto(ev) {
+      const hu = horarioEv(ev);
+      if (hu) return `${hu.inicio} a ${hu.fin}${hu.cruza ? " (día sig.)" : ""}`;
+      if (eventoUsaTurnos(ev)) return turnoConfigTexto(ev);
+      return "—";
+    }
+    function filaEventoExport(ev, i, c) {
+      return [
+        i + 1,
+        ev.nombre_evento || "—",
+        ev.empresa || "—",
+        ev.direccion || "—",
+        ev.comuna || "—",
+        eventoTipoCorto(ev),
+        eventoHoraTexto(ev),
+        citacionEv(ev) || "—",
+        ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
+        ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
+        ev.resol_numero || "—",
+        ev.resol_fecha ? fechaFmt(ev.resol_fecha) : "—",
+        eventoArchivado(ev) ? "Archivado" : "Activo",
+        ev.cantidad_esperada || 0,
+        c.guardias,
+        c.supervisores,
+      ];
+    }
+    // Evento PENDIENTE: no archivado y su fecha de término (o de inicio) aún no pasa. Sin fecha = pendiente.
+    function eventoPendiente(ev) {
+      if (eventoArchivado(ev)) return false;
+      const fin = ev.fecha_hasta || ev.fecha_evento;
+      if (!fin) return true;
+      const d = new Date(), hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return String(fin).slice(0, 10) >= hoy;
+    }
+    // Eventos a exportar según el filtro elegido: "pendientes" (por defecto) o "todos".
+    function eventosParaExportar(filtro) {
+      const todos = ordenarEventos(ADMIN_STATE.eventos || []);
+      return filtro === "todos" ? todos : todos.filter(eventoPendiente);
+    }
+    const tituloExpEventos = filtro => filtro === "todos" ? "Listado de eventos" : "Listado de eventos pendientes";
+    const archivoExpEventos = (filtro, ext) => `Eventos${filtro === "todos" ? "" : "-pendientes"}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+
+    // --- Excel de los eventos (en el orden del panel) con los datos de la empresa ---
+    function xlsFileEventos(eventos, conteos, filtro) {
+      const cols = EV_EXP_COLS;
       const thS = `background:${VERDE_PAGINA};color:#ffffff;font-weight:bold;text-align:center;border:1px solid #0a3d18;padding:6px 10px;white-space:nowrap;`;
       const tdS = `border:1px solid #cbd5e1;padding:5px 10px;mso-number-format:'\\@';`;
       const tdC = tdS + "text-align:center;";
       const header = `<tr>${cols.map(c => `<th style="${thS}">${esc(c)}</th>`).join("")}</tr>`;
       const body = eventos.map((ev, i) => {
-        const c = conteos[ev.id] || { guardias: 0, supervisores: 0 };
-        const cells = [
-          i + 1,
-          ev.nombre_evento || "",
-          ev.empresa || "",
-          ev.direccion || "—",
-          ev.comuna || "—",
-          eventoTipoTexto(ev),
-          ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
-          ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
-          ev.resol_numero || "—",
-          ev.resol_fecha ? fechaFmt(ev.resol_fecha) : "—",
-          ev.activo === false ? "Inactivo" : "Activo",
-          ev.cantidad_esperada || 0,
-          c.guardias,
-          c.supervisores,
-        ];
-        return `<tr>${cells.map((v, j) => `<td style="${j === 1 || j === 2 || j === 3 || j === 4 || j === 8 ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
+        const cells = filaEventoExport(ev, i, conteos[ev.id] || { guardias: 0, supervisores: 0 });
+        return `<tr>${cells.map((v, j) => `<td style="${EV_EXP_IZQ.includes(j) ? tdS : tdC}">${esc(String(v))}</td>`).join("")}</tr>`;
       }).join("");
       const nCols = cols.length;
       const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
       const totalReg = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).guardias || 0), 0);
       const totalSup = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).supervisores || 0), 0);
       const meta = `
-        <tr><td colspan="${nCols}" style="font-weight:bold;font-size:14px;text-align:center;padding:6px;">Listado de eventos</td></tr>
+        <tr><td colspan="${nCols}" style="font-weight:bold;font-size:14px;text-align:center;padding:6px;">${esc(tituloExpEventos(filtro))}</td></tr>
         <tr><td colspan="${nCols}" style="text-align:center;padding:2px;">${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${esc(new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" }))}</td></tr>
         <tr><td colspan="${nCols}" style="padding:2px;"></td></tr>`;
       const totalRow = `<tr>
-        <td style="${tdC}font-weight:bold;" colspan="11">TOTALES</td>
+        <td style="${tdC}font-weight:bold;" colspan="${EV_EXP_TOT}">TOTALES</td>
         <td style="${tdC}font-weight:bold;">${totalEsp}</td>
         <td style="${tdC}font-weight:bold;">${totalReg}</td>
         <td style="${tdC}font-weight:bold;">${totalSup}</td>
@@ -5923,66 +5959,46 @@
         <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Eventos</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
         <style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}</style></head>
         <body><table>${meta}${header}${body}${totalRow}</table></body></html>`;
-      const fecha = new Date().toISOString().slice(0, 10);
-      return new File(["﻿" + html], `Eventos-${fecha}.xls`, { type: "application/vnd.ms-excel;charset=utf-8;" });
+      return new File(["﻿" + html], archivoExpEventos(filtro, "xls"), { type: "application/vnd.ms-excel;charset=utf-8;" });
     }
 
     // --- Excel REAL (.xlsx con SheetJS): se abre sin errores en Excel, Google Sheets y celulares ---
-    function xlsxEventos(eventos, conteos) {
+    function xlsxEventos(eventos, conteos, filtro) {
       if (!window.XLSX) return false;
-      const cols = ["N°", "Evento", "Empresa", "Dirección", "Comuna", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
+      const cols = EV_EXP_COLS;
       const totalEsp = eventos.reduce((s, e) => s + (e.cantidad_esperada || 0), 0);
       const totalReg = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).guardias || 0), 0);
       const totalSup = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).supervisores || 0), 0);
       const gen = new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" });
       const aoa = [
-        ["Listado de eventos"],
+        [tituloExpEventos(filtro)],
         [`${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${gen}`],
         [],
         cols,
       ];
-      eventos.forEach((ev, i) => {
-        const c = conteos[ev.id] || { guardias: 0, supervisores: 0 };
-        aoa.push([
-          i + 1,
-          ev.nombre_evento || "",
-          ev.empresa || "",
-          ev.direccion || "—",
-          ev.comuna || "—",
-          eventoTipoTexto(ev),
-          ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
-          ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
-          ev.resol_numero || "—",
-          ev.resol_fecha ? fechaFmt(ev.resol_fecha) : "—",
-          ev.activo === false ? "Inactivo" : "Activo",
-          ev.cantidad_esperada || 0,
-          c.guardias,
-          c.supervisores,
-        ]);
-      });
+      eventos.forEach((ev, i) => aoa.push(filaEventoExport(ev, i, conteos[ev.id] || { guardias: 0, supervisores: 0 })));
       const rHead = 3, rBody0 = 4;
-      aoa.push(["", "TOTALES", "", "", "", "", "", "", "", "", "", totalEsp, totalReg, totalSup]);
+      aoa.push(["", "TOTALES", ...Array(EV_EXP_TOT - 2).fill(""), totalEsp, totalReg, totalSup]);
       const rTot = aoa.length - 1;
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 10 }, { wch: 11 }, { wch: 12 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 26 }, { wch: 28 }, { wch: 16 }, { wch: 12 }, { wch: 24 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 12 }, { wch: 14 }];
       const nc = cols.length - 1;
       ws["!merges"] = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: nc } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: nc } },
-        { s: { r: rTot, c: 0 }, e: { r: rTot, c: 10 } },
+        { s: { r: rTot, c: 0 }, e: { r: rTot, c: EV_EXP_TOT - 1 } },
       ];
       // Estilos: título, encabezado verde con letras blancas, bordes y totales.
       xlSet(ws, 0, 0, XL_ST.titulo); xlSet(ws, 1, 0, XL_ST.sub);
       cols.forEach((c, j) => xlSet(ws, rHead, j, XL_ST.head));
       eventos.forEach((ev, i) => {
         const rr = rBody0 + i;
-        for (let j = 0; j <= nc; j++) xlSet(ws, rr, j, (j === 1 || j === 2 || j === 3 || j === 4) ? XL_ST.celdaIzq : XL_ST.celda);
+        for (let j = 0; j <= nc; j++) xlSet(ws, rr, j, EV_EXP_IZQ.includes(j) ? XL_ST.celdaIzq : XL_ST.celda);
       });
       for (let j = 0; j <= nc; j++) xlSet(ws, rTot, j, XL_ST.total);
       const wb = window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb, ws, "Eventos");
-      const fecha = new Date().toISOString().slice(0, 10);
-      window.XLSX.writeFile(wb, `Eventos-${fecha}.xlsx`);
+      window.XLSX.writeFile(wb, archivoExpEventos(filtro, "xlsx"));
       return true;
     }
 
@@ -6000,13 +6016,13 @@
       return conteos;
     }
 
-    async function descargarExcelEventos() {
-      const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
-      if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
+    async function descargarExcelEventos(filtro) {
+      const eventos = eventosParaExportar(filtro);
+      if (!eventos.length) { toast(filtro === "todos" ? "No hay eventos para exportar" : "No hay eventos pendientes para exportar", false); return; }
       toast("Preparando el Excel de eventos…");
       const conteos = await cargarConteosEventos(eventos);
       // Excel real (.xlsx); si la librería no cargó, respaldo al .xls con formato.
-      if (!xlsxEventos(eventos, conteos)) descargarArchivo(xlsFileEventos(eventos, conteos));
+      if (!xlsxEventos(eventos, conteos, filtro)) descargarArchivo(xlsFileEventos(eventos, conteos, filtro));
     }
 
     // Lista plana de infractores/detenidos (una fila por observación), ordenada por nombre.
@@ -6207,7 +6223,7 @@
 
     // --- PDF de TODOS los eventos, en hoja OFICIO HORIZONTAL (se abre en cualquier celular y PC) ---
     // Oficio = 216 x 330 mm = 612 x 936 pt. Horizontal => 936 pt de ancho x 612 pt de alto.
-    function construirPDFEventos(eventos, conteos) {
+    function construirPDFEventos(eventos, conteos, filtro) {
       const JsPDF = window.jspdf && window.jspdf.jsPDF;
       if (!JsPDF) return null;
       const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: [612, 936] });
@@ -6217,54 +6233,38 @@
       const totalReg = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).guardias || 0), 0);
       const totalSup = eventos.reduce((s, e) => s + ((conteos[e.id] || {}).supervisores || 0), 0);
       doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(15, 83, 35);
-      doc.text("Listado de eventos", W / 2, 34, { align: "center" });
+      doc.text(tituloExpEventos(filtro), W / 2, 34, { align: "center" });
       doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
       doc.text(`${eventos.length} evento${eventos.length === 1 ? "" : "s"} · Generado ${new Date().toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, hourCycle: "h23" })}`, W / 2, 50, { align: "center" });
-      const cols = ["N°", "Evento", "Empresa", "Dirección", "Comuna", "Tipo", "Desde", "Hasta", "N° Resol. DD.FF.", "Fecha Resol.", "Estado", "Esperados", "Registrados", "Supervisores"];
-      const body = eventos.map((ev, i) => {
-        const c = conteos[ev.id] || { guardias: 0, supervisores: 0 };
-        return [
-          String(i + 1),
-          ev.nombre_evento || "—",
-          ev.empresa || "—",
-          ev.direccion || "—",
-          ev.comuna || "—",
-          eventoTipoTexto(ev),
-          ev.fecha_evento ? fechaFmt(ev.fecha_evento) : "—",
-          ev.fecha_hasta ? fechaFmt(ev.fecha_hasta) : "—",
-          ev.resol_numero || "—",
-          ev.resol_fecha ? fechaFmt(ev.resol_fecha) : "—",
-          ev.activo === false ? "Inactivo" : "Activo",
-          String(ev.cantidad_esperada || 0),
-          String(c.guardias),
-          String(c.supervisores),
-        ];
-      });
-      body.push(["", "TOTALES", "", "", "", "", "", "", "", "", "", String(totalEsp), String(totalReg), String(totalSup)]);
+      const cols = EV_EXP_COLS;
+      const body = eventos.map((ev, i) => filaEventoExport(ev, i, conteos[ev.id] || { guardias: 0, supervisores: 0 }).map(String));
+      body.push(["", "TOTALES", ...Array(EV_EXP_TOT - 2).fill(""), String(totalEsp), String(totalReg), String(totalSup)]);
       const lastIdx = body.length - 1;
       doc.autoTable({
         startY: 62,
         head: [cols],
         body,
         theme: "grid",
-        styles: { fontSize: 7.5, cellPadding: 2.5, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+        styles: { fontSize: 7, cellPadding: 2.5, halign: "center", valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
         headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
         alternateRowStyles: { fillColor: [244, 247, 245] },
         columnStyles: {
-          0: { cellWidth: 22 },
-          1: { halign: "left", cellWidth: 116 },
-          2: { halign: "left", cellWidth: 92 },
-          3: { halign: "left", cellWidth: 104 },
-          4: { halign: "left", cellWidth: 64 },
-          5: { cellWidth: 50 },
-          6: { cellWidth: 46 },
-          7: { cellWidth: 46 },
-          8: { cellWidth: 62 },
-          9: { cellWidth: 52 },
-          10: { cellWidth: 46 },
-          11: { cellWidth: 44 },
-          12: { cellWidth: 50 },
-          13: { cellWidth: 56 },
+          0: { cellWidth: 20 },
+          1: { halign: "left", cellWidth: 96 },
+          2: { halign: "left", cellWidth: 76 },
+          3: { halign: "left", cellWidth: 86 },
+          4: { halign: "left", cellWidth: 52 },
+          5: { cellWidth: 46 },
+          6: { cellWidth: 62, fontStyle: "bold" },
+          7: { cellWidth: 44, fontStyle: "bold" },
+          8: { cellWidth: 44 },
+          9: { cellWidth: 44 },
+          10: { cellWidth: 56 },
+          11: { cellWidth: 48 },
+          12: { cellWidth: 44 },
+          13: { cellWidth: 42 },
+          14: { cellWidth: 46 },
+          15: { cellWidth: 50 },
         },
         margin: { left: 28, right: 28, bottom: 40 },
         didParseCell: (d) => {
@@ -6283,31 +6283,46 @@
       return doc;
     }
 
-    async function descargarPDFEventos() {
-      const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
-      if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
+    async function descargarPDFEventos(filtro) {
+      const eventos = eventosParaExportar(filtro);
+      if (!eventos.length) { toast(filtro === "todos" ? "No hay eventos para exportar" : "No hay eventos pendientes para exportar", false); return; }
       toast("Preparando el PDF de eventos…");
       const conteos = await cargarConteosEventos(eventos);
-      const fecha = new Date().toISOString().slice(0, 10);
-      const doc = construirPDFEventos(eventos, conteos);
-      if (doc) { doc.save(`Eventos-${fecha}.pdf`); return; }
+      const doc = construirPDFEventos(eventos, conteos, filtro);
+      if (doc) { doc.save(archivoExpEventos(filtro, "pdf")); return; }
       toast("No se pudo generar el PDF", false);
     }
 
     // Menú del botón "Exportar eventos": Excel real (.xlsx) o PDF (hoja oficio horizontal).
+    // Por defecto solo los PENDIENTES (sin archivados ni eventos que ya pasaron); opción de incluir todos.
     function modalExportEventos() {
-      const eventos = ordenarEventos(ADMIN_STATE.eventos || []);
-      if (!eventos.length) { toast("No hay eventos para exportar", false); return; }
+      const todos = eventosParaExportar("todos");
+      if (!todos.length) { toast("No hay eventos para exportar", false); return; }
+      const nPend = eventosParaExportar("pendientes").length;
+      let filtro = "pendientes";
+      const opc = (val, txt, n, on) => `<label class="flex items-center gap-2 border rounded-xl px-3 py-2 cursor-pointer text-sm ${on ? "border-green-700 bg-green-50" : "border-slate-200"}" data-exp-f="${val}">
+        <input type="radio" name="exp_f" value="${val}" ${on ? "checked" : ""} class="accent-green-700"><span class="flex-1">${txt}</span><b>${n}</b></label>`;
       openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">⬇ Descargar eventos</h2>
-    <p class="text-sm text-slate-500 mb-3">Descarga el listado de <b>${eventos.length} evento${eventos.length === 1 ? "" : "s"}</b> con los datos de la empresa. Ambos formatos se abren en celular y PC.</p>
+    <p class="text-sm text-slate-500 mb-3">Listado con los datos de la empresa, <b>hora del evento</b> y <b>hora de citación de los guardias</b>. Ambos formatos se abren en celular y PC.</p>
+    <div class="grid gap-2 mb-3" id="exp_filtro">
+      ${opc("pendientes", "Solo pendientes <span class='text-slate-400'>(sin archivados ni eventos ya pasados)</span>", nPend, true)}
+      ${opc("todos", "Todos <span class='text-slate-400'>(incluye archivados)</span>", todos.length, false)}
+    </div>
     <div class="grid grid-cols-2 gap-2">
       <button id="exp_xls" class="btn btn-p text-sm py-3 flex items-center justify-center gap-1" style="background:#15803d;border-color:#15803d">📊 Excel (.xlsx)</button>
       <button id="exp_pdf" class="btn btn-p text-sm py-3 flex items-center justify-center gap-1" style="background:#b91c1c;border-color:#b91c1c">📄 PDF (hoja oficio)</button>
     </div>
     <p class="text-[11px] text-slate-400 mt-3">El PDF usa hoja oficio horizontal para que quepan todas las columnas y se vea bien en cualquier dispositivo.</p>
     <div class="mt-3"><button id="exp_close" class="btn btn-ghost w-full">Cerrar</button></div>`);
-      $("#exp_xls").addEventListener("click", () => { closeModal(); descargarExcelEventos(); });
-      $("#exp_pdf").addEventListener("click", () => { closeModal(); descargarPDFEventos(); });
+      $("#exp_filtro").addEventListener("change", e => {
+        filtro = e.target.value;
+        document.querySelectorAll("#exp_filtro [data-exp-f]").forEach(l => {
+          const on = l.dataset.expF === filtro;
+          l.classList.toggle("border-green-700", on); l.classList.toggle("bg-green-50", on); l.classList.toggle("border-slate-200", !on);
+        });
+      });
+      $("#exp_xls").addEventListener("click", () => { closeModal(); descargarExcelEventos(filtro); });
+      $("#exp_pdf").addEventListener("click", () => { closeModal(); descargarPDFEventos(filtro); });
       $("#exp_close").addEventListener("click", closeModal);
     }
 
