@@ -546,10 +546,10 @@
     .evResCard .hcRow:last-child { border-bottom: 0; }
     .evResCard .hcLbl { color: #64748b; white-space: nowrap; }
     .evResCard .hcVal { font-weight: 600; text-align: right; }
-    .evResGrande .hcHead { padding: 14px 16px; }
+    .evResGrande .hcHead { padding: 12px 14px; }
     .evResGrande .hcTit { font-size: 22px; }
     .evResGrande .hcEmp { font-size: 16px; }
-    .evResGrande .hcBody { padding: 8px 16px 12px; font-size: 17px; }
+    .evResGrande .hcBody { padding: 4px 14px 8px; font-size: 17px; }
     .evResGrande .hcRow { padding: 9px 0; }
     #listaEventos .evItem { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     html[data-theme="dark"] .evResCard { background: #16191d; color: #e7f6ec; border-color: #1f5133; }
@@ -3953,7 +3953,7 @@
     }
     async function abrirResumenEvento(e) {
       const pintar = c => `<div class="evResCard evResGrande">${resumenEventoHTML(e, c)}</div>
-        <div class="grid grid-cols-2 gap-2 mt-3">
+        <div class="grid grid-cols-2 gap-2 mt-2">
           <button id="res_close" class="btn btn-ghost">Cerrar</button>
           <button id="res_open" class="btn btn-p">Abrir evento</button>
         </div>`;
@@ -3968,6 +3968,8 @@
       };
       const fresco = conteosFrescos(e);
       openModal(pintar(fresco)); wire();
+      // Menos margen alrededor para que el resumen ocupe casi todo el ancho del celular (openModal lo restablece).
+      $("#modalBox").classList.replace("p-5", "p-2"); $("#modal").style.padding = "8px";
       if (fresco) return;
       const c = await conteosResumenEvento(e);
       const box = $("#modalBox .evResGrande");
