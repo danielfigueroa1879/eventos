@@ -7308,7 +7308,7 @@
         </div>`;
       document.body.appendChild(ov);
 
-      const state = { ev, puestos: [], asist: [], map: null, markers: {}, panelOpen: false };
+      const state = { ev, puestos: [], puestosTodos: [], anteriores: [], verAnteriores: false, asist: [], map: null, markers: {}, panelOpen: false };
       // Para la distribución, cada guardia aparece UNA sola vez. Con el reingreso por turnos un
       // mismo guardia puede tener varios registros; sin esto se duplicaba en el mapa y en la
       // asignación. IMPORTANTE: se PREFIERE el registro que ya tiene faccion asignada, para no
@@ -7354,12 +7354,29 @@
       // la clase "absolute", le fija position:relative y el mapa queda con altura 0 (pantalla blanca).
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
+      state.tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
       map.setView([-29.9427, -71.2530], 15);
 
-      try { state.puestos = await Data.listPuestos(ev.id); }
+      // PARTIDOS: los puestos de partidos anteriores siguen guardados (sus guardias se archivaron al cerrar).
+      // Un puesto creado ANTES del último cierre y sin guardias asignados ahora es de un partido anterior:
+      // se oculta del mapa, del resumen, de "Asignar" y del PDF. Los creados para el partido actual se ven
+      // aunque aún estén en 0. El botón "Ver anteriores" del resumen los muestra (para reutilizar o borrar).
+      let ultimoCierre = null;
+      async function cargarUltimoCierre() {
+        if (!esPartido(ev)) return;
+        try { const h = await Data.listHistorial(ev.id); ultimoCierre = h && h[0] && h[0].cerrado_at ? Date.parse(h[0].cerrado_at) : null; } catch (_) { }
+      }
+      const esPuestoAnterior = p => !!ultimoCierre && !!p.created_at && Date.parse(p.created_at) < ultimoCierre && !state.asist.some(a => a.puesto_id === p.id);
+      function filtrarPuestos() {
+        state.anteriores = state.puestosTodos.filter(esPuestoAnterior);
+        state.puestos = state.verAnteriores ? state.puestosTodos.slice() : state.puestosTodos.filter(p => !state.anteriores.includes(p));
+      }
+
+      try { state.puestosTodos = await Data.listPuestos(ev.id); }
       catch (e) { toast(/Sin respuesta/.test(e && e.message) ? "El servidor no respondió. Cierra el mapa y vuelve a abrirlo." : "Falta crear la tabla 'puestos' en Supabase (ejecuta el SQL).", false); }
       try { state.asist = await cargarAsist(); } catch (e) { }
+      await cargarUltimoCierre();
+      filtrarPuestos();
       if (!document.body.contains(ov)) return;   // se cerró el mapa mientras cargaba
       // Modo noche: el mismo mapa de OSM se oscurece con un filtro CSS (ver .leaflet-tile-pane en el CSS).
       const mapaOscuro = isDarkTheme();
@@ -7393,13 +7410,15 @@
           let chips = "";
           for (let i = 0; i < mostrar; i++) {
             const on = i < n;   // asignados a color, faltantes (hasta el plan) en gris
-            chips += `<img src="images/guardia.webp" alt="" width="14" height="14" style="display:block;width:14px;height:14px;object-fit:contain;margin-left:-3.5px;position:relative;z-index:${mostrar - i};${on ? "filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
+            // Tamaño con la proporción real de la imagen (195x452): html2canvas (PDF) ignora object-fit
+            // y estiraba el ícono a un cuadrado (guardias "anchos").
+            chips += `<img src="images/guardia.webp" alt="" width="6" height="14" style="display:block;width:6px;height:14px;margin:0 2.25px;position:relative;z-index:${mostrar - i};${on ? "filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
           }
           const extra = total > MAX
-            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 4px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4);margin-left:-3px;position:relative;z-index:0">+${total - MAX}</span>`
+            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 4px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4);margin-left:2px;position:relative;z-index:0">+${total - MAX}</span>`
             : "";
           // En modo noche los guardias (ropa negra) van sobre una franja clara: sobre el mapa oscuro no se distinguían.
-          const fondoNoche = mapaOscuro ? `background:rgba(241,245,249,.92);border-radius:7px;padding:1px 3px 1px 6.5px;box-shadow:0 1px 3px rgba(0,0,0,.5);` : "padding-left:3.5px;";
+          const fondoNoche = mapaOscuro ? `background:rgba(241,245,249,.92);border-radius:7px;padding:1px 3px;box-shadow:0 1px 3px rgba(0,0,0,.5);` : "";
           iconos = `<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;margin:3px auto 0;${fondoNoche}width:max-content;max-width:${(POR_FILA * 11) + 4 + (mapaOscuro ? 6 : 0)}px">${chips}${extra}</div>`;
         }
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
@@ -7523,8 +7542,10 @@
       }
 
       async function recargar() {
-        try { state.puestos = await Data.listPuestos(ev.id); } catch (e) { }
+        try { state.puestosTodos = await Data.listPuestos(ev.id); } catch (e) { }
         try { state.asist = await cargarAsist(); } catch (e) { }
+        await cargarUltimoCierre();
+        filtrarPuestos();
         refreshMarkers(); if (state.panelOpen) renderPanel();
       }
 
@@ -7556,10 +7577,31 @@
           // La captura del mapa tampoco muestra los puestos vacíos (se vuelven a mostrar después).
           const ocultos = state.puestos.filter(p => !puestosPDF.includes(p)).map(p => state.markers[p.id]).filter(m => m && map.hasLayer(m));
           ocultos.forEach(m => map.removeLayer(m));
+          // Mejor calidad: el mapa se captura en un tamaño fijo con la proporción del recuadro del PDF
+          // (no el de la pantalla, que en PC ancho dejaba el lugar chico y las etiquetas diminutas),
+          // centrado en los puestos y al doble de resolución. Después se restaura la vista del usuario.
+          const vista = { centro: map.getCenter(), zoom: map.getZoom(), css: mapEl.style.cssText };
+          const conCoordPDF = puestosPDF.filter(p => p.lat != null && p.lng != null);
           let canvas;
-          try { canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 1, logging: false }); }
-          finally { ocultos.forEach(m => m.addTo(map)); }
-          const imgData = canvas.toDataURL("image/jpeg", 0.92);
+          try {
+            mapEl.style.right = "auto"; mapEl.style.bottom = "auto";
+            mapEl.style.width = "900px"; mapEl.style.height = "640px";
+            map.invalidateSize({ animate: false });
+            if (conCoordPDF.length) map.fitBounds(conCoordPDF.map(p => [p.lat, p.lng]), { padding: [60, 60], maxZoom: 18, animate: false });
+            // Espera a que carguen las teselas de la nueva vista (máx. 5 s).
+            await new Promise(res => {
+              const t = setTimeout(res, 5000);
+              if (state.tiles && state.tiles.isLoading && !state.tiles.isLoading()) { setTimeout(() => { if (!state.tiles.isLoading()) { clearTimeout(t); res(); } }, 300); }
+              if (state.tiles) state.tiles.once("load", () => { clearTimeout(t); setTimeout(res, 150); });
+            });
+            canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 2, logging: false, ignoreElements: el => el.classList && el.classList.contains("leaflet-control-zoom") });
+          } finally {
+            ocultos.forEach(m => m.addTo(map));
+            mapEl.style.cssText = vista.css;
+            map.invalidateSize({ animate: false });
+            map.setView(vista.centro, vista.zoom, { animate: false });
+          }
+          const imgData = canvas.toDataURL("image/jpeg", 0.9);
 
           const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
           const W = doc.internal.pageSize.getWidth();
@@ -7573,7 +7615,7 @@
 
           // Captura del mapa: respetar proporción real y limitar altura
           const maxW = W - marginX * 2;
-          const maxH = H * 0.40;
+          const maxH = H * 0.45;
           const ratio = canvas.width / canvas.height;
           let imgW = maxW, imgH = imgW / ratio;
           if (imgH > maxH) { imgH = maxH; imgW = imgH * ratio; }
@@ -7582,30 +7624,49 @@
           doc.addImage(imgData, "JPEG", imgX, imgY, imgW, imgH);
 
           // Tabla con las facciones. Cada guardia: "Nombre — RUT" en línea propia.
+          // Tabla con las facciones: UNA FILA POR GUARDIA (Nombre | RUT | Vigencia con su color);
+          // las celdas del puesto (#, Puesto, Zona, Guardias, Paletas) se unen sobre sus guardias.
           const trim = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
-          const rows = puestosPDF.map((p, i) => {
+          const hexRGB = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+          const tinte = (rgb, f) => rgb.map(c => Math.round(255 - (255 - c) * f));
+          const vigCelda = a => {
+            const g = a.guardia || {};
+            if (esSPD(g, a)) return { content: "SPD", styles: { fillColor: hexRGB(SPD_AZUL), textColor: [255, 255, 255], fontStyle: "bold" } };
+            if (a.es_supervisor) return { content: "—", styles: { textColor: [100, 116, 139] } };
+            const v = calcularVigencia(g.fecha_ultimo_examen);
+            const rgb = hexRGB(VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO);
+            return { content: String(v.vigencia || "—").toUpperCase(), styles: { fillColor: tinte(rgb, 0.16), textColor: rgb, fontStyle: "bold" } };
+          };
+          const rows = [];
+          puestosPDF.forEach((p, i) => {
             const asig = state.asist.filter(a => a.puesto_id === p.id);
-            const asigTxt = asig.length
-              ? asig.map(a => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim(); return `${trim(nom || "—", 28)} — ${a.rut}`; }).join("\n")
-              : "—";
-            const plan = p.guardias_plan || 0;
-            return [String(i + 1), p.nombre, p.anillo || "—", `${asig.length}/${plan}`, String(p.paletas || 0), asigTxt];
+            const fondo = i % 2 ? [244, 247, 245] : [255, 255, 255];   // alternado por puesto
+            const span = Math.max(1, asig.length);
+            const cel = (content, extra = {}) => ({ content, rowSpan: span, styles: { fillColor: fondo, ...extra } });
+            const cabeza = [cel(String(i + 1)), cel(p.nombre), cel(p.anillo || "—"), cel(`${asig.length}/${p.guardias_plan || 0}`), cel(String(p.paletas || 0))];
+            if (!asig.length) { rows.push([...cabeza, { content: "—", styles: { fillColor: fondo } }, { content: "—", styles: { fillColor: fondo } }, { content: "—", styles: { fillColor: fondo } }]); return; }
+            asig.forEach((a, j) => {
+              const g = a.guardia || {};
+              const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+              rows.push([...(j === 0 ? cabeza : []), { content: trim(nom, 34), styles: { fillColor: fondo } }, { content: a.rut, styles: { fillColor: fondo } }, vigCelda(a)]);
+            });
           });
           doc.autoTable({
             startY: imgY + imgH + 14,
-            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Asignados (nombre — RUT)"]],
+            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Nombre", "RUT", "Vigencia"]],
             body: rows,
             theme: "grid",
-            styles: { font: "helvetica", fontSize: 8, cellPadding: 3, valign: "top", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+            styles: { font: "helvetica", fontSize: 7.5, cellPadding: 2.5, valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
             headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
-            alternateRowStyles: { fillColor: [244, 247, 245] },
             columnStyles: {
-              0: { cellWidth: 22, halign: "center" },
-              1: { cellWidth: 110, fontStyle: "bold" },
-              2: { cellWidth: 60, halign: "center" },
-              3: { cellWidth: 46, halign: "center", fontStyle: "bold" },
-              4: { cellWidth: 46, halign: "center" },
-              5: { cellWidth: "auto", font: "courier", fontSize: 8 }
+              0: { cellWidth: 20, halign: "center" },
+              1: { cellWidth: 88, fontStyle: "bold" },
+              2: { cellWidth: 44, halign: "center" },
+              3: { cellWidth: 40, halign: "center", fontStyle: "bold" },
+              4: { cellWidth: 38, halign: "center" },
+              5: { cellWidth: "auto" },
+              6: { cellWidth: 60, font: "courier", halign: "center" },
+              7: { cellWidth: 66, halign: "center" }
             },
             margin: { left: marginX, right: marginX, bottom: 34 },
             didDrawPage: () => {
@@ -7724,13 +7785,15 @@
       // --- Panel lateral con mini-listados y totales ---
       function renderPanel() {
         const panel = $("#distPanel", ov);
-        const totPlan = state.puestos.reduce((s, p) => s + (p.guardias_plan || 0), 0);
-        const totPal = state.puestos.reduce((s, p) => s + (p.paletas || 0), 0);
+        const actuales = state.puestos.filter(p => !state.anteriores.includes(p));   // los totales no suman puestos anteriores
+        const totPlan = actuales.reduce((s, p) => s + (p.guardias_plan || 0), 0);
+        const totPal = actuales.reduce((s, p) => s + (p.paletas || 0), 0);
         const totAsig = state.asist.filter(a => a.puesto_id).length;
         const sinAsig = state.asist.length - totAsig;
         panel.innerHTML = `
           <div class="p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10 shadow-sm">
-            <div class="font-bold text-slate-800">Resumen de Puestos (${state.puestos.length})</div>
+            <div class="font-bold text-slate-800">Resumen de Puestos (${state.puestos.length - (state.verAnteriores ? state.anteriores.length : 0)})</div>
+            ${state.anteriores.length ? `<button id="pnl_ant" class="ml-auto mr-2 whitespace-nowrap text-[11px] font-semibold px-2 py-1 rounded-lg border ${state.verAnteriores ? "bg-slate-700 text-white border-slate-700" : "text-slate-500 border-slate-300 hover:bg-slate-50"}" title="Puestos de partidos anteriores sin guardias asignados">${state.verAnteriores ? "Ocultar" : "Ver"} anteriores (${state.anteriores.length})</button>` : ""}
             <button id="pnl_close" class="text-slate-400 hover:text-slate-600 text-xl leading-none transition-colors">✕</button>
           </div>
           <div class="p-3 grid grid-cols-2 gap-2 text-center border-b border-slate-200 bg-slate-50/50">
@@ -7757,7 +7820,7 @@
               <div class="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow">
                 <div class="flex items-start justify-between gap-2 mb-3">
                   <div class="min-w-0 flex-1">
-                    <div class="font-bold text-slate-800 text-base leading-tight truncate">${esc(p.nombre)}</div>
+                    <div class="font-bold text-slate-800 text-base leading-tight truncate">${esc(p.nombre)}${state.anteriores.includes(p) ? ` <span class="ml-1 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Partido anterior</span>` : ""}</div>
                     ${p.notas ? `<div class="text-xs text-slate-500 mt-1 truncate">📍 ${esc(p.notas)}</div>` : ""}
                   </div>
                   <span class="text-[10px] font-bold px-2 py-1 rounded-md flex-shrink-0 border" style="background:${colorAnillo(p.anillo)}0f;color:${colorAnillo(p.anillo)};border-color:${colorAnillo(p.anillo)}33">${esc(p.anillo || "—")}</span>
@@ -7788,6 +7851,8 @@
               </div>`}).join("") : `<div class="text-slate-500 text-sm text-center py-10 px-4 bg-white rounded-2xl border border-slate-200 border-dashed">Aún no hay puestos creados.<br><br>Cierra este panel y usa <b>➕ Agregar puesto</b> para empezar.</div>`}
           </div>`;
         $("#pnl_close", panel).addEventListener("click", togglePanel);
+        const bAnt = $("#pnl_ant", panel);
+        if (bAnt) bAnt.addEventListener("click", () => { state.verAnteriores = !state.verAnteriores; filtrarPuestos(); refreshMarkers(); renderPanel(); });
         panel.querySelectorAll("[data-pver]").forEach(b => b.addEventListener("click", () => { const p = state.puestos.find(x => x.id === b.dataset.pver); if (p && p.lat != null) { map.setView([p.lat, p.lng], 18); const m = state.markers[p.id]; } }));
         panel.querySelectorAll("[data-pasig]").forEach(b => b.addEventListener("click", () => { const p = state.puestos.find(x => x.id === b.dataset.pasig); if (p) modalAsignar(p); }));
       }
