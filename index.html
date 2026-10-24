@@ -7354,7 +7354,7 @@
       // la clase "absolute", le fija position:relative y el mapa queda con altura 0 (pantalla blanca).
       const map = L.map("distMap", { zoomControl: true });
       state.map = map;
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
+      state.tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: "anonymous" }).addTo(map);
       map.setView([-29.9427, -71.2530], 15);
 
       try { state.puestos = await Data.listPuestos(ev.id); }
@@ -7393,13 +7393,15 @@
           let chips = "";
           for (let i = 0; i < mostrar; i++) {
             const on = i < n;   // asignados a color, faltantes (hasta el plan) en gris
-            chips += `<img src="images/guardia.webp" alt="" width="14" height="14" style="display:block;width:14px;height:14px;object-fit:contain;margin-left:-3.5px;position:relative;z-index:${mostrar - i};${on ? "filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
+            // Tamaño con la proporción real de la imagen (195x452): html2canvas (PDF) ignora object-fit
+            // y estiraba el ícono a un cuadrado (guardias "anchos").
+            chips += `<img src="images/guardia.webp" alt="" width="6" height="14" style="display:block;width:6px;height:14px;margin:0 2.25px;position:relative;z-index:${mostrar - i};${on ? "filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))" : "opacity:.35;filter:grayscale(1) drop-shadow(0 1px 1px rgba(0,0,0,.4))"}"/>`;
           }
           const extra = total > MAX
-            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 4px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4);margin-left:-3px;position:relative;z-index:0">+${total - MAX}</span>`
+            ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:14px;padding:0 4px;border-radius:8px;background:#111;color:#fff;font:700 10px system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.4);margin-left:2px;position:relative;z-index:0">+${total - MAX}</span>`
             : "";
           // En modo noche los guardias (ropa negra) van sobre una franja clara: sobre el mapa oscuro no se distinguían.
-          const fondoNoche = mapaOscuro ? `background:rgba(241,245,249,.92);border-radius:7px;padding:1px 3px 1px 6.5px;box-shadow:0 1px 3px rgba(0,0,0,.5);` : "padding-left:3.5px;";
+          const fondoNoche = mapaOscuro ? `background:rgba(241,245,249,.92);border-radius:7px;padding:1px 3px;box-shadow:0 1px 3px rgba(0,0,0,.5);` : "";
           iconos = `<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;margin:3px auto 0;${fondoNoche}width:max-content;max-width:${(POR_FILA * 11) + 4 + (mapaOscuro ? 6 : 0)}px">${chips}${extra}</div>`;
         }
         return L.divIcon({ className: "", iconSize: null, iconAnchor: [0, 34], html: `<div style="transform:translateX(-50%);display:inline-block;text-align:center">${box}${iconos}</div>` });
@@ -7556,10 +7558,31 @@
           // La captura del mapa tampoco muestra los puestos vacíos (se vuelven a mostrar después).
           const ocultos = state.puestos.filter(p => !puestosPDF.includes(p)).map(p => state.markers[p.id]).filter(m => m && map.hasLayer(m));
           ocultos.forEach(m => map.removeLayer(m));
+          // Mejor calidad: el mapa se captura en un tamaño fijo con la proporción del recuadro del PDF
+          // (no el de la pantalla, que en PC ancho dejaba el lugar chico y las etiquetas diminutas),
+          // centrado en los puestos y al doble de resolución. Después se restaura la vista del usuario.
+          const vista = { centro: map.getCenter(), zoom: map.getZoom(), css: mapEl.style.cssText };
+          const conCoordPDF = puestosPDF.filter(p => p.lat != null && p.lng != null);
           let canvas;
-          try { canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 1, logging: false }); }
-          finally { ocultos.forEach(m => m.addTo(map)); }
-          const imgData = canvas.toDataURL("image/jpeg", 0.92);
+          try {
+            mapEl.style.right = "auto"; mapEl.style.bottom = "auto";
+            mapEl.style.width = "900px"; mapEl.style.height = "640px";
+            map.invalidateSize({ animate: false });
+            if (conCoordPDF.length) map.fitBounds(conCoordPDF.map(p => [p.lat, p.lng]), { padding: [60, 60], maxZoom: 18, animate: false });
+            // Espera a que carguen las teselas de la nueva vista (máx. 5 s).
+            await new Promise(res => {
+              const t = setTimeout(res, 5000);
+              if (state.tiles && state.tiles.isLoading && !state.tiles.isLoading()) { setTimeout(() => { if (!state.tiles.isLoading()) { clearTimeout(t); res(); } }, 300); }
+              if (state.tiles) state.tiles.once("load", () => { clearTimeout(t); setTimeout(res, 150); });
+            });
+            canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: "#e5e7eb", scale: 2, logging: false, ignoreElements: el => el.classList && el.classList.contains("leaflet-control-zoom") });
+          } finally {
+            ocultos.forEach(m => m.addTo(map));
+            mapEl.style.cssText = vista.css;
+            map.invalidateSize({ animate: false });
+            map.setView(vista.centro, vista.zoom, { animate: false });
+          }
+          const imgData = canvas.toDataURL("image/jpeg", 0.9);
 
           const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
           const W = doc.internal.pageSize.getWidth();
@@ -7573,7 +7596,7 @@
 
           // Captura del mapa: respetar proporción real y limitar altura
           const maxW = W - marginX * 2;
-          const maxH = H * 0.40;
+          const maxH = H * 0.45;
           const ratio = canvas.width / canvas.height;
           let imgW = maxW, imgH = imgW / ratio;
           if (imgH > maxH) { imgH = maxH; imgW = imgH * ratio; }
