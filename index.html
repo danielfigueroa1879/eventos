@@ -7605,30 +7605,49 @@
           doc.addImage(imgData, "JPEG", imgX, imgY, imgW, imgH);
 
           // Tabla con las facciones. Cada guardia: "Nombre — RUT" en línea propia.
+          // Tabla con las facciones: UNA FILA POR GUARDIA (Nombre | RUT | Vigencia con su color);
+          // las celdas del puesto (#, Puesto, Zona, Guardias, Paletas) se unen sobre sus guardias.
           const trim = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
-          const rows = puestosPDF.map((p, i) => {
+          const hexRGB = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+          const tinte = (rgb, f) => rgb.map(c => Math.round(255 - (255 - c) * f));
+          const vigCelda = a => {
+            const g = a.guardia || {};
+            if (esSPD(g, a)) return { content: "SPD", styles: { fillColor: hexRGB(SPD_AZUL), textColor: [255, 255, 255], fontStyle: "bold" } };
+            if (a.es_supervisor) return { content: "—", styles: { textColor: [100, 116, 139] } };
+            const v = calcularVigencia(g.fecha_ultimo_examen);
+            const rgb = hexRGB(VIG_COLOR[v.estado] || VIG_COLOR.SIN_CURSO);
+            return { content: String(v.vigencia || "—").toUpperCase(), styles: { fillColor: tinte(rgb, 0.16), textColor: rgb, fontStyle: "bold" } };
+          };
+          const rows = [];
+          puestosPDF.forEach((p, i) => {
             const asig = state.asist.filter(a => a.puesto_id === p.id);
-            const asigTxt = asig.length
-              ? asig.map(a => { const g = a.guardia || {}; const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim(); return `${trim(nom || "—", 28)} — ${a.rut}`; }).join("\n")
-              : "—";
-            const plan = p.guardias_plan || 0;
-            return [String(i + 1), p.nombre, p.anillo || "—", `${asig.length}/${plan}`, String(p.paletas || 0), asigTxt];
+            const fondo = i % 2 ? [244, 247, 245] : [255, 255, 255];   // alternado por puesto
+            const span = Math.max(1, asig.length);
+            const cel = (content, extra = {}) => ({ content, rowSpan: span, styles: { fillColor: fondo, ...extra } });
+            const cabeza = [cel(String(i + 1)), cel(p.nombre), cel(p.anillo || "—"), cel(`${asig.length}/${p.guardias_plan || 0}`), cel(String(p.paletas || 0))];
+            if (!asig.length) { rows.push([...cabeza, { content: "—", styles: { fillColor: fondo } }, { content: "—", styles: { fillColor: fondo } }, { content: "—", styles: { fillColor: fondo } }]); return; }
+            asig.forEach((a, j) => {
+              const g = a.guardia || {};
+              const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
+              rows.push([...(j === 0 ? cabeza : []), { content: trim(nom, 34), styles: { fillColor: fondo } }, { content: a.rut, styles: { fillColor: fondo } }, vigCelda(a)]);
+            });
           });
           doc.autoTable({
             startY: imgY + imgH + 14,
-            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Asignados (nombre — RUT)"]],
+            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Nombre", "RUT", "Vigencia"]],
             body: rows,
             theme: "grid",
-            styles: { font: "helvetica", fontSize: 8, cellPadding: 3, valign: "top", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
+            styles: { font: "helvetica", fontSize: 7.5, cellPadding: 2.5, valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
             headStyles: { fillColor: [15, 83, 35], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
-            alternateRowStyles: { fillColor: [244, 247, 245] },
             columnStyles: {
-              0: { cellWidth: 22, halign: "center" },
-              1: { cellWidth: 110, fontStyle: "bold" },
-              2: { cellWidth: 60, halign: "center" },
-              3: { cellWidth: 46, halign: "center", fontStyle: "bold" },
-              4: { cellWidth: 46, halign: "center" },
-              5: { cellWidth: "auto", font: "courier", fontSize: 8 }
+              0: { cellWidth: 20, halign: "center" },
+              1: { cellWidth: 88, fontStyle: "bold" },
+              2: { cellWidth: 44, halign: "center" },
+              3: { cellWidth: 40, halign: "center", fontStyle: "bold" },
+              4: { cellWidth: 38, halign: "center" },
+              5: { cellWidth: "auto" },
+              6: { cellWidth: 60, font: "courier", halign: "center" },
+              7: { cellWidth: 66, halign: "center" }
             },
             margin: { left: marginX, right: marginX, bottom: 34 },
             didDrawPage: () => {
