@@ -7688,7 +7688,10 @@
             }
           });
 
-          const slug = (ev.slug || "facciones").replace(/[^a-z0-9\-]+/gi, "-");
+          // Nombre del archivo = nombre del partido (equipos), p. ej. "Facciones-La-Serena-vs-Dep-Concepcion.pdf".
+          const nomArch = (esPartido(ev) && ev.partido) || ev.nombre_evento || ev.slug || "facciones";
+          const slug = String(nomArch).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+v\/?s\.?\s+/gi, " vs ")
+            .replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "facciones";
           doc.save(`Facciones-${slug}${conRut ? "" : "-sin-rut"}.pdf`);
         } catch (e) {
           toast("No se pudo generar el PDF: " + (e.message || e), false);
