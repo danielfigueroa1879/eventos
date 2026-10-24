@@ -529,24 +529,32 @@
       color: #86efac
     }
 
-    /* Tarjeta flotante con el resumen del evento al pasar el mouse (solo PC) */
+    /* Resumen del evento: tarjeta flotante al pasar el mouse (PC) y ventana grande al mantener presionado (celular) */
     #evHoverCard {
       position: fixed; z-index: 60; width: 340px; max-width: calc(100vw - 24px);
-      background: #fff; color: #1e293b; border: 1px solid #bbf7d0; border-radius: 14px;
       box-shadow: 0 18px 40px -12px rgba(15, 83, 35, .35), 0 4px 12px rgba(0, 0, 0, .08);
-      overflow: hidden; pointer-events: none; opacity: 0; transform: translateX(-6px);
+      pointer-events: none; opacity: 0; transform: translateX(-6px);
       transition: opacity .15s ease, transform .15s ease;
     }
     #evHoverCard.on { opacity: 1; transform: none; }
-    #evHoverCard .hcHead { background: #0f5323; color: #fff; padding: 10px 14px; }
-    #evHoverCard .hcBody { padding: 10px 14px 12px; font-size: 13px; }
-    #evHoverCard .hcRow { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; }
-    #evHoverCard .hcRow:last-child { border-bottom: 0; }
-    #evHoverCard .hcLbl { color: #64748b; white-space: nowrap; }
-    #evHoverCard .hcVal { font-weight: 600; text-align: right; }
-    html[data-theme="dark"] #evHoverCard { background: #16191d; color: #e7f6ec; border-color: #1f5133; }
-    html[data-theme="dark"] #evHoverCard .hcRow { border-bottom-color: #2a2f36; }
-    html[data-theme="dark"] #evHoverCard .hcLbl { color: #94a3b8; }
+    .evResCard { background: #fff; color: #1e293b; border: 1px solid #bbf7d0; border-radius: 14px; overflow: hidden; }
+    .evResCard .hcHead { background: #0f5323; color: #fff; padding: 10px 14px; }
+    .evResCard .hcTit { font-size: 15px; }
+    .evResCard .hcEmp { font-size: 12px; }
+    .evResCard .hcBody { padding: 10px 14px 12px; font-size: 13px; }
+    .evResCard .hcRow { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; }
+    .evResCard .hcRow:last-child { border-bottom: 0; }
+    .evResCard .hcLbl { color: #64748b; white-space: nowrap; }
+    .evResCard .hcVal { font-weight: 600; text-align: right; }
+    .evResGrande .hcHead { padding: 14px 16px; }
+    .evResGrande .hcTit { font-size: 19px; }
+    .evResGrande .hcEmp { font-size: 14px; }
+    .evResGrande .hcBody { padding: 8px 16px 12px; font-size: 15px; }
+    .evResGrande .hcRow { padding: 8px 0; }
+    #listaEventos .evItem { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+    html[data-theme="dark"] .evResCard { background: #16191d; color: #e7f6ec; border-color: #1f5133; }
+    html[data-theme="dark"] .evResCard .hcRow { border-bottom-color: #2a2f36; }
+    html[data-theme="dark"] .evResCard .hcLbl { color: #94a3b8; }
 
     @media (max-width: 767px) {
       .row-mujer {
@@ -3836,17 +3844,56 @@
       });
     }
 
-    // Resumen GRANDE del evento al pasar el mouse sobre su tarjeta en la barra lateral (solo PC con mouse).
-    // Los conteos de asistencia se consultan al pasar el mouse y se recuerdan 60 s.
+    // Resumen GRANDE del evento: tarjeta flotante al pasar el mouse (PC) o ventana al mantener
+    // presionado el evento (celular). Los conteos de asistencia se consultan al abrirlo y se recuerdan 60 s.
     const HOVER_CONTEOS = new Map();
+    async function conteosResumenEvento(e) {
+      const cache = HOVER_CONTEOS.get(e.id);
+      if (cache && Date.now() - cache.t < 60000) return cache;
+      let as = [];
+      try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
+      const asV = asistVigentes(e, as);
+      const g = asV.filter(a => !a.es_supervisor), hm = contarHM(g);
+      const c = { t: Date.now(), g: g.length, s: asV.length - g.length, h: hm.h, m: hm.m };
+      HOVER_CONTEOS.set(e.id, c);
+      return c;
+    }
+    const conteosFrescos = e => { const c = HOVER_CONTEOS.get(e.id); return c && Date.now() - c.t < 60000 ? c : null; };
+    // Encabezado + filas del resumen (c = conteos, o null mientras cargan).
+    function resumenEventoHTML(e, c) {
+      const fila = (l, v) => `<div class="hcRow"><span class="hcLbl">${l}</span><span class="hcVal">${v}</span></div>`;
+      const rango = e.fecha_evento ? (fechaFmt(e.fecha_evento) + (e.fecha_hasta && e.fecha_hasta !== e.fecha_evento ? " al " + fechaFmt(e.fecha_hasta) : "")) : "—";
+      const hu = horarioEv(e), ci = citacionEv(e), d = dotacionEv(e);
+      const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
+      const lugar = [e.direccion, e.comuna].filter(Boolean).join(", ");
+      const cnt = v => c ? v : "…";
+      return `<div class="hcHead">
+          <div class="hcTit font-bold leading-snug">${esc(e.nombre_evento)}</div>
+          <div class="hcEmp opacity-80">${esc(e.empresa || "—")}</div>
+        </div>
+        <div class="hcBody">
+          ${lugar ? fila("📍 Lugar", esc(lugar)) : ""}
+          ${fila("📅 Fechas", esc(rango))}
+          ${fila("📄 Resol. DD.FF.", esc(e.resol_numero || "—") + (e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""))}
+          ${fila("🏷️ Tipo", esc(eventoTipoCorto(e)) + (esPartido(e) && e.partido ? ": " + esc(e.partido) : ""))}
+          ${eventoUsaTurnos(e)
+            ? fila("🕑 Turnos", esc(turnoConfigTexto(e))) + fila("⏱️ Turno actual", tnNow ? `${esc(tnNow.etiqueta)} (${esc(tnNow.rango)})` : "—")
+            : (hu ? fila("🕘 Hora evento", `${esc(hu.inicio)} a ${esc(hu.fin)} hrs.${hu.cruza ? " (día sig.)" : ""}`) : fila("🕘 Hora evento", "—"))}
+          ${ci ? fila("👮 Citación GG.SS.", esc(ci) + " hrs.") : ""}
+          ${fila(`${guardiaIcon()} Guardias`, `${cnt(c && c.g)} / ${esc(e.cantidad_esperada || "—")}`)}
+          ${fila("🤵 Supervisores", `${cnt(c && c.s)} / ${d.supervisores || "—"}`)}
+          ${d.otros.map(o => fila("⭐ " + esc(o.cargo), esc(o.cantidad || 1))).join("")}
+          ${fila("👨 / 👩", c ? `${c.h} H · ${c.m} M` : "…")}
+          ${fila("📁 Estado", eventoArchivado(e) ? "Archivado" : "Activo")}
+        </div>`;
+    }
     function habilitarHoverResumen(cont) {
-      if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+      if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) { habilitarPresionLarga(cont); return; }
       let card = $("#evHoverCard");
-      if (!card) { card = document.createElement("div"); card.id = "evHoverCard"; card.setAttribute("role", "tooltip"); document.body.appendChild(card); }
+      if (!card) { card = document.createElement("div"); card.id = "evHoverCard"; card.className = "evResCard"; card.setAttribute("role", "tooltip"); document.body.appendChild(card); }
       card.classList.remove("on");   // la lista se volvió a dibujar: la fila bajo el mouse ya no existe
       let timer = null, actual = null;
       const ocultar = () => { clearTimeout(timer); actual = null; card.classList.remove("on"); };
-      const fila = (l, v) => `<div class="hcRow"><span class="hcLbl">${l}</span><span class="hcVal">${v}</span></div>`;
       const posicionar = (row) => {
         const r = row.getBoundingClientRect(), ch = card.offsetHeight, cw = card.offsetWidth;
         let left = r.right + 12;
@@ -3854,33 +3901,7 @@
         const top = Math.min(Math.max(12, r.top + r.height / 2 - ch / 2), window.innerHeight - ch - 12);
         card.style.left = left + "px"; card.style.top = Math.max(12, top) + "px";
       };
-      const pintar = (e, row, c) => {
-        const rango = e.fecha_evento ? (fechaFmt(e.fecha_evento) + (e.fecha_hasta && e.fecha_hasta !== e.fecha_evento ? " al " + fechaFmt(e.fecha_hasta) : "")) : "—";
-        const hu = horarioEv(e), ci = citacionEv(e), d = dotacionEv(e);
-        const tnNow = eventoUsaTurnos(e) ? calcularTurno(new Date().toISOString(), e) : null;
-        const lugar = [e.direccion, e.comuna].filter(Boolean).join(", ");
-        const cnt = v => c ? v : "…";
-        card.innerHTML = `<div class="hcHead">
-            <div class="font-bold text-[15px] leading-snug">${esc(e.nombre_evento)}</div>
-            <div class="text-[12px] opacity-80">${esc(e.empresa || "—")}</div>
-          </div>
-          <div class="hcBody">
-            ${lugar ? fila("📍 Lugar", esc(lugar)) : ""}
-            ${fila("📅 Fechas", esc(rango))}
-            ${fila("📄 Resol. DD.FF.", esc(e.resol_numero || "—") + (e.resol_fecha ? " · " + esc(fechaFmt(e.resol_fecha)) : ""))}
-            ${fila("🏷️ Tipo", esc(eventoTipoCorto(e)) + (esPartido(e) && e.partido ? ": " + esc(e.partido) : ""))}
-            ${eventoUsaTurnos(e)
-              ? fila("🕑 Turnos", esc(turnoConfigTexto(e))) + fila("⏱️ Turno actual", tnNow ? `${esc(tnNow.etiqueta)} (${esc(tnNow.rango)})` : "—")
-              : (hu ? fila("🕘 Hora evento", `${esc(hu.inicio)} a ${esc(hu.fin)} hrs.${hu.cruza ? " (día sig.)" : ""}`) : fila("🕘 Hora evento", "—"))}
-            ${ci ? fila("👮 Citación GG.SS.", esc(ci) + " hrs.") : ""}
-            ${fila(`${guardiaIcon()} Guardias`, `${cnt(c && c.g)} / ${esc(e.cantidad_esperada || "—")}`)}
-            ${fila("🤵 Supervisores", `${cnt(c && c.s)} / ${d.supervisores || "—"}`)}
-            ${d.otros.map(o => fila("⭐ " + esc(o.cargo), esc(o.cantidad || 1))).join("")}
-            ${fila("👨 / 👩", c ? `${c.h} H · ${c.m} M` : "…")}
-            ${fila("📁 Estado", eventoArchivado(e) ? "Archivado" : "Activo")}
-          </div>`;
-        posicionar(row);
-      };
+      const pintar = (e, row, c) => { card.innerHTML = resumenEventoHTML(e, c); posicionar(row); };
       cont.querySelectorAll(".evRow").forEach(row => {
         const nom = row.querySelector(".evName"); if (nom) nom.removeAttribute("title");   // evita el tooltip nativo encima
         row.addEventListener("mouseenter", () => {
@@ -3890,17 +3911,11 @@
             const e = (ADMIN_STATE.eventos || []).find(x => x.id === row.dataset.id);
             if (!e || ADMIN_STATE._reordenando) return;
             actual = e.id;
-            const cache = HOVER_CONTEOS.get(e.id);
-            const fresco = cache && Date.now() - cache.t < 60000 ? cache : null;
+            const fresco = conteosFrescos(e);
             pintar(e, row, fresco);
             card.classList.add("on");
             if (fresco) return;
-            let as = [];
-            try { as = await Data.listAsistencias(e.id); } catch (_) { as = []; }
-            const asV = asistVigentes(e, as);
-            const g = asV.filter(a => !a.es_supervisor), hm = contarHM(g);
-            const c = { t: Date.now(), g: g.length, s: asV.length - g.length, h: hm.h, m: hm.m };
-            HOVER_CONTEOS.set(e.id, c);
+            const c = await conteosResumenEvento(e);
             if (actual === e.id && row.isConnected) pintar(e, row, c);
           }, 250);
         });
@@ -3911,6 +3926,52 @@
         card.dataset.wired = "1";
         window.addEventListener("scroll", () => card.classList.remove("on"), true);
       }
+    }
+    // CELULAR: mantener presionado un evento (fuera del asa ⠿) abre su resumen grande al frente.
+    // El toque corto sigue seleccionando el evento como siempre.
+    function habilitarPresionLarga(cont) {
+      cont.querySelectorAll(".evItem").forEach(btn => {
+        let timer = null, x0 = 0, y0 = 0, disparado = false;
+        const cancelar = () => { clearTimeout(timer); timer = null; };
+        btn.addEventListener("pointerdown", ev => {
+          if (ev.pointerType === "mouse" || ev.target.closest(".evHandle") || ADMIN_STATE._reordenando) return;
+          disparado = false; x0 = ev.clientX; y0 = ev.clientY;
+          cancelar();
+          timer = setTimeout(() => {
+            timer = null; disparado = true;
+            try { navigator.vibrate && navigator.vibrate(15); } catch (_) { }
+            const e = (ADMIN_STATE.eventos || []).find(x => x.id === btn.dataset.id);
+            if (e) abrirResumenEvento(e);
+          }, 500);
+        });
+        btn.addEventListener("pointermove", ev => { if (timer && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) cancelar(); });
+        ["pointerup", "pointercancel", "pointerleave"].forEach(t => btn.addEventListener(t, cancelar));
+        // Tras la presión larga, el "click" que llega al soltar NO debe seleccionar el evento.
+        btn.addEventListener("click", ev => { if (disparado) { disparado = false; ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);
+        btn.addEventListener("contextmenu", ev => ev.preventDefault());
+      });
+    }
+    async function abrirResumenEvento(e) {
+      const pintar = c => `<div class="evResCard evResGrande">${resumenEventoHTML(e, c)}</div>
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <button id="res_close" class="btn btn-ghost">Cerrar</button>
+          <button id="res_open" class="btn btn-p">Abrir evento</button>
+        </div>`;
+      const wire = () => {
+        $("#res_close").addEventListener("click", closeModal);
+        $("#res_open").addEventListener("click", () => {
+          closeModal();
+          ADMIN_STATE.selected = e.id; ADMIN_STATE.expandido = null; ADMIN_STATE.turnoFiltro = "all";
+          if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer();
+          refreshAdmin();
+        });
+      };
+      const fresco = conteosFrescos(e);
+      openModal(pintar(fresco)); wire();
+      if (fresco) return;
+      const c = await conteosResumenEvento(e);
+      const box = $("#modalBox .evResGrande");
+      if (box && $("#modal").style.display !== "none") box.innerHTML = resumenEventoHTML(e, c);
     }
 
     // Permite al administrador reordenar los eventos arrastrando el asa (los puntos ⠿)
