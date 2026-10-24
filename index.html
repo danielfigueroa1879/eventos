@@ -7562,7 +7562,20 @@
       if (distShareBtn) distShareBtn.addEventListener("click", () => modalCompartirDistribucion(ev));
 
       // --- Descargar relación de facciones con captura del mapa (PDF) ---
-      $("#dist_pdf", ov).addEventListener("click", async () => {
+      // Al tocar PDF se elige la versión: con RUT o sin RUT (para compartir sin datos personales).
+      $("#dist_pdf", ov).addEventListener("click", () => {
+        openModal(`<h2 class="font-bold text-lg text-slate-800 mb-1">📄 Relación de facciones</h2>
+          <p class="text-sm text-slate-500 mb-3">Elige la versión del PDF.</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="fpdf_rut" class="btn btn-p text-sm py-3">Con RUT</button>
+            <button id="fpdf_sin" class="btn btn-p text-sm py-3" style="background:#475569;border-color:#475569">Sin RUT</button>
+          </div>
+          <button id="fpdf_close" class="btn btn-ghost w-full mt-3">Cancelar</button>`);
+        $("#fpdf_rut").addEventListener("click", () => { closeModal(); pdfFacciones(true); });
+        $("#fpdf_sin").addEventListener("click", () => { closeModal(); pdfFacciones(false); });
+        $("#fpdf_close").addEventListener("click", closeModal);
+      });
+      async function pdfFacciones(conRut) {
         if (!state.puestos.length) { toast("Aún no hay puestos para exportar", false); return; }
         // Solo puestos con guardias asignados ahora: los que quedaron en 0 son de partidos/turnos anteriores
         // (sus asistencias ya se archivaron) y no deben aparecer en la relación.
@@ -7644,16 +7657,16 @@
             const span = Math.max(1, asig.length);
             const cel = (content, extra = {}) => ({ content, rowSpan: span, styles: { fillColor: fondo, ...extra } });
             const cabeza = [cel(String(i + 1)), cel(p.nombre), cel(p.anillo || "—"), cel(`${asig.length}/${p.guardias_plan || 0}`), cel(String(p.paletas || 0))];
-            if (!asig.length) { rows.push([...cabeza, { content: "—", styles: { fillColor: fondo } }, { content: "—", styles: { fillColor: fondo } }, { content: "—", styles: { fillColor: fondo } }]); return; }
+            if (!asig.length) { rows.push([...cabeza, ...Array(conRut ? 3 : 2).fill(0).map(() => ({ content: "—", styles: { fillColor: fondo } }))]); return; }
             asig.forEach((a, j) => {
               const g = a.guardia || {};
               const nom = ((g.nombres || "") + " " + (g.apellidos || "")).trim() || "—";
-              rows.push([...(j === 0 ? cabeza : []), { content: trim(nom, 34), styles: { fillColor: fondo } }, { content: a.rut, styles: { fillColor: fondo } }, vigCelda(a)]);
+              rows.push([...(j === 0 ? cabeza : []), { content: trim(nom, conRut ? 34 : 48), styles: { fillColor: fondo } }, ...(conRut ? [{ content: a.rut, styles: { fillColor: fondo } }] : []), vigCelda(a)]);
             });
           });
           doc.autoTable({
             startY: imgY + imgH + 14,
-            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Nombre", "RUT", "Vigencia"]],
+            head: [["#", "Puesto", "Zona", "Guardias", "Paletas", "Nombre", ...(conRut ? ["RUT"] : []), "Vigencia"]],
             body: rows,
             theme: "grid",
             styles: { font: "helvetica", fontSize: 7.5, cellPadding: 2.5, valign: "middle", lineColor: [203, 213, 225], lineWidth: 0.5, textColor: [30, 30, 30], overflow: "linebreak" },
@@ -7665,8 +7678,7 @@
               3: { cellWidth: 40, halign: "center", fontStyle: "bold" },
               4: { cellWidth: 38, halign: "center" },
               5: { cellWidth: "auto" },
-              6: { cellWidth: 60, font: "courier", halign: "center" },
-              7: { cellWidth: 66, halign: "center" }
+              ...(conRut ? { 6: { cellWidth: 60, font: "courier", halign: "center" }, 7: { cellWidth: 66, halign: "center" } } : { 6: { cellWidth: 66, halign: "center" } })
             },
             margin: { left: marginX, right: marginX, bottom: 34 },
             didDrawPage: () => {
@@ -7677,11 +7689,11 @@
           });
 
           const slug = (ev.slug || "facciones").replace(/[^a-z0-9\-]+/gi, "-");
-          doc.save(`Facciones-${slug}.pdf`);
+          doc.save(`Facciones-${slug}${conRut ? "" : "-sin-rut"}.pdf`);
         } catch (e) {
           toast("No se pudo generar el PDF: " + (e.message || e), false);
         }
-      });
+      }
 
       // --- Formulario crear/editar puesto ---
       function formPuesto(p, latlng) {
