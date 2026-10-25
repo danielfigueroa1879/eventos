@@ -2600,6 +2600,41 @@
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
 
+    // ===== Juzgado de Policía Local de turno (La Serena / Coquimbo) — traído de Directivas2 =====
+    // Turnos semanales de lunes a domingo, alternando 1er y 2do JPL. Referencias (calendarios oficiales):
+    //   La Serena: lunes 19-10-2026 → 1er JPL
+    //   Coquimbo:  lunes 02-11-2026 → 1er JPL (antes de esa fecha no hay turno)
+    function modalJuzgadoTurno() {
+      const DIA = 86400000;
+      const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+      const REF_LS = new Date(2026, 9, 19), REF_CQ = new Date(2026, 10, 2);
+      const fmt = d => d.getDate() + " " + MESES[d.getMonth()];
+      const fmtNum = d => String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
+      // Semanas completas desde el lunes de referencia (Math.round absorbe cambios de horario)
+      const turno = (lunes, ref) => { const n = Math.round((lunes - ref) / DIA / 7); return n < 0 ? null : (n % 2 === 0 ? "1er JPL" : "2do JPL"); };
+      const hoy = new Date();
+      const lunes = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - ((hoy.getDay() + 6) % 7));
+      const domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
+      const fila = (ciudad, ref) => {
+        const v = turno(lunes, ref);
+        const badge = v
+          ? `<span class="px-2.5 py-0.5 rounded-full text-sm font-bold text-white whitespace-nowrap" style="background:#146314">${v}</span>`
+          : `<span class="px-2.5 py-0.5 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-700">1er JPL del ${fmtNum(ref)}</span>`;
+        return `<div class="flex items-center justify-between gap-3 px-3.5 py-3 mt-2 rounded-xl text-left" style="background:rgba(20,99,20,.07);border:1px solid rgba(20,99,20,.18)"><span class="font-bold text-[15px]">${ciudad}</span>${badge}</div>`;
+      };
+      openModal(`<div class="relative text-center">
+        <button id="jpl_x" type="button" class="absolute -top-1 -right-1 text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Cerrar">✕</button>
+        <div class="text-3xl leading-none" aria-hidden="true">⚖️</div>
+        <h3 class="mt-2 font-extrabold text-[17px]" style="color:#146314">Juzgado de Policía Local de turno</h3>
+        <p class="text-xs text-slate-500 mb-3">Semana del lunes ${fmt(lunes)} al domingo ${fmt(domingo)}</p>
+        ${fila("La Serena", REF_LS)}
+        ${fila("Coquimbo", REF_CQ)}
+        <button id="jpl_ok" type="button" class="btn btn-p w-full mt-4">Cerrar</button>
+      </div>`);
+      $("#jpl_x").addEventListener("click", closeModal);
+      $("#jpl_ok").addEventListener("click", closeModal);
+    }
+
     /* =========================================================================
        FOTO DE VERIFICACIÓN (ingreso) — captura con guía ovalada + conversión a WebP HD
        ---------------------------------------------------------------------------
@@ -3648,6 +3683,7 @@
         </button>
         </div>
         </div>
+        <button id="jplBtn" type="button" class="btn btn-ghost w-full mb-3 text-sm font-semibold flex items-center justify-center gap-1.5" style="border:1.5px solid rgba(20,99,20,.35);color:#146314" title="Juzgado de Policía Local de turno">⚖️ Juzgado de turno</button>
         <div id="listaWrap">
         <div id="evHeader" class="flex items-center justify-between px-1 mb-1.5">
           <h2 id="evTitulo" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Eventos</h2>
@@ -3691,6 +3727,7 @@
         ADMIN_STATE.expandido = null; ADMIN_STATE.turnoFiltro = "all";
         renderSidebarList(); renderMain();
       });
+      $("#jplBtn").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalJuzgadoTurno(); });
       $("#importar").addEventListener("click", () => { if (window.innerWidth < 768 && window.cerrarDrawer) window.cerrarDrawer(); modalImportar(); });
       $("#salir").addEventListener("click", () => { sessionStorage.removeItem("os10_admin"); sessionStorage.removeItem("os10_admin_pin"); route(); });
       // PC: angostar / ampliar el panel lateral con el botón de la franja verde. Se recuerda en este equipo.
