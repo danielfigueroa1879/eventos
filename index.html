@@ -1284,36 +1284,40 @@
     /* ===== Calendario de turno de los JPL (modal «Juzgado de turno») ===== */
     .jplCals { display: grid; grid-template-columns: 1fr; gap: .75rem; }
     @media (min-width: 640px) { .jplCals { grid-template-columns: 1fr 1fr; } }
-    .jplCal { border: 1px solid rgba(20,99,20,.18); border-radius: .85rem; padding: .6rem .55rem .55rem; background: rgba(20,99,20,.04); }
+    /* Colores por ciudad: La Serena en rojo colonial y sus derivados; Coquimbo en amarillo y negro. */
+    .jplCal.ls { --c: #9b1b1e; --c-tx: #fff; --j1: rgba(155,27,30,.22); --j2: rgba(214,150,100,.2); --t1: #9b1b1e; --t2: #b5533c; --bd: rgba(155,27,30,.22); --bg: rgba(155,27,30,.04); --hv: rgba(155,27,30,.1); }
+    .jplCal.cq { --c: #111111; --c-tx: #facc15; --j1: rgba(250,204,21,.38); --j2: rgba(17,17,17,.11); --t1: #a16207; --t2: #111111; --bd: rgba(202,138,4,.4); --bg: rgba(250,204,21,.07); --hv: rgba(250,204,21,.3); }
+    .jplCal { border: 1px solid var(--bd); border-radius: .85rem; padding: .6rem .55rem .55rem; background: var(--bg); }
     .jplCal table { width: 100%; border-collapse: separate; border-spacing: 0 3px; table-layout: fixed; }
     .jplCal th { font-size: 10px; font-weight: 700; color: #64748b; padding-bottom: 2px; }
     .jplCal td { text-align: center; font-size: 12.5px; height: 30px; padding: 0; font-variant-numeric: tabular-nums; }
     .jplCal td.fuera { color: #b6bfca; }
-    .jplCal tr.j1 td { background: rgba(20,99,20,.14); }
-    .jplCal tr.j2 td { background: rgba(37,99,235,.12); }
+    .jplCal tr.j1 td { background: var(--j1); }
+    .jplCal tr.j2 td { background: var(--j2); }
     .jplCal tr td:first-child { border-radius: 8px 0 0 8px; }
     .jplCal tr td:last-child { border-radius: 0 8px 8px 0; }
-    .jplCal tr.actual td { box-shadow: inset 0 2px 0 #146314, inset 0 -2px 0 #146314; font-weight: 700; }
-    .jplCal tr.actual td:first-child { box-shadow: inset 2px 2px 0 #146314, inset 0 -2px 0 #146314; }
-    .jplCal tr.actual td:last-child { box-shadow: inset -2px 2px 0 #146314, inset 0 -2px 0 #146314; }
-    .jplCal td.tag { font-size: 10px; font-weight: 800; color: #146314; }
-    .jplCal tr.j2 td.tag { color: #1d4ed8; }
-    .jplCal .hoy { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 999px; background: #146314; color: #fff; font-weight: 800; }
-    .jplCal .jplNav { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #146314; font-size: 18px; font-weight: 800; }
-    .jplCal .jplNav:hover { background: rgba(20,99,20,.1); }
+    .jplCal tr.actual td { box-shadow: inset 0 2px 0 var(--c), inset 0 -2px 0 var(--c); font-weight: 700; }
+    .jplCal tr.actual td:first-child { box-shadow: inset 2px 2px 0 var(--c), inset 0 -2px 0 var(--c); }
+    .jplCal tr.actual td:last-child { box-shadow: inset -2px 2px 0 var(--c), inset 0 -2px 0 var(--c); }
+    .jplCal td.tag { font-size: 10px; font-weight: 800; color: var(--t1); }
+    .jplCal tr.j2 td.tag { color: var(--t2); }
+    .jplCal .hoy { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 999px; background: var(--c); color: var(--c-tx); font-weight: 800; }
+    .jplCal .jplNav { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--c); font-size: 18px; font-weight: 800; }
+    .jplCal .jplNav:hover { background: var(--hv); }
+    .jplCal .jplTit { color: var(--c); }
+    .jplCal .jplLeyenda i.l1 { background: var(--j1); } .jplCal .jplLeyenda i.l2 { background: var(--j2); } .jplCal .jplLeyenda i.la { border: 2px solid var(--c); }
     .jplLeyenda { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem .9rem; font-size: 11px; color: #64748b; }
     .jplLeyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+    .jplRes.ls { background: rgba(155,27,30,.07); border: 1px solid rgba(155,27,30,.22); }
+    .jplRes.cq { background: rgba(250,204,21,.12); border: 1px solid rgba(202,138,4,.4); }
     @media (max-width: 639px) { .jplCal td { height: 34px; font-size: 13.5px; } .jplCal .hoy { width: 27px; height: 27px; } }
-    html[data-theme="dark"] .jplCal { background: #16191d; border-color: #1f5133; }
+    html[data-theme="dark"] .jplCal { background: #16191d; }
+    html[data-theme="dark"] .jplCal.ls { --c: #e0625f; --c-tx: #1b0a0a; --j1: rgba(185,40,44,.32); --j2: rgba(214,120,90,.17); --t1: #f08a87; --t2: #e3a07f; --bd: rgba(185,40,44,.45); --hv: rgba(185,40,44,.25); }
+    html[data-theme="dark"] .jplCal.cq { --c: #facc15; --c-tx: #111; --j1: rgba(250,204,21,.24); --j2: rgba(0,0,0,.5); --t1: #facc15; --t2: #e5e7eb; --bd: rgba(250,204,21,.4); --hv: rgba(250,204,21,.18); }
     html[data-theme="dark"] .jplCal th { color: #94a3b8; }
     html[data-theme="dark"] .jplCal td.fuera { color: #4b5563; }
-    html[data-theme="dark"] .jplCal tr.j1 td { background: rgba(34,197,94,.16); }
-    html[data-theme="dark"] .jplCal tr.j2 td { background: rgba(96,165,250,.16); }
-    html[data-theme="dark"] .jplCal td.tag, html[data-theme="dark"] .jplCal .jplNav { color: #4ade80; }
-    html[data-theme="dark"] .jplCal tr.j2 td.tag { color: #93c5fd; }
-    html[data-theme="dark"] .jplCal tr.actual td { box-shadow: inset 0 2px 0 #4ade80, inset 0 -2px 0 #4ade80; }
-    html[data-theme="dark"] .jplCal tr.actual td:first-child { box-shadow: inset 2px 2px 0 #4ade80, inset 0 -2px 0 #4ade80; }
-    html[data-theme="dark"] .jplCal tr.actual td:last-child { box-shadow: inset -2px 2px 0 #4ade80, inset 0 -2px 0 #4ade80; }
+    html[data-theme="dark"] .jplRes.ls { background: rgba(185,40,44,.14); border-color: rgba(185,40,44,.45); }
+    html[data-theme="dark"] .jplRes.cq { background: rgba(250,204,21,.1); border-color: rgba(250,204,21,.4); }
 
     /* ===== Resaltado temporal de la fila del RUT consultado (al cerrar la consulta) ===== */
     /* Primero un marco ROJO, y al desaparecer, tres saltitos cortos de rebote. */
@@ -2651,12 +2655,15 @@
       const hoy = new Date();
       const lunes = lunesDe(hoy);
       const domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
-      const fila = (ciudad, ref) => {
+      // Insignia de cada JPL con el color de su ciudad (La Serena: rojo colonial / terracota; Coquimbo: amarillo / negro)
+      const COLOR = { LS: { "1er JPL": "background:#9b1b1e;color:#fff", "2do JPL": "background:#b5533c;color:#fff" },
+                      CQ: { "1er JPL": "background:#facc15;color:#111", "2do JPL": "background:#111;color:#facc15" } };
+      const fila = (clave, ciudad, ref) => {
         const v = turno(lunes, ref);
         const badge = v
-          ? `<span class="px-2.5 py-0.5 rounded-full text-sm font-bold text-white whitespace-nowrap" style="background:${v === "1er JPL" ? "#146314" : "#1d4ed8"}">${v}</span>`
+          ? `<span class="px-2.5 py-0.5 rounded-full text-sm font-bold whitespace-nowrap" style="${COLOR[clave][v]}">${v}</span>`
           : `<span class="px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap" style="background:#e2e8f0;color:#334155">Desde ${fmtNum(ref).slice(0, 5)}</span>`;
-        return `<div class="flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-3 px-2 sm:px-3.5 py-2 sm:py-2.5 rounded-xl" style="background:rgba(20,99,20,.07);border:1px solid rgba(20,99,20,.18)"><span class="font-bold text-sm sm:text-[15px]">${ciudad}</span>${badge}</div>`;
+        return `<div class="jplRes ${clave.toLowerCase()} flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-3 px-2 sm:px-3.5 py-2 sm:py-2.5 rounded-xl"><span class="font-bold text-sm sm:text-[15px]">${ciudad}</span>${badge}</div>`;
       };
       // Calendario mensual pequeño: cada semana (lunes a domingo) se pinta según el JPL de turno,
       // con la semana actual enmarcada y el día de hoy en un círculo. Se puede cambiar de mes.
@@ -2680,10 +2687,11 @@
         }
         return `<div class="flex items-center justify-between mb-1">
             <button type="button" class="jplNav" data-cal="${clave}" data-dir="-1" aria-label="Mes anterior">‹</button>
-            <div class="leading-tight"><div class="font-extrabold text-[14px]">${ciudad}</div><div class="text-[11px] text-slate-500">${MESES_L[mo]} ${y}</div></div>
+            <div class="leading-tight"><div class="jplTit font-extrabold text-[14px]">${ciudad}</div><div class="text-[11px] text-slate-500">${MESES_L[mo]} ${y}</div></div>
             <button type="button" class="jplNav" data-cal="${clave}" data-dir="1" aria-label="Mes siguiente">›</button>
           </div>
-          <table><thead><tr>${["L", "M", "M", "J", "V", "S", "D"].map(x => `<th>${x}</th>`).join("")}<th>JPL</th></tr></thead><tbody>${filas}</tbody></table>`;
+          <table><thead><tr>${["L", "M", "M", "J", "V", "S", "D"].map(x => `<th>${x}</th>`).join("")}<th>JPL</th></tr></thead><tbody>${filas}</tbody></table>
+          <div class="jplLeyenda mt-1.5"><span><i class="l1"></i>1er JPL</span><span><i class="l2"></i>2do JPL</span><span><i class="la"></i>Semana actual</span></div>`;
       };
       const REFS = { LS: ["La Serena", REF_LS], CQ: ["Coquimbo", REF_CQ] };
       openModal(`<div class="relative text-center">
@@ -2691,15 +2699,10 @@
         <div class="text-3xl leading-none" aria-hidden="true">⚖️</div>
         <h3 class="mt-2 font-extrabold text-[17px]" style="color:#146314">Juzgado de Policía Local de turno</h3>
         <p class="text-xs text-slate-500 mb-3">Semana del lunes ${fmt(lunes)} al domingo ${fmt(domingo)}</p>
-        <div class="grid grid-cols-2 gap-2 mb-3">${fila("La Serena", REF_LS)}${fila("Coquimbo", REF_CQ)}</div>
+        <div class="grid grid-cols-2 gap-2 mb-3">${fila("LS", "La Serena", REF_LS)}${fila("CQ", "Coquimbo", REF_CQ)}</div>
         <div class="jplCals">
-          <div class="jplCal" id="jplCal_LS">${calHTML("LS", ...REFS.LS)}</div>
-          <div class="jplCal" id="jplCal_CQ">${calHTML("CQ", ...REFS.CQ)}</div>
-        </div>
-        <div class="jplLeyenda mt-2.5">
-          <span><i style="background:rgba(20,99,20,.35)"></i>1er JPL</span>
-          <span><i style="background:rgba(37,99,235,.32)"></i>2do JPL</span>
-          <span><i style="border:2px solid #146314"></i>Semana actual</span>
+          <div class="jplCal ls" id="jplCal_LS">${calHTML("LS", ...REFS.LS)}</div>
+          <div class="jplCal cq" id="jplCal_CQ">${calHTML("CQ", ...REFS.CQ)}</div>
         </div>
         <button id="jpl_ok" type="button" class="btn btn-p w-full mt-4">Cerrar</button>
       </div>`);
