@@ -2783,7 +2783,6 @@
         <div style="background:#fff;border-radius:22px;padding:26px 22px;width:100%;max-width:330px;text-align:center;box-shadow:0 20px 50px -12px rgba(0,0,0,.45)">
           <div style="position:relative;width:86px;height:86px;margin:0 auto 14px">
             <div style="position:absolute;inset:0;border-radius:50%;border:6px solid #dcfce7;border-top-color:#16a34a;animation:procGiro .8s linear infinite"></div>
-            <img src="images/logo-os10-original.webp" alt="" style="position:absolute;inset:12px;width:62px;height:62px;border-radius:50%;animation:procLatido 1.6s ease-in-out infinite">
           </div>
           <div style="font-weight:800;font-size:18px;color:#0f172a">Procesando tu ingreso</div>
           <div style="font-size:12px;color:#64748b;margin-top:2px">No cierres esta pantalla</div>
@@ -3138,13 +3137,13 @@
       if (_qrTimer) { clearInterval(_qrTimer); _qrTimer = null; }
       if (!container) return;
       let actual = guardLinkVigente(ev);
-      renderQRConLogo(container, actual);
+      renderQR(container, actual);
       if (qrRotativo(ev)) {
         _qrTimer = setInterval(() => {
           const c = document.querySelector("#qrbox");
           if (!c) { clearInterval(_qrTimer); _qrTimer = null; return; }
           const nuevo = guardLinkVigente(ev);
-          if (nuevo !== actual) { actual = nuevo; renderQRConLogo(c, nuevo); }
+          if (nuevo !== actual) { actual = nuevo; renderQR(c, nuevo); }
         }, 60 * 1000);
       }
     }
@@ -3336,7 +3335,7 @@
         </div>` : ""}
       </div>
 
-      <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-3 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" alt="" class="w-5 h-5 rounded-full">Ir a os10coquimbo.cl</a>
+      <a href="https://os10coquimbo.cl/" target="_blank" rel="noopener" class="btn btn-ghost w-full mt-3 flex items-center justify-center gap-2">Ir a os10coquimbo.cl</a>
 
       <p class="text-center text-xs text-slate-400 mt-4">Sistema de fiscalización OS10 · ${USING_SUPABASE ? '' : 'MODO DEMO'}</p>
     </div>
@@ -3729,7 +3728,7 @@
     <!-- Topbar móvil -->
     <div class="md:hidden brand-bg text-white flex items-center justify-between px-4 h-16">
       <button id="hamb" class="w-9 h-9 -ml-1 flex items-center justify-center" aria-label="Abrir menú"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 6h17M3.5 12h17M3.5 18h17"/></svg></button>
-      <div class="font-bold text-lg flex items-center gap-2"><img src="images/logo-os10-original.webp" class="hidden w-8 h-8 rounded-full bg-white/90" alt="OS10"><!-- logo oculto por ahora; quitar "hidden" para mostrarlo -->CONTROL EVENTOS</div>
+      <div class="font-bold text-lg flex items-center gap-2">CONTROL EVENTOS</div>
       <!-- Opciones del evento abierto (mismo panel ☰ de PC). Invisible si no hay evento seleccionado. -->
       <button id="menuEvTop" type="button" class="w-9 h-9 -mr-1 flex items-center justify-center invisible" aria-label="Opciones del evento" title="Opciones del evento"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
@@ -4728,7 +4727,7 @@
       $("#admQrFondo").addEventListener("click", () => qrAbrir(false));
       if (!window._admQrEsc) { window._admQrEsc = true; document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("admQrFondo") && ADMIN_STATE.showQR) { const b = document.getElementById("admQrCerrarBtn"); if (b) b.click(); } }); }
 
-      // QR (con logo O.S.10 al centro y margen blanco)
+      // QR (con margen blanco)
       if (ADMIN_STATE.showQR) montarQR($("#qrbox"), ev);   // si no, se dibuja al abrirlo (ahorra tiempo en cada repintado)
       if ($("#qrDl")) $("#qrDl").addEventListener("click", () => dlQR(ev));
       if ($("#qrPr")) $("#qrPr").addEventListener("click", () => prQR(ev));
@@ -5743,15 +5742,15 @@
       }
     }
 
-    /* ---- QR con logo O.S.10 + margen blanco ---- */
-    function renderQRConLogo(container, text) {
+    /* ---- QR con margen blanco ---- */
+    function renderQR(container, text) {
       const SIZE = 150;      // módulo del QR (unidades lógicas)
       const MARGIN = 7;      // margen blanco (quiet zone) discreto
       const SCALE = 4;       // supersampling: el canvas se dibuja a 4x para que no se pixele al ampliar/imprimir
       const total = SIZE + MARGIN * 2;
       const px = total * SCALE;
       container.innerHTML = "";
-      // Genera el QR en un contenedor temporal (correctLevel H para tolerar el logo central)
+      // Genera el QR en un contenedor temporal
       const tmp = document.createElement("div");
       new QRCode(tmp, { text, width: SIZE, height: SIZE, correctLevel: QRCode.CorrectLevel.H });
 
@@ -5772,40 +5771,17 @@
         return false;
       };
 
-      const pintarLogo = () => {
-        const logo = new Image();
-        logo.onload = () => {
-          // Tamaño del logo: ~27% del QR. Con correctLevel H (30% de tolerancia)
-          // queda bien visible y centrado sin interrumpir la lectura.
-          const box = Math.round(SIZE * 0.27) * SCALE;
-          // Mantener la proporción real del logo (150x153) para que no se deforme
-          const ar = (logo.naturalHeight && logo.naturalWidth) ? logo.naturalHeight / logo.naturalWidth : 1;
-          const lw = box, lh = Math.round(box * ar);
-          const cx = px / 2, cy = px / 2;              // centro exacto del QR
-          // Fondo blanco CIRCULAR que sigue la forma del emblema (el logo es transparente):
-          // devuelve el blanco interior del logo y deja solo una orilla mínima, sin recuadro cuadrado.
-          const r = Math.max(lw, lh) / 2 + 0.5 * SCALE;
-          ctx.fillStyle = "#fff";
-          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-          ctx.imageSmoothingEnabled = true;                 // logo suavizado (nítido, no pixelado)
-          ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
-        };
-        logo.src = "images/logo-os10-original.webp";
-      };
-
       // qrcodejs dibuja de forma síncrona en canvas; reintenta por si usa <img>
-      if (pintarQR()) pintarLogo();
-      else {
+      if (!pintarQR()) {
         let intentos = 0;
-        const t = setInterval(() => { if (pintarQR() || ++intentos > 20) { clearInterval(t); pintarLogo(); } }, 50);
+        const t = setInterval(() => { if (pintarQR() || ++intentos > 20) clearInterval(t); }, 50);
       }
     }
 
     /* ---- QR descargar / imprimir ---- */
     function qrCanvasDataURL() { const c = $("#qrbox canvas"); if (c) return c.toDataURL("image/png"); const img = $("#qrbox img"); return img ? img.src : null; }
     // El QR se dibuja solo cuando hace falta (al abrirlo o al descargar/imprimir): si recién se
-    // monta, se espera un instante a que se pinte el logo del centro.
+    // monta, se espera un instante a que se pinte.
     function asegurarQR(ev) { const c = $("#qrbox"); if (!c || c.firstChild) return false; montarQR(c, ev); return true; }
     function dlQR(ev) {
       const nuevo = asegurarQR(ev);
@@ -7138,7 +7114,6 @@
           <aside class="bg-white border-b md:border-b-0 md:border-r border-slate-200 overflow-y-auto flex-shrink-0 md:w-72 md:max-w-none">
             <div class="brand-bg text-white p-4 flex items-center gap-2">
               <button id="hp_back" class="text-white leading-none p-1 -ml-1 rounded-md hover:bg-white/20 transition-colors flex-shrink-0" aria-label="Volver" title="Volver"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
-              <img src="images/logo-os10-original.webp" class="w-10 h-10 rounded-full bg-white/90 flex-shrink-0" alt="OS10">
               <div class="flex-1 min-w-0"><div class="font-bold text-base leading-tight truncate">${esc(ev.nombre_evento)}</div><div class="text-xs opacity-80 truncate">Historial de partidos</div></div>
             </div>
             <div class="p-3">
@@ -7339,7 +7314,6 @@
           <aside class="bg-white border-b md:border-b-0 md:border-r border-slate-200 overflow-y-auto flex-shrink-0 md:w-72 md:max-w-none">
             <div class="brand-bg text-white p-4 flex items-center gap-2">
               <button id="ht_back" class="text-white leading-none p-1 -ml-1 rounded-md hover:bg-white/20 transition-colors flex-shrink-0" aria-label="Volver" title="Volver"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
-              <img src="images/logo-os10-original.webp" class="w-10 h-10 rounded-full bg-white/90 flex-shrink-0" alt="OS10">
               <div class="flex-1 min-w-0"><div class="font-bold text-base leading-tight truncate">${esc(ev.nombre_evento)}</div><div class="text-xs opacity-80 truncate">Historial de turnos</div></div>
             </div>
             <div class="p-3">
@@ -9682,7 +9656,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           </table>
         </div>
       </div>
-      <p class="text-center text-xs text-slate-400 mt-4 flex items-center justify-center gap-2"><img src="images/logo-os10-original.webp" class="w-5 h-5 opacity-60" alt="">O.S.10 Coquimbo · Vista de solo lectura</p>
+      <p class="text-center text-xs text-slate-400 mt-4">O.S.10 Coquimbo · Vista de solo lectura</p>
     </div>`;
         // Paneles plegables con auto-repliegue a los 7 s (igual que el "Resumen" del admin).
         const autoRepliegue = (btnId, panelId, chevId, key) => {
