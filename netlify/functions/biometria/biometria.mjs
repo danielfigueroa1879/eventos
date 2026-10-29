@@ -39,6 +39,7 @@ const WASM = "ort-wasm-simd-threaded.wasm", WASM_MJS = "ort-wasm-simd-threaded.m
 const MAX_IMG_BYTES = 400 * 1024, MAX_IMG_LADO = 1280;
 const LIMITE_INTENTOS = 30, VENTANA_LIMITE_MS = 10 * 60 * 1000;   // piloto: holgado para calibrar
 const INGRESO_PLAZO_MS = 15 * 60 * 1000, INGRESO_MAX_INTENTOS = 2;   // por asistencia
+const ENVIO_GRACIA_MS = 2 * 60 * 1000;   // margen para envíos reintentados con señal débil
 const RETENCION_DIAS = 60;   // limpieza biométrica cada 2 meses
 
 const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
@@ -238,12 +239,17 @@ export default async (req) => {
       const [plant, ints, fallidos] = await Promise.all([
         sbFetch(cfg, `/rest/v1/guardias_biometria?select=rut,fecha_enrolamiento&activo=is.true&order=fecha_enrolamiento.desc&limit=10000`),
         sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,estado,liveness_ok,fecha&limit=50000`),
-        sbFetch(cfg, `/rest/v1/biometria_intentos?select=detalle&liveness_ok=is.false&fecha=gte.${enc(hace7)}&limit=20000`)]);
-      // Causas de la prueba de vida fallida (7 días): cuántos intentos tuvieron cada motivo (un intento puede tener varios).
-      const causas = {};
+        sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,fecha,detalle&liveness_ok=is.false&limit=50000`)]);
+      // Causas de la prueba de vida fallida: total de 7 días y, por guardia, de todo lo guardado (máx. 60 días).
+      // Cuenta intentos por causa (un intento puede tener varias).
+      const causas = {}, causasRut = new Map();
       fallidos.forEach(x => {
         const vistos = new Set();
-        ((x.detalle && x.detalle.motivos) || []).forEach(m => { const c = causaVida(m); if (!vistos.has(c)) { vistos.add(c); causas[c] = (causas[c] || 0) + 1; } });
+        ((x.detalle && x.detalle.motivos) || []).forEach(m => vistos.add(causaVida(m)));
+        if (!vistos.size) vistos.add("Otra");
+        const cr = causasRut.get(x.rut) || {};
+        vistos.forEach(c => { cr[c] = (cr[c] || 0) + 1; if (x.fecha >= hace7) causas[c] = (causas[c] || 0) + 1; });
+        if (x.rut) causasRut.set(x.rut, cr);
       });
       const ints7 = ints.filter(x => x.fecha >= hace7);
       const cuenta = f => ints7.filter(f).length;
@@ -263,7 +269,7 @@ export default async (req) => {
         no_coincide_7d: cuenta(x => x.estado === L.ESTADOS.NO),
         vida_fallida_7d: cuenta(x => x.liveness_ok === false),
         causas_vida_7d: causas,
-        lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento, ...(porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 }) })) });
+        lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento, ...(porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 }), causas: causasRut.get(x.rut) || {} })) });
     }
 
     // ----- Panel admin -> retención de 60 días (solo PIN) -----
@@ -339,7 +345,9 @@ export default async (req) => {
     }
     if (b.accion === "procesar_auto") {
       let d;
-      try { d = L.leerDesafio(cfg.k, b.token); } catch (e) { throw new ErrorCliente(e.message); }
+      // Señal débil: el envío puede llegar tarde por los reintentos; se acepta hasta 2 min después del
+      // vencimiento (el nonce de un solo uso sigue impidiendo reutilizar el desafío).
+      try { d = L.leerDesafio(cfg.k, b.token, Date.now() - ENVIO_GRACIA_MS); } catch (e) { throw new ErrorCliente(e.message); }
       if (d.rut !== rut || d.tipo !== "auto") throw new ErrorCliente("El desafío no corresponde a este RUT.");
       if (b.consentimiento !== true) throw new ErrorCliente("Falta el consentimiento.");
       // previo = verificación ANTES de registrar el ingreso (RUT ya enrolado): si el rostro NO COINCIDE
@@ -363,7 +371,7 @@ export default async (req) => {
       const otraPersona = !!(p && p.activo && frente) && L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb) < L.UMBRAL_NO_COINCIDE;
       if (previo && (!vida.ok || !frente) && !otraPersona) {
         await registrarIntento(cfg, { ...base, tipo: p && p.activo ? "verificacion" : "enrolamiento", estado: p && p.activo ? L.ESTADOS.REVISAR : "RECHAZADO", detalle: { motivo: "prueba de vida no superada (previa)", motivos: vida.motivos, medidas: vida.medidas }, duracion_ms: ms(performance.now() - t0) });
-        return json({ ok: true, resultado: "repetir", reintentar: true, pista: pistaVida(vida.motivos), tiempos: tiempos() });
+        return json({ ok: true, resultado: "repetir", reintentar: true, pista: pistaVida(vida.motivos), causa: vida.motivos.length ? causaVida(vida.motivos[0]) : "No se vio el rostro", tiempos: tiempos() });
       }
       if (previo && (!p || !p.activo)) return json({ ok: true, resultado: "vida_ok", bloqueado: false, tiempos: tiempos() });
       if (!p || !p.activo) {

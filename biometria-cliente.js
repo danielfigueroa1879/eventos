@@ -203,15 +203,17 @@
       // Si el servidor no responde bien (error, límite), se deja de consultar y se usa la espera simple.
       // Tiempo para lograr el giro (más en el 2.º intento o más). El servidor admite 40 consultas/min por RUT.
       const limite = Date.now() + (reintento ? 12000 : 9000), MAX_CONSULTAS = reintento ? 18 : 14;
-      let consecutivos = 0, huboRespuesta = false, consultas = 0;
+      let consecutivos = 0, huboRespuesta = false, consultas = 0, fallidas = 0;
       while (Date.now() < limite && consultas < MAX_CONSULTAS) {
         let r;
         consultas++;
         try {
           r = await api({ accion: "pose_live", rut, direccion, imagen: frameLive() }, 4500);
-          huboRespuesta = true;
         } catch (_) { r = null; }
-        if (!r || r.status !== 200) return huboRespuesta && consultas > 1 ? false : null;
+        // Señal débil: una consulta que no llega NO corta la guía; se sigue intentando hasta el límite de tiempo.
+        if (!r || r.status >= 500) { fallidas++; if (!huboRespuesta && fallidas >= 3) return null; msg("Señal débil… sigue girando hacia la flecha"); await esperar(500); continue; }
+        if (r.status !== 200) return huboRespuesta ? false : null;   // límite de consultas u otro rechazo
+        huboRespuesta = true;
         if (r && r.status === 200 && r.d) { pintarProgresoGiro(r.d); msg(pistaVivo(r.d)); }
         if (r && r.status === 200 && r.d && r.d.listo) {
           consecutivos++;
@@ -329,32 +331,42 @@
     }
   }
 
+  // SEÑAL DÉBIL: reintenta el envío hasta que llegue (máx. `veces`, con esperas crecientes). Solo se reintenta
+  // cuando NO hubo respuesta (sin red, tiempo agotado) o el servidor falló (5xx); una respuesta 4xx es definitiva.
+  async function enviarConReintentos(cuerpo, timeoutMs, veces, onReintento, keepalive) {
+    let ultimo = { status: 0, d: {} };
+    for (let i = 0; i < veces; i++) {
+      if (i) { if (onReintento) try { onReintento(i); } catch (_) { } await esperar(Math.min(8000, 2000 * i)); }
+      try { ultimo = await api(cuerpo, timeoutMs, keepalive); } catch (_) { ultimo = { status: 0, d: {} }; continue; }
+      if (ultimo.status && ultimo.status < 500) return ultimo;
+    }
+    return ultimo;
+  }
+
   // Envía las capturas a la función (enrola o verifica). Nunca lanza error: el ingreso ya está guardado.
   async function procesar({ rut, asistenciaId, token, imagenes }) {
     if (!token || !imagenes || !asistenciaId) return "omitido";
-    try {
-      const r = await api({ accion: "procesar_auto", rut, asistencia_id: asistenciaId, token, imagenes, consentimiento: true }, 30000);
-      return r.status === 200 ? (r.d.resultado || "ok") : "error";
-    } catch (_) { return "error"; }
+    const r = await enviarConReintentos({ accion: "procesar_auto", rut, asistencia_id: asistenciaId, token, imagenes, consentimiento: true }, 30000, 6);
+    if (r.status === 409) return "ok";   // un envío anterior sí llegó (el desafío ya se usó)
+    return r.status === 200 ? (r.d.resultado || "ok") : "error";
   }
 
   // Revisión ANTES de registrar. Devuelve { estado }: "bloqueado" (otra persona: no registrar),
   // "repetir" (prueba de vida no superada: repetir, con una pista), "ok" (registrar) o "error"
   // (sin señal / falla: se registra igual, como antes). En el primer ingreso solo revisa la prueba de vida.
-  async function verificarPrevio({ rut, token, imagenes }) {
+  // Con señal débil se reintenta solo (hasta 5 envíos); onReintento(n) permite avisar en pantalla.
+  async function verificarPrevio({ rut, token, imagenes, onReintento }) {
     if (!token || !imagenes) return { estado: "error" };
-    try {
-      const r = await api({ accion: "procesar_auto", previo: true, rut, token, imagenes, consentimiento: true }, 30000);
-      if (r.status !== 200) return { estado: "error" };
-      if (r.d.reintentar) return { estado: "repetir", pista: r.d.pista || "" };
-      return { estado: r.d.bloqueado ? "bloqueado" : "ok" };
-    } catch (_) { return { estado: "error" }; }
+    const r = await enviarConReintentos({ accion: "procesar_auto", previo: true, rut, token, imagenes, consentimiento: true }, 30000, 5, onReintento);
+    if (r.status !== 200) return { estado: "error" };
+    if (r.d.reintentar) return { estado: "repetir", pista: r.d.pista || "", causa: r.d.causa || "" };
+    return { estado: r.d.bloqueado ? "bloqueado" : "ok" };
   }
   // Asocia la verificación previa a la asistencia recién creada (para las palomas del panel).
   async function vincular({ rut, token, asistenciaId, enSegundoPlano }) {
     if (!token || !asistenciaId) return "omitido";
-    try { const r = await api({ accion: "vincular", rut, token, asistencia_id: asistenciaId }, 15000, !!enSegundoPlano); return r.status === 200 && r.d.vinculado ? "ok" : "error"; }
-    catch (_) { return "error"; }
+    const r = await enviarConReintentos({ accion: "vincular", rut, token, asistencia_id: asistenciaId }, 15000, 6, null, !!enSegundoPlano);
+    return r.status === 200 && r.d.vinculado ? "ok" : "error";
   }
 
   window.BioIngreso = { capturar, procesar, verificarPrevio, vincular, precalentar };

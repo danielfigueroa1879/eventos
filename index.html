@@ -2800,7 +2800,13 @@
           else if (actual) { li.style.color = "#0f172a"; ic.style.cssText = "width:22px;height:22px;flex-shrink:0;border-radius:50%;border:3px solid #dcfce7;border-top-color:#16a34a;animation:procGiro .7s linear infinite"; ic.innerHTML = ""; }
         });
       };
-      return { paso, cerrar: () => el.remove() };
+      // Aviso bajo los pasos (p. ej. "Señal débil: reintentando…"); vacío = se oculta.
+      const aviso = t => {
+        let a = el.querySelector("[data-aviso]");
+        if (!a) { a = document.createElement("div"); a.dataset.aviso = "1"; a.style.cssText = "margin-top:14px;padding:8px 10px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:13px;font-weight:700"; el.firstElementChild.nextElementSibling.appendChild(a); }
+        a.textContent = t || ""; a.style.display = t ? "" : "none";
+      };
+      return { paso, aviso, cerrar: () => el.remove() };
     }
     // Captura biométrica en lugar de la foto normal. null = no aplica o falló -> se usa la foto normal.
     async function capturaBiometrica(rut, reintento) {
@@ -3245,12 +3251,13 @@
       // Prueba de vida NO superada: el ingreso no se registra; debe repetir la verificación.
       let bioVidaFallos = 0;            // pruebas de vida no superadas (desde el 2.º intento: guía reforzada)
       const BIO_VIDA_MAX_FALLOS = 6;    // al 6.º fallo se registra igual (con foto) y queda para revisión
-      const avisoRepetirVida = (pista) => {
+      const avisoRepetirVida = (pista, causa) => {
         bioVidaFallos++;
         openModal(`<div class="text-center">
           <div class="text-5xl mb-2">🔄</div>
           <h2 class="font-extrabold text-lg mb-2" style="color:#b45309">Repite la verificación</h2>
           <div class="rounded-xl p-3 mb-3 text-sm font-bold" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d">No se superó la prueba de vida. Tu ingreso aún NO está registrado.</div>
+          ${causa ? `<p class="text-sm mb-2"><span class="text-slate-500">Motivo:</span> <b style="color:#b45309">${esc(causa)}</b></p>` : ""}
           <p class="text-sm text-slate-700 mb-3">${esc(pista || "Mira al frente y luego gira la cabeza hacia el lado de la flecha.")}</p>
           <ol class="text-left text-sm text-slate-700 mb-3 space-y-1 rounded-xl p-3" style="background:#f1f5f9">
             <li><b>1.</b> Rostro dentro del óvalo, cerca y con luz de frente (sin gorro, lentes oscuros ni mascarilla).</li>
@@ -3583,13 +3590,16 @@
                 submit.disabled = true;
                 procUI = pantallaProceso(["verificar", "registrar"]); procUI.paso("verificar");
                 let v = { estado: "error" };
-                try { v = (await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes }), 35000)) || v; } catch (_) { }
+                // Señal débil: verificarPrevio reintenta solo el envío hasta que llegue (hasta 5 veces) y lo avisa aquí.
+                const avisoSenal = n => { if (procUI) procUI.aviso(`📶 Señal débil: reenviando tu verificación… (intento ${n + 1})`); };
+                try { v = (await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes, onReintento: avisoSenal }), 180000)) || v; } catch (_) { }
+                if (procUI) procUI.aviso("");
                 submit.disabled = false;
                 if (v.estado === "bloqueado") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
                 // Prueba de vida no superada: se repite. Al 6.º fallo seguido NO se le sigue pidiendo (había guardias
                 // con 9+ intentos): se registra con la foto y el intento queda vinculado al ingreso para revisión del
                 // admin (⚠ o "no se pudo enrolar"). El bloqueo por rostro de OTRA persona (arriba) sigue igual.
-                if (v.estado === "repetir" && bioVidaFallos < BIO_VIDA_MAX_FALLOS - 1) { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; avisoRepetirVida(v.pista); return; }
+                if (v.estado === "repetir" && bioVidaFallos < BIO_VIDA_MAX_FALLOS - 1) { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; avisoRepetirVida(v.pista, v.causa); return; }
                 if (v.estado === "repetir") { bioVidaFallos++; bioPend = { ...bio, previo: true, previoOk: false }; }
                 // Primer ingreso: tras registrar se enrola (procesar). Ya enrolado: tras registrar se vincula.
                 else bioPend = enrolar ? bio : { ...bio, previo: true, previoOk: v.estado === "ok" };
@@ -3636,7 +3646,19 @@
           }
           // Si la edición está CERRADA (registroAbierto=false), no se modifica el guardia: solo se registra la asistencia.
           // 2) Registrar la asistencia y CONFIRMAR que el servidor la escribió (devuelve la fila insertada).
-          const asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superSel && superSel.value === "supervisor")), TIMEOUT_MS);
+          // Señal débil: si no hay respuesta se reintenta solo (hasta 4 veces). Antes de cada reintento se revisa si
+          // el intento anterior SÍ llegó (para no duplicar); un duplicado lo resuelve el catch de abajo.
+          let asis = null;
+          for (let i = 0; i < 4 && !asis; i++) {
+            if (i) {
+              procUI && procUI.aviso(`📶 Señal débil: reintentando el registro… (intento ${i + 1})`);
+              await new Promise(r => setTimeout(r, 2000 * i));
+              const ya = await conTimeout(Data.yaRegistrado(ev.id, rutV), 8000).catch(() => null);
+              if (ya && registroBloquea(ya, ev)) { asis = ya; break; }
+            }
+            try { asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superSel && superSel.value === "supervisor")), TIMEOUT_MS); }
+            catch (e) { if (esErrorDuplicado(e) || i === 3 || (e && e.status >= 400 && e.status < 500)) throw e; }
+          }
           if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
           // VELOCIDAD: el ingreso YA quedó confirmado → se muestra el éxito (con sonido) al instante.
           // La foto (R2) y la biometría siguen en SEGUNDO PLANO; la pantalla de éxito muestra "Guardando
@@ -3645,9 +3667,10 @@
           // 2b) Foto (WebP HD) a la asistencia recién creada. Mejor esfuerzo: un reintento si falla la red.
           const pFoto = !fb ? null : (async () => {
             if (USING_SUPABASE && window.indexedDB) await FotoCola.poner(asis.id, ev.id, fb);   // respaldo en el teléfono por si se corta la señal
-            for (let i = 0; i < 2; i++) {
+            // Señal débil: hasta 4 intentos seguidos; si no llega, queda en el teléfono y se reenvía sola cada minuto.
+            for (let i = 0; i < 4; i++) {
               try { const u = await conTimeout(Data.subirFotoIngreso(ev.id, asis.id, fb), TIMEOUT_MS); if (u) asis.foto_url = u; FotoCola.quitar(asis.id); return true; }
-              catch (e) { console.error("foto:", e); if (e && e.status >= 400 && e.status < 500) { FotoCola.quitar(asis.id); return false; } if (i === 1) return "pendiente"; await new Promise(r => setTimeout(r, 1500)); }
+              catch (e) { console.error("foto:", e); if (e && e.status >= 400 && e.status < 500) { FotoCola.quitar(asis.id); return false; } if (i === 3) return "pendiente"; await new Promise(r => setTimeout(r, 2000 * (i + 1))); }
             }
             return "pendiente";
           })();
@@ -3656,7 +3679,7 @@
             try {
               // Verificación previa OK: el vínculo se envía sin esperar (keepalive), el guardia ve su ingreso al tiro.
               if (b.previoOk) { window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id, enSegundoPlano: true }); }
-              else if ((b.previo ? await conTimeout(window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id }), 20000) : null) !== "ok") await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 35000);
+              else if ((b.previo ? await conTimeout(window.BioIngreso.vincular({ rut: rutV, token: b.token, asistenciaId: asis.id }), 120000) : null) !== "ok") await conTimeout(window.BioIngreso.procesar({ rut: rutV, asistenciaId: asis.id, token: b.token, imagenes: b.imagenes }), 240000);
             } catch (_) { }
           })();
           // 3) Escritura confirmada → "Ingreso registrado" (la foto termina de subir en esa pantalla).
@@ -5287,10 +5310,12 @@
       // Ventana ANCHA y compacta, pensada para miles de enrolados: totales en una franja, tabla numerada con
       // encabezado fijo, orden (recientes / A–Z), buscador sin tildes y un único listener para "Restablecer".
       const tile = (n, t, c) => `<div class="rounded-lg px-2 py-1.5 text-center" style="background:${c}"><div class="text-lg font-extrabold text-slate-800 leading-tight">${n}</div><div class="text-[10.5px] font-semibold text-slate-600 leading-tight">${t}</div></div>`;
-      const items = lista.map(x => ({ rut: x.rut, fecha: String(x.fecha || ""), nom: nombres[x.rut] || "", vf: +x.vf || 0, nc: +x.nc || 0, ok: +x.ok || 0 }));
+      const items = lista.map(x => ({ rut: x.rut, fecha: String(x.fecha || ""), nom: nombres[x.rut] || "", vf: +x.vf || 0, nc: +x.nc || 0, ok: +x.ok || 0, causas: x.causas || {} }));
+      // Texto con las causas de vida fallida de un guardia, de la más frecuente a la menos.
+      const txtCausas = x => Object.entries(x.causas || {}).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}: ${n}`).join(" · ");
       // Intentos por guardia (todo lo guardado, máx. 60 días): vida fallida, no coincide y verificados.
       const num = (n, col) => n ? `<b class="tabular-nums" style="color:${col}">${n}</b>` : `<span class="text-slate-300">—</span>`;
-      const chips = x => [x.vf ? `<span class="px-1 rounded bg-amber-100 text-amber-800" title="Prueba de vida fallida">🔄 ${x.vf}</span>` : "", x.nc ? `<span class="px-1 rounded bg-red-100 text-red-700" title="Rostro no coincide">⛔ ${x.nc}</span>` : "", x.ok ? `<span class="px-1 rounded bg-indigo-100 text-indigo-700" title="Verificado">✓ ${x.ok}</span>` : ""].filter(Boolean).join(" ");
+      const chips = x => [x.vf ? `<button data-enr-vf="${esc(x.rut)}" class="px-1 rounded bg-amber-100 text-amber-800 underline decoration-dotted" title="Prueba de vida fallida: ver motivo">🔄 ${x.vf}</button>` : "", x.nc ? `<span class="px-1 rounded bg-red-100 text-red-700" title="Rostro no coincide">⛔ ${x.nc}</span>` : "", x.ok ? `<span class="px-1 rounded bg-indigo-100 text-indigo-700" title="Verificado">✓ ${x.ok}</span>` : ""].filter(Boolean).join(" ");
       items.forEach(x => { x.q = normBusqueda(x.rut + " " + x.nom); });
       const porRut = new Map(items.map(x => [x.rut, x]));
       let orden = "recientes";
@@ -5303,7 +5328,7 @@
             <td class="py-1 px-2 min-w-0"><div class="font-semibold text-slate-800 truncate">${esc(x.nom || "—")}</div><div class="sm:hidden text-[11px] font-mono text-slate-500">${esc(x.rut)} · ${esc(fechaFmt(x.fecha.slice(0, 10)))}</div>${chips(x) ? `<div class="sm:hidden text-[11px] mt-0.5">${chips(x)}</div>` : ""}</td>
             <td class="py-1 px-2 font-mono text-slate-600 whitespace-nowrap hidden sm:table-cell">${esc(x.rut)}</td>
             <td class="py-1 px-2 text-slate-500 whitespace-nowrap hidden sm:table-cell">${esc(fechaFmt(x.fecha.slice(0, 10)))}</td>
-            <td class="py-1 px-2 text-center hidden sm:table-cell">${num(x.vf, "#b45309")}</td>
+            <td class="py-1 px-2 text-center hidden sm:table-cell">${x.vf ? `<button data-enr-vf="${esc(x.rut)}" class="underline decoration-dotted" title="${esc(txtCausas(x))}">${num(x.vf, "#b45309")}</button>` : num(0)}</td>
             <td class="py-1 px-2 text-center hidden sm:table-cell">${num(x.nc, "#dc2626")}</td>
             <td class="py-1 px-2 text-center hidden sm:table-cell">${num(x.ok, "#4338ca")}</td>
             <td class="py-1 pl-1 pr-2 text-right"><button data-enr-reset="${esc(x.rut)}" class="text-[11px] font-semibold text-slate-500 hover:text-red-600 border border-slate-200 rounded-md px-1.5 py-0.5" title="Restablecer: borra su plantilla y se vuelve a enrolar en su próximo ingreso" aria-label="Restablecer"><span class="hidden sm:inline">Restablecer</span><span class="sm:hidden">↺</span></button></td></tr>`).join("");
@@ -5311,6 +5336,7 @@
       };
       const filtrar = () => {
         const q = normBusqueda($("#enrBuscar").value); let n = 0;
+        document.querySelectorAll("#enrTbody [data-enr-det]").forEach(el => el.remove());
         document.querySelectorAll("#enrTbody [data-enr]").forEach(el => { const x = porRut.get(el.dataset.enr); const ok = !q || (x && x.q.includes(q)); el.style.display = ok ? "" : "none"; if (ok) n++; });
         $("#enrCuenta").textContent = q ? `${n} de ${items.length}` : `${items.length} enrolado${items.length === 1 ? "" : "s"}`;
       };
@@ -5334,6 +5360,15 @@
       $("#enrOrden").addEventListener("change", e => { orden = e.target.value; pintar(); });
       const tb = $("#enrTbody");
       if (tb) tb.addEventListener("click", async ev => {
+        // Clic en "vida fallida": muestra/oculta, bajo la fila, el motivo de cada fallo de ese guardia.
+        const bv = ev.target.closest("[data-enr-vf]");
+        if (bv) {
+          const tr = bv.closest("tr"), sig = tr.nextElementSibling;
+          if (sig && sig.dataset.enrDet) { sig.remove(); return; }
+          const x = porRut.get(bv.dataset.enrVf);
+          tr.insertAdjacentHTML("afterend", `<tr data-enr-det="1" class="bg-amber-50"><td></td><td colspan="7" class="py-1.5 px-2 text-[12px] text-amber-900"><b>Motivos de vida fallida:</b> ${esc(txtCausas(x) || "sin detalle")}</td></tr>`);
+          return;
+        }
         const b = ev.target.closest("[data-enr-reset]"); if (!b) return;
         const rut = b.dataset.enrReset;
         if (!confirm(`¿Restablecer la verificación facial de ${nombres[rut] || rut}? Se volverá a enrolar en su próximo ingreso.`)) return;

@@ -95,3 +95,12 @@ certificado (Etapa 3).
 2. Supabase: ejecutar `supabase-biometria-borrar.sql`.
 3. Netlify: borrar `SUPABASE_SERVICE_ROLE_KEY`, `BIOMETRIA_KEY`, `BIOMETRIA_PILOTO_RUTS` (y opcionalmente rotar la service_role key en Supabase).
 4. Punto de restauración de producción: rama `respaldo/pre-biometria-piloto` (`d27e26b`).
+
+## Señal débil y motivos de fallo
+- Con señal débil los envíos se **reintentan solos** hasta que llegan: verificación (hasta 5 envíos, con aviso
+  "📶 Señal débil" en pantalla), registro del ingreso (hasta 4, revisando antes si el anterior sí llegó),
+  foto (4 seguidos y luego queda en el teléfono y se reenvía cada minuto), enrolamiento y vínculo (hasta 6).
+  El servidor acepta un envío reintentado hasta 2 min después de vencido el desafío (el nonce sigue siendo de un uso).
+- Si no supera la prueba de vida, el guardia ve el **Motivo** (p. ej. "No giró lo suficiente").
+- Panel 🧬 Enrolados: franja con las causas de los últimos 7 días y, por guardia, clic en el número de
+  "Vida fallida" para ver sus motivos.
