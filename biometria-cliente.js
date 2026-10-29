@@ -196,34 +196,62 @@
       if (d.movimiento && d.progreso >= 0.5) return "¡Casi! Gira un poco más y quédate así";
       return "Gira la cabeza hacia la flecha roja (como mirando tu hombro)";
     };
-    async function esperarGiroVerde(paso) {
+    // Foto de calidad (la que se envía para verificar) del cuadro ACTUAL del video. Sin espejo.
+    const frameCaptura = () => {
+      const v = ui.video, k = Math.min(1, 480 / v.videoWidth), cv = document.createElement("canvas");
+      cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
+      cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
+      return cv.toDataURL("image/jpeg", 0.85).split(",")[1];
+    };
+    // Guía del giro. SEÑAL DÉBIL: antes se mandaba un cuadro, se esperaba la respuesta (2-3 s con mala señal),
+    // se pedían DOS respuestas seguidas y recién ahí se sacaba OTRA foto: había que quedarse girado mucho rato.
+    // Ahora, junto con cada cuadro que se consulta, se guarda en el teléfono la foto de calidad de ESE mismo
+    // instante; se envían varios cuadros sin esperar cada respuesta, y con UNA respuesta "girado" (aunque
+    // llegue tarde) se usa la foto de ese instante, aunque la persona ya haya vuelto la cabeza.
+    // Devuelve { estado: true | false | null, img }: true = giro logrado (img = foto de ese instante);
+    // false = hubo respuestas pero no alcanzó (img = el cuadro más girado, si avanzó lo bastante);
+    // null = guía en vivo no disponible (se usa la espera simple).
+    function esperarGiroVerde(paso) {
       const direccion = paso === "giro_izquierda" ? "izquierda" : "derecha";
-      // AHORRO DE SERVIDOR: máximo 8 consultas por giro, una cada ~0,5 s (antes ~17, cada 0,35 s).
-      // El color del óvalo cambia con transición suave entre lecturas (se ve fluido sin más consultas).
-      // Si el servidor no responde bien (error, límite), se deja de consultar y se usa la espera simple.
       // Tiempo para lograr el giro (más en el 2.º intento o más). El servidor admite 40 consultas/min por RUT.
       const limite = Date.now() + (reintento ? 12000 : 9000), MAX_CONSULTAS = reintento ? 18 : 14;
-      let consecutivos = 0, huboRespuesta = false, consultas = 0, fallidas = 0;
-      while (Date.now() < limite && consultas < MAX_CONSULTAS) {
-        let r;
-        consultas++;
-        try {
-          r = await api({ accion: "pose_live", rut, direccion, imagen: frameLive() }, 4500);
-        } catch (_) { r = null; }
-        // Señal débil: una consulta que no llega NO corta la guía; se sigue intentando hasta el límite de tiempo.
-        if (!r || r.status >= 500) { fallidas++; if (!huboRespuesta && fallidas >= 3) return null; msg("Señal débil… sigue girando hacia la flecha"); await esperar(500); continue; }
-        if (r.status !== 200) return huboRespuesta ? false : null;   // límite de consultas u otro rechazo
-        huboRespuesta = true;
-        if (r && r.status === 200 && r.d) { pintarProgresoGiro(r.d); msg(pistaVivo(r.d)); }
-        if (r && r.status === 200 && r.d && r.d.listo) {
-          consecutivos++;
-          // Dos lecturas seguidas evitan que un único frame accidental pinte verde.
-          // Se vuelve AL TIRO (sin esperas): la foto del giro se toma mientras la cabeza sigue girada.
-          if (consecutivos >= 2) return true;
-        } else consecutivos = 0;
-        await esperar(500);
-      }
-      return huboRespuesta ? false : null; // null = guía live no disponible; usar fallback antiguo
+      const EN_VUELO = 6, CADA_MS = 450, ESPERA_EXTRA_MS = 3000;
+      let consultas = 0, enVuelo = 0, huboRespuesta = false, fallidas = 0, cortar = false, ultimoSeq = 0, mejor = null, fin = false;
+      return new Promise(resolve => {
+        const terminar = v => { if (fin) return; fin = true; clearInterval(tic); resolve(v); };
+        const cerrarSiCorresponde = () => {
+          const agotado = cortar || Date.now() >= limite || consultas >= MAX_CONSULTAS;
+          if (!huboRespuesta && fallidas >= 3 && enVuelo === 0) return terminar({ estado: null });
+          // Se espera a las respuestas pendientes (un poco más allá del límite): pueden traer el "girado".
+          if (agotado && (enVuelo === 0 || Date.now() >= limite + ESPERA_EXTRA_MS))
+            terminar(huboRespuesta ? { estado: false, img: mejor && mejor.progreso >= 0.8 ? mejor.img : null } : { estado: null });
+        };
+        const enviar = async () => {
+          if (fin) return;
+          if (cortar || enVuelo >= EN_VUELO || consultas >= MAX_CONSULTAS || Date.now() >= limite) return cerrarSiCorresponde();
+          const seq = ++consultas; enVuelo++;
+          const img = frameCaptura(), live = frameLive();   // mismo instante
+          let r;
+          try { r = await api({ accion: "pose_live", rut, direccion, imagen: live }, 6000); } catch (_) { r = null; }
+          enVuelo--;
+          if (fin) return;
+          if (!r || r.status >= 500) {
+            fallidas++;
+            if (seq > ultimoSeq) msg("Señal débil… sigue girando hacia la flecha");
+            return cerrarSiCorresponde();
+          }
+          if (r.status !== 200) { cortar = true; return cerrarSiCorresponde(); }   // límite de consultas u otro rechazo
+          huboRespuesta = true;
+          const d = r.d || {};
+          if (d.listo) return terminar({ estado: true, img });
+          if (d.caras === 1 && !d.contrario && (!mejor || (d.progreso || 0) > mejor.progreso)) mejor = { progreso: d.progreso || 0, img };
+          // Solo se pinta la respuesta más reciente (pueden llegar desordenadas).
+          if (seq > ultimoSeq) { ultimoSeq = seq; pintarProgresoGiro(d); msg(pistaVivo(d)); }
+          cerrarSiCorresponde();
+        };
+        const tic = setInterval(enviar, CADA_MS);
+        enviar();
+      });
     }
 
     try {
@@ -288,13 +316,14 @@
       }
       const pasos = r.status === 200 && r.d.pasos ? r.d.pasos : ["frente"];   // si falla, al menos la foto de frente
       const token = r.status === 200 ? r.d.token : null;
-      const imgs = []; let fotoBlob = null;
+      const imgs = []; let fotoBlob = null, imgGiro = null;
       for (let i = 0; i < pasos.length; i++) {
         ui.$("bioi-ins").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
         if (pasos[i].startsWith("giro_")) {
           msg("Gira la cabeza hacia la flecha roja (como mirando tu hombro)"); ui.$("bioi-cta").textContent = "";
-          const verde = await esperarGiroVerde(pasos[i]);
-          if (verde === false) {
+          const giro = await esperarGiroVerde(pasos[i]), verde = giro.estado;
+          imgGiro = giro.img || null;   // foto del instante en que se confirmó (o del cuadro más girado)
+          if (verde === false && !imgGiro) {
             // Hubo medición, pero aún no alcanzó el giro correcto: damos una oportunidad extra antes de capturar.
             msg("Gira un poco más hacia la flecha y mantén la posición");
             await esperar(reintento ? 1200 : 900);
@@ -306,10 +335,9 @@
           msg("Mira la cámara y quédate quieto");
           for (let s = 2; s > 0; s--) { ui.$("bioi-cta").textContent = s; await esperar(900); }
         }
-        const v = ui.video, k = Math.min(1, 480 / v.videoWidth), cv = document.createElement("canvas");
-        cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
-        cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);   // sin espejo
-        imgs.push(cv.toDataURL("image/jpeg", 0.85).split(",")[1]);
+        const v = ui.video;
+        imgs.push(imgGiro || frameCaptura());   // giro: la foto del instante confirmado; si no, el cuadro actual
+        imgGiro = null;
         if (pasos[i].startsWith("giro_")) {
           // Confirmación visual DESPUÉS de capturar (antes se mostraba primero y la persona volvía al frente).
           ui.$("bioi-esc").classList.add("ok-giro");
