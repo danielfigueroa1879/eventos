@@ -2633,9 +2633,9 @@
       const c = err && (err.code || ""); const m = ((err && (err.message || err.details)) || "").toLowerCase();
       return c === "23505" || m.includes("duplicate") || m.includes("unique") || m.includes("ya registrad");
     }
-    function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.innerHTML = html; const mo = $("#modal"); mo.style.alignItems = ""; mo.style.padding = ""; mo.style.display = "flex"; }
+    function openModal(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-md p-5 max-h-[90vh] overflow-auto"; mb.style.maxWidth = ""; mb.innerHTML = html; const mo = $("#modal"); mo.style.alignItems = ""; mo.style.padding = ""; mo.style.display = "flex"; }
     // Modal ancho (para tablas tipo escritorio); en celular ocupa todo el ancho disponible.
-    function openModalWide(html) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.innerHTML = html; $("#modal").style.display = "flex"; }
+    function openModalWide(html, anchoMax) { const mb = $("#modalBox"); mb.className = "card w-full max-w-5xl p-4 sm:p-5 max-h-[92vh] overflow-auto"; mb.style.maxWidth = anchoMax || ""; mb.innerHTML = html; $("#modal").style.display = "flex"; }
     function closeModal() { $("#modal").style.display = "none"; }
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
 
@@ -5378,7 +5378,7 @@
         <div class="flex items-center justify-between gap-2 mb-1"><div id="enrCuenta" class="text-[11px] text-slate-500"></div><div class="text-[11px] text-slate-400">Intentos por guardia: ${desde ? "desde " + esc(fechaFmt(desde)) : "últimos 60 días"}</div></div>
         ${items.length ? `<div class="border border-slate-200 rounded-lg overflow-auto" style="max-height:calc(92vh - 260px);min-height:180px">
           <table class="w-full text-[13px] table-fixed">            <thead class="sticky top-0 bg-slate-100 text-slate-600 text-[11px] uppercase tracking-wide"><tr><th class="py-1.5 pl-2 pr-1 text-right" style="width:2.75rem">#</th><th class="py-1.5 px-2 text-left">Nombre</th><th class="py-1.5 px-2 text-left hidden sm:table-cell" style="width:7.25rem">RUT</th><th class="py-1.5 px-2 text-left hidden sm:table-cell" style="width:6.5rem">Enrolado</th><th class="py-1.5 px-1 text-center hidden sm:table-cell normal-case tracking-normal leading-tight" style="width:5rem" title="Intentos con prueba de vida no superada">🔄 Vida<br>fallida</th><th class="py-1.5 px-1 text-center hidden sm:table-cell normal-case tracking-normal leading-tight" style="width:5rem" title="Intentos en que el rostro no coincidió">⛔ No<br>coincide</th><th class="py-1.5 px-1 text-center hidden sm:table-cell normal-case tracking-normal leading-tight" style="width:5rem" title="Ingresos con identidad verificada">✓ Verifi-<br>cados</th><th class="enrThR"></th></tr></thead>
-            <tbody id="enrTbody"></tbody></table></div>` : `<div class="text-center text-slate-400 py-6 text-sm">Aún no hay guardias enrolados.</div>`}`);
+            <tbody id="enrTbody"></tbody></table></div>` : `<div class="text-center text-slate-400 py-6 text-sm">Aún no hay guardias enrolados.</div>`}`, "min(1400px, 96vw)");
       $("#enrX").addEventListener("click", closeModal);
       // Cambio de período: se vuelve a consultar con el nuevo "desde".
       const hoyP = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, "0")}-${String(h.getDate()).padStart(2, "0")}`; })();
