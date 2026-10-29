@@ -10,10 +10,10 @@ export const UMBRAL_VERIFICADO = 0.45;
 export const UMBRAL_NO_COINCIDE = 0.30;
 // Prueba de vida (desafío de giro)
 export const GIRO_FRENTE_MAX = 0.20;     // |giro| máximo para considerar "mirando al frente" (0.15 rechazaba celulares algo de lado)
-export const GIRO_LADO_MIN = 0.22;       // |giro| que pide la guía EN VIVO para ponerse verde
+export const GIRO_LADO_MIN = 0.19;       // |giro| que pide la guía EN VIVO para ponerse verde
 // La foto final acepta un poco menos (margen): se toma justo después de la guía y la cabeza puede volver
 // levemente. "No giró lo suficiente" era la 1.ª causa de vida fallida (104 de 167 en 7 días).
-export const GIRO_LADO_MIN_FINAL = 0.17;
+export const GIRO_LADO_MIN_FINAL = 0.15;
 export const MISMA_SESION_MIN = 0.22;    // coseno mínimo entre los frames de un mismo intento (de frente vs. girado; 0.30 fallaba con barba)
 export const FRENTES_ENROL_MIN = 0.60;   // coseno mínimo entre los 2 frames frontales del enrolamiento
 export const IDENTICOS_MAX = 0.995;      // por encima: frames prácticamente idénticos (imagen fija)
