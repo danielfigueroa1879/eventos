@@ -162,10 +162,12 @@
 
     // Frame liviano para la guía EN VIVO. No se guarda: el servidor devuelve solo pose/encuadre.
     const frameLive = () => {
-      const v = ui.video, k = Math.min(1, 320 / v.videoWidth), cv = document.createElement("canvas");
+      // LIVIANO para señal débil: 240 px y calidad 0,5 (~10-14 KB; antes 320 px / 0,62, ~20-25 KB).
+      // Medido con YuNet: detecta igual y el giro varía menos de ±0,03.
+      const v = ui.video, k = Math.min(1, 240 / v.videoWidth), cv = document.createElement("canvas");
       cv.width = Math.max(1, Math.round(v.videoWidth * k)); cv.height = Math.max(1, Math.round(v.videoHeight * k));
       cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
-      return cv.toDataURL("image/jpeg", 0.62).split(",")[1];
+      return cv.toDataURL("image/jpeg", 0.5).split(",")[1];
     };
     const pintarProgresoGiro = d => {
       const o = ui.$("bioi-ovalo");
@@ -197,11 +199,13 @@
       return "Gira la cabeza hacia la flecha roja (como mirando tu hombro)";
     };
     // Foto de calidad (la que se envía para verificar) del cuadro ACTUAL del video. Sin espejo.
+    // 400 px y calidad 0,72 (~25-40 KB; antes 480 px / 0,85, ~45-80 KB). Medido con SFace: el parecido con
+    // la imagen original queda en 0,98-0,99, muy lejos de los umbrales de decisión (0,30 / 0,45).
     const frameCaptura = () => {
-      const v = ui.video, k = Math.min(1, 480 / v.videoWidth), cv = document.createElement("canvas");
+      const v = ui.video, k = Math.min(1, 400 / v.videoWidth), cv = document.createElement("canvas");
       cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
       cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
-      return cv.toDataURL("image/jpeg", 0.85).split(",")[1];
+      return cv.toDataURL("image/jpeg", 0.72).split(",")[1];
     };
     // Guía del giro. SEÑAL DÉBIL: antes se mandaba un cuadro, se esperaba la respuesta (2-3 s con mala señal),
     // se pedían DOS respuestas seguidas y recién ahí se sacaba OTRA foto: había que quedarse girado mucho rato.
