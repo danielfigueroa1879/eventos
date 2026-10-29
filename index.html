@@ -3545,7 +3545,11 @@
         const otro = $("#otroRegistro"); if (otro) otro.addEventListener("click", irOtro);
         // La foto sigue subiendo en SEGUNDO PLANO aunque se vuelva al formulario (misma página). Si falla,
         // el aviso aparece igual (toast) en la pantalla que esté abierta.
+        // Si la foto tarda en subir (señal débil), se avisa que sigue subiendo.
+        let fotoLista = false;
+        if (pFoto) setTimeout(() => { const fe = $("#fotoEstado"); if (!fotoLista && fe) { fe.style.color = "#b45309"; fe.textContent = "📶 Señal muy débil, pero tu foto se está subiendo… no cierres la página."; } }, 5000);
         if (pFoto) pFoto.then(ok => {
+          fotoLista = true;
           const fe = $("#fotoEstado");
           if (ok === "pendiente") {   // sin señal: la foto quedó guardada en el teléfono y se enviará sola
             if (fe) { fe.style.color = "#b45309"; fe.textContent = "📶 Señal débil: la foto quedó guardada en el teléfono y se enviará sola cuando haya señal."; }
@@ -3592,7 +3596,9 @@
                 let v = { estado: "error" };
                 // Señal débil: verificarPrevio reintenta solo el envío hasta que llegue (hasta 5 veces) y lo avisa aquí.
                 const avisoSenal = n => { if (procUI) procUI.aviso(`📶 Señal débil: reenviando tu verificación… (intento ${n + 1})`); };
+                const tLento = setTimeout(() => { if (procUI) procUI.aviso("📶 Señal muy débil, pero tu verificación se está enviando… no cierres esta pantalla."); }, 4000);
                 try { v = (await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes, onReintento: avisoSenal }), 180000)) || v; } catch (_) { }
+                clearTimeout(tLento);
                 if (procUI) procUI.aviso("");
                 submit.disabled = false;
                 if (v.estado === "bloqueado") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
@@ -3656,8 +3662,9 @@
               const ya = await conTimeout(Data.yaRegistrado(ev.id, rutV), 8000).catch(() => null);
               if (ya && registroBloquea(ya, ev)) { asis = ya; break; }
             }
-            try { asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superSel && superSel.value === "supervisor")), TIMEOUT_MS); }
-            catch (e) { if (esErrorDuplicado(e) || i === 3 || (e && e.status >= 400 && e.status < 500)) throw e; }
+            const tLento = setTimeout(() => { procUI && procUI.aviso("📶 Señal muy débil, pero tu ingreso se está enviando… no cierres esta pantalla."); }, 4000);
+            try { asis = await conTimeout(Data.createAsistencia(ev.id, rutV, !!(superSel && superSel.value === "supervisor")), TIMEOUT_MS); clearTimeout(tLento); }
+            catch (e) { clearTimeout(tLento); if (esErrorDuplicado(e) || i === 3 || (e && e.status >= 400 && e.status < 500)) throw e; }
           }
           if (!asis || !asis.id) throw new Error("No se pudo confirmar el registro en el servidor.");
           // VELOCIDAD: el ingreso YA quedó confirmado → se muestra el éxito (con sonido) al instante.
