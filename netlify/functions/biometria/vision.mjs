@@ -25,7 +25,7 @@ function bilineal(im, x, y, c) {
 }
 
 // Devuelve las caras (score, caja, 5 puntos: ojos, nariz, comisuras) ordenadas por score.
-export async function detectar(det, im, umbral = 0.8) {
+export async function detectar(det, im, umbral = 0.6) {
   const k = Math.min(SZ / im.w, SZ / im.h), N = SZ * SZ, t = new Float32Array(3 * N);
   for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
     const sx = x / k, sy = y / k, i = y * SZ + x;

@@ -9,12 +9,12 @@ export const METODO = "desafio-2giros-v2";
 export const UMBRAL_VERIFICADO = 0.45;
 export const UMBRAL_NO_COINCIDE = 0.30;
 // Prueba de vida (desafío de giro)
-export const GIRO_FRENTE_MAX = 0.15;     // |giro| máximo para considerar "mirando al frente"
+export const GIRO_FRENTE_MAX = 0.20;     // |giro| máximo para considerar "mirando al frente" (0.15 rechazaba celulares algo de lado)
 export const GIRO_LADO_MIN = 0.22;       // |giro| mínimo para considerar "cabeza girada"
-export const MISMA_SESION_MIN = 0.30;    // coseno mínimo entre los frames de un mismo intento
+export const MISMA_SESION_MIN = 0.22;    // coseno mínimo entre los frames de un mismo intento (de frente vs. girado; 0.30 fallaba con barba)
 export const FRENTES_ENROL_MIN = 0.60;   // coseno mínimo entre los 2 frames frontales del enrolamiento
 export const IDENTICOS_MAX = 0.995;      // por encima: frames prácticamente idénticos (imagen fija)
-export const CARA_MIN_FRAC = 0.18;       // ancho mínimo del rostro respecto del ancho de la imagen
+export const CARA_MIN_FRAC = 0.15;       // ancho mínimo del rostro respecto del ancho de la imagen (al girar el rostro se ve más angosto)
 export const DESAFIO_MS = 90 * 1000;     // vigencia del desafío
 // Convención: imagen SIN espejo; si la persona gira hacia SU izquierda, la nariz se desplaza hacia
 // la derecha de la imagen (giro > 0). Se confirma con las primeras pruebas reales del piloto.

@@ -47,7 +47,9 @@ Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
    - si coincide (o queda en revisión ⚠) → se registra y la verificación se asocia a la asistencia (`vincular`);
    - si la función falla o no hay señal → se registra igual, como antes.
    - **prueba de vida no superada** (no giró, giró al lado contrario, rostro lejos, dos personas…) → aviso
-     "🔄 Repite la verificación" con una pista; **no se registra** hasta superarla. Vale también para el
+     "🔄 Repite la verificación" con una pista; **no se registra** hasta superarla. Al **6.º fallo seguido** ya no
+     se le pide repetir: se registra con la foto y el intento queda vinculado al ingreso (⚠ / "no se pudo enrolar")
+     para revisión del admin. Vale también para el
      **primer ingreso**: antes de registrar se revisa la prueba de vida (sin guardar nada) y, tras registrar,
      se enrola con las mismas capturas. Si el rostro es claramente de otra persona, manda el bloqueo ⛔.
    Los rechazos quedan en `biometria_intentos` sin asistencia. Un guardia rechazado por error: el admin puede
@@ -93,3 +95,12 @@ certificado (Etapa 3).
 2. Supabase: ejecutar `supabase-biometria-borrar.sql`.
 3. Netlify: borrar `SUPABASE_SERVICE_ROLE_KEY`, `BIOMETRIA_KEY`, `BIOMETRIA_PILOTO_RUTS` (y opcionalmente rotar la service_role key en Supabase).
 4. Punto de restauración de producción: rama `respaldo/pre-biometria-piloto` (`d27e26b`).
+
+## Señal débil y motivos de fallo
+- Con señal débil los envíos se **reintentan solos** hasta que llegan: verificación (hasta 5 envíos, con aviso
+  "📶 Señal débil" en pantalla), registro del ingreso (hasta 4, revisando antes si el anterior sí llegó),
+  foto (4 seguidos y luego queda en el teléfono y se reenvía cada minuto), enrolamiento y vínculo (hasta 6).
+  El servidor acepta un envío reintentado hasta 2 min después de vencido el desafío (el nonce sigue siendo de un uso).
+- Si no supera la prueba de vida, el guardia ve el **Motivo** (p. ej. "No giró lo suficiente").
+- Panel 🧬 Enrolados: franja con las causas de los últimos 7 días y, por guardia, clic en el número de
+  "Vida fallida" para ver sus motivos.

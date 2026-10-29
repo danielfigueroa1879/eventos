@@ -39,6 +39,7 @@ const WASM = "ort-wasm-simd-threaded.wasm", WASM_MJS = "ort-wasm-simd-threaded.m
 const MAX_IMG_BYTES = 400 * 1024, MAX_IMG_LADO = 1280;
 const LIMITE_INTENTOS = 30, VENTANA_LIMITE_MS = 10 * 60 * 1000;   // piloto: holgado para calibrar
 const INGRESO_PLAZO_MS = 15 * 60 * 1000, INGRESO_MAX_INTENTOS = 2;   // por asistencia
+const ENVIO_GRACIA_MS = 2 * 60 * 1000;   // margen para envíos reintentados con señal débil
 const RETENCION_DIAS = 60;   // limpieza biométrica cada 2 meses
 
 const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
@@ -146,9 +147,22 @@ function pistaVida(motivos) {
   const m = (motivos || []).join(" | ");
   if (/más de un rostro/.test(m)) return "Debe aparecer solo una persona frente a la cámara.";
   if (/no se detectó rostro|muy lejos/.test(m)) return "Acércate a la cámara y deja tu rostro completo dentro del óvalo, con buena luz.";
-  if (/lado contrario|no se detectó el giro/.test(m)) return "Gira la cabeza hacia el lado que indica la flecha y mantenla hasta ver 📸.";
+  if (/lado contrario|no se detectó el giro/.test(m)) return "Gira la cabeza hacia la flecha roja (como mirando tu hombro) y quédate girado hasta que el óvalo se ponga verde.";
   if (/no mira al frente/.test(m)) return "En la primera foto mira directo a la cámara.";
   return "Repite la verificación: mira al frente y luego gira la cabeza hacia la flecha.";
+}
+
+// Agrupa un motivo de evaluarVida() en una causa corta para el panel admin.
+function causaVida(m) {
+  if (/lado contrario/.test(m)) return "Giró al lado contrario";
+  if (/no se detectó el giro/.test(m)) return "No giró lo suficiente";
+  if (/no se detectó rostro/.test(m)) return "No se vio el rostro";
+  if (/muy lejos/.test(m)) return "Rostro lejos o pequeño";
+  if (/no mira al frente/.test(m)) return "No miró al frente";
+  if (/más de un rostro/.test(m)) return "Más de un rostro";
+  if (/misma persona/.test(m)) return "Capturas no consistentes";
+  if (/idéntica/.test(m)) return "Posible foto fija";
+  return "Otra";
 }
 
 // ---------- Imágenes ----------
@@ -161,13 +175,18 @@ function decodificar(v, b64) {
   if (im.w > MAX_IMG_LADO || im.h > MAX_IMG_LADO) throw new ErrorCliente("imagen demasiado grande");
   return im;
 }
+// El detector acepta rostros desde 0,6 (barba, rostro ancho o poca luz bajaban el puntaje y "no se
+// detectaba rostro"). Un rostro ADICIONAL solo cuenta si es una detección segura (>= 0,8), para no
+// rechazar por "más de un rostro" a causa de detecciones débiles del fondo.
+const CARA_EXTRA_MIN = 0.8;
+const contarCaras = caras => caras.length ? 1 + caras.slice(1).filter(c => c.score >= CARA_EXTRA_MIN).length : 0;
 async function analizar(m, pasos, imagenes) {
   if (!Array.isArray(imagenes) || imagenes.length !== pasos.length) throw new ErrorCliente(`se esperaban ${pasos.length} imágenes`);
   const frames = [];
   for (let i = 0; i < pasos.length; i++) {
     const im = decodificar(m.v, imagenes[i]);
     const caras = await m.v.detectar(m.det, im);
-    const f = { paso: pasos[i], caras: caras.length, ancho: im.w };
+    const f = { paso: pasos[i], caras: contarCaras(caras), ancho: im.w };
     if (caras.length) { f.cara = caras[0]; f.pose = m.v.pose(caras[0]); f.emb = await m.v.embedding(m.rec, im, caras[0]); }
     frames.push(f);
   }
@@ -217,9 +236,21 @@ export default async (req) => {
       const hace7 = new Date(Date.now() - 7 * 86400000).toISOString();
       // Intentos de TODO el período guardado (máx. 60 días, ver "purgar"): totales de 7 días y, por
       // guardia, cuántos intentos tuvo con prueba de vida fallida, rostro que no coincide y verificados.
-      const [plant, ints] = await Promise.all([
+      const [plant, ints, fallidos] = await Promise.all([
         sbFetch(cfg, `/rest/v1/guardias_biometria?select=rut,fecha_enrolamiento&activo=is.true&order=fecha_enrolamiento.desc&limit=10000`),
-        sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,estado,liveness_ok,fecha&limit=50000`)]);
+        sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,estado,liveness_ok,fecha&limit=50000`),
+        sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,fecha,detalle&liveness_ok=is.false&limit=50000`)]);
+      // Causas de la prueba de vida fallida: total de 7 días y, por guardia, de todo lo guardado (máx. 60 días).
+      // Cuenta intentos por causa (un intento puede tener varias).
+      const causas = {}, causasRut = new Map();
+      fallidos.forEach(x => {
+        const vistos = new Set();
+        ((x.detalle && x.detalle.motivos) || []).forEach(m => vistos.add(causaVida(m)));
+        if (!vistos.size) vistos.add("Otra");
+        const cr = causasRut.get(x.rut) || {};
+        vistos.forEach(c => { cr[c] = (cr[c] || 0) + 1; if (x.fecha >= hace7) causas[c] = (causas[c] || 0) + 1; });
+        if (x.rut) causasRut.set(x.rut, cr);
+      });
       const ints7 = ints.filter(x => x.fecha >= hace7);
       const cuenta = f => ints7.filter(f).length;
       const porRut = new Map();
@@ -237,7 +268,8 @@ export default async (req) => {
         verificados_7d: cuenta(x => x.estado === L.ESTADOS.OK),
         no_coincide_7d: cuenta(x => x.estado === L.ESTADOS.NO),
         vida_fallida_7d: cuenta(x => x.liveness_ok === false),
-        lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento, ...(porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 }) })) });
+        causas_vida_7d: causas,
+        lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento, ...(porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 }), causas: causasRut.get(x.rut) || {} })) });
     }
 
     // ----- Panel admin -> retención de 60 días (solo PIN) -----
@@ -276,7 +308,7 @@ export default async (req) => {
       const m = await cargarModelos();
       const im = decodificar(m.v, b.imagen);
       const caras = await m.v.detectar(m.det, im);
-      if (caras.length !== 1) return json({ ok: true, caras: caras.length, listo: false });
+      if (contarCaras(caras) !== 1) return json({ ok: true, caras: contarCaras(caras), listo: false });
       const cara = caras[0], pose = m.v.pose(cara), cara_frac = cara.box[2] / im.w;
       const dir = b.direccion === "izquierda" ? "izquierda" : b.direccion === "derecha" ? "derecha" : null;
       let listo = false, progreso = 0, contrario = false, movimiento = false;
@@ -297,6 +329,7 @@ export default async (req) => {
         caras: 1,
         giro: +pose.giro.toFixed(3),
         cara_frac: +cara_frac.toFixed(3),
+        lejos: cara_frac < L.CARA_MIN_FRAC,   // para que la app diga "acércate" en vez de quedar sin respuesta
         movimiento,
         contrario,
         progreso: +progreso.toFixed(3),
@@ -312,7 +345,9 @@ export default async (req) => {
     }
     if (b.accion === "procesar_auto") {
       let d;
-      try { d = L.leerDesafio(cfg.k, b.token); } catch (e) { throw new ErrorCliente(e.message); }
+      // Señal débil: el envío puede llegar tarde por los reintentos; se acepta hasta 2 min después del
+      // vencimiento (el nonce de un solo uso sigue impidiendo reutilizar el desafío).
+      try { d = L.leerDesafio(cfg.k, b.token, Date.now() - ENVIO_GRACIA_MS); } catch (e) { throw new ErrorCliente(e.message); }
       if (d.rut !== rut || d.tipo !== "auto") throw new ErrorCliente("El desafío no corresponde a este RUT.");
       if (b.consentimiento !== true) throw new ErrorCliente("Falta el consentimiento.");
       // previo = verificación ANTES de registrar el ingreso (RUT ya enrolado): si el rostro NO COINCIDE
@@ -336,7 +371,7 @@ export default async (req) => {
       const otraPersona = !!(p && p.activo && frente) && L.coseno(L.descifrarPlantilla(cfg.k, rut, p.plantilla), frente.emb) < L.UMBRAL_NO_COINCIDE;
       if (previo && (!vida.ok || !frente) && !otraPersona) {
         await registrarIntento(cfg, { ...base, tipo: p && p.activo ? "verificacion" : "enrolamiento", estado: p && p.activo ? L.ESTADOS.REVISAR : "RECHAZADO", detalle: { motivo: "prueba de vida no superada (previa)", motivos: vida.motivos, medidas: vida.medidas }, duracion_ms: ms(performance.now() - t0) });
-        return json({ ok: true, resultado: "repetir", reintentar: true, pista: pistaVida(vida.motivos), tiempos: tiempos() });
+        return json({ ok: true, resultado: "repetir", reintentar: true, pista: pistaVida(vida.motivos), causa: vida.motivos.length ? causaVida(vida.motivos[0]) : "No se vio el rostro", tiempos: tiempos() });
       }
       if (previo && (!p || !p.activo)) return json({ ok: true, resultado: "vida_ok", bloqueado: false, tiempos: tiempos() });
       if (!p || !p.activo) {

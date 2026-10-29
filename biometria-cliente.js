@@ -24,7 +24,7 @@
   // Ícono estilo Face ID (dibujado en SVG: se ve igual en todos los celulares). Marco fijo + rasgos que se
   // desplazan hacia el lado de la flecha durante el giro.
   const FACE_ID = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M22 8H14a6 6 0 0 0-6 6v8M42 8h8a6 6 0 0 1 6 6v8M22 56H14a6 6 0 0 1-6-6v-8M42 56h8a6 6 0 0 0 6-6v-8" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><g class="fid-cara"><path d="M22 27v-3M42 27v-3M32 23v13c0 3-2 5-5 5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path d="M22 43c3 4 7 6 10 6s7-2 10-6" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></g></svg>';
-  const INSTR = { frente: "Mira al frente", giro_izquierda: "Gira la cabeza hacia la flecha ⬅", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
+  const INSTR = { frente: "Mira al frente", giro_izquierda: "⬅ Gira la cabeza hacia la flecha", giro_derecha: "Gira la cabeza hacia la flecha ➡" };
 
   async function api(cuerpo, timeoutMs = 25000, keepalive = false) {
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), timeoutMs);
@@ -60,7 +60,7 @@
       #bioi-esc video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
       #bioi-esc svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
       #bioi-ovalo{transition:stroke .45s ease,stroke-width .45s ease,filter .45s ease}
-      #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#0f172a;font-weight:800;font-size:18px;background:linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,0))}
+      #bioi-ins{position:absolute;left:0;right:0;top:0;padding:12px 10px 18px;text-align:center;color:#0f172a;font-weight:800;font-size:17px;line-height:1.25;background:linear-gradient(rgba(255,255,255,.97),rgba(255,255,255,0))}
       #bioi-cta{position:absolute;left:0;right:0;bottom:78px;text-align:center;color:#0f172a;font-size:50px;font-weight:900;text-shadow:0 0 8px #fff}#bioi-cta svg{width:52px;height:52px;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 6px #fff)}
       #bioi-fl{position:absolute;top:50%;transform:translateY(-50%);display:none;flex-direction:column;align-items:center;gap:4px;color:#ea580c;text-shadow:0 0 6px #fff;pointer-events:none}
       /* Flecha dibujada (SVG), ROJA y del mismo grosor a ambos lados y en todos los intentos (antes era
@@ -109,7 +109,7 @@
           <rect width="300" height="400" fill="#ffffff" mask="url(#bioi-m)"/><ellipse id="bioi-ovalo" cx="150" cy="180" rx="100" ry="132" fill="none" stroke="#0f172a" stroke-width="5"/></svg>
         <div id="bioi-guia"><div class="borde"></div>
 </div>
-        <div id="bioi-fl"><b></b><span>Mira hacia este lado</span></div><div id="bioi-fid">${FACE_ID}</div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
+        <div id="bioi-fl"><b></b><span>Gira hacia aquí</span></div><div id="bioi-fid">${FACE_ID}</div><div id="bioi-cta"></div><div id="bioi-ins"></div></div>
       <div id="bioi-msg"></div>
       <div id="bioi-btns"><button id="bioi-no">Cancelar</button><button id="bioi-si" class="p">Continuar</button></div>`;
     document.head.appendChild(st); document.body.appendChild(c);
@@ -143,6 +143,7 @@
     const ui = crearCapa();
     let stream = null;
     const msg = t => { ui.$("bioi-msg").textContent = t || ""; };
+    const msgHtml = h => { ui.$("bioi-msg").innerHTML = h; };   // solo textos fijos de este archivo
     const indicar = paso => {
       const f = ui.$("bioi-fl"), g = ui.$("bioi-guia"); f.className = ""; g.className = "";
       ui.$("bioi-esc").classList.remove("ok-giro");
@@ -185,35 +186,40 @@
       o.style.filter = `drop-shadow(0 0 ${4 + 7 * p}px ${color})`;
     };
 
+    // Indicación EN VIVO según lo que ve el servidor en ese momento (rostro, distancia, lado, avance).
+    const pistaVivo = d => {
+      if (!d.caras) return "No vemos tu rostro: acércate y busca luz de frente";
+      if (d.caras > 1) return "Debe aparecer solo una persona";
+      if (d.lejos) return "Acerca más el teléfono a tu cara";
+      if (d.listo) return "¡Así! Quédate girado…";
+      if (d.contrario) return "Hacia el OTRO lado: hacia la flecha roja";
+      if (d.movimiento && d.progreso >= 0.5) return "¡Casi! Gira un poco más y quédate así";
+      return "Gira la cabeza hacia la flecha roja (como mirando tu hombro)";
+    };
     async function esperarGiroVerde(paso) {
       const direccion = paso === "giro_izquierda" ? "izquierda" : "derecha";
       // AHORRO DE SERVIDOR: máximo 8 consultas por giro, una cada ~0,5 s (antes ~17, cada 0,35 s).
       // El color del óvalo cambia con transición suave entre lecturas (se ve fluido sin más consultas).
       // Si el servidor no responde bien (error, límite), se deja de consultar y se usa la espera simple.
-      const limite = Date.now() + 6500, MAX_CONSULTAS = 8;
-      let consecutivos = 0, huboRespuesta = false, consultas = 0;
+      // Tiempo para lograr el giro (más en el 2.º intento o más). El servidor admite 40 consultas/min por RUT.
+      const limite = Date.now() + (reintento ? 12000 : 9000), MAX_CONSULTAS = reintento ? 18 : 14;
+      let consecutivos = 0, huboRespuesta = false, consultas = 0, fallidas = 0;
       while (Date.now() < limite && consultas < MAX_CONSULTAS) {
         let r;
         consultas++;
         try {
           r = await api({ accion: "pose_live", rut, direccion, imagen: frameLive() }, 4500);
-          huboRespuesta = true;
         } catch (_) { r = null; }
-        if (!r || r.status !== 200) return huboRespuesta && consultas > 1 ? false : null;
-        if (r && r.status === 200 && r.d) pintarProgresoGiro(r.d);
+        // Señal débil: una consulta que no llega NO corta la guía; se sigue intentando hasta el límite de tiempo.
+        if (!r || r.status >= 500) { fallidas++; if (!huboRespuesta && fallidas >= 3) return null; msg("Señal débil… sigue girando hacia la flecha"); await esperar(500); continue; }
+        if (r.status !== 200) return huboRespuesta ? false : null;   // límite de consultas u otro rechazo
+        huboRespuesta = true;
+        if (r && r.status === 200 && r.d) { pintarProgresoGiro(r.d); msg(pistaVivo(r.d)); }
         if (r && r.status === 200 && r.d && r.d.listo) {
           consecutivos++;
           // Dos lecturas seguidas evitan que un único frame accidental pinte verde.
-          if (consecutivos >= 2) {
-            ui.$("bioi-esc").classList.add("ok-giro");
-            ui.$("bioi-ins").textContent = "✓ Giro correcto";
-            ui.$("bioi-fl").querySelector("span").textContent = "¡Bien!";
-            ui.$("bioi-cta").textContent = "✓ BIEN"; ui.$("bioi-fid").className = "ok";
-            msg("Mantén la posición y la mirada hacia la cámara");
-            try { navigator.vibrate && navigator.vibrate(120); } catch (_) { }
-            await esperar(350);
-            return true;
-          }
+          // Se vuelve AL TIRO (sin esperas): la foto del giro se toma mientras la cabeza sigue girada.
+          if (consecutivos >= 2) return true;
         } else consecutivos = 0;
         await esperar(500);
       }
@@ -266,10 +272,11 @@
         reproducir();
         if (!(await esperarImagen(5000))) { cerrar(); return { sinCamara: true }; }   // cámara sin imagen: NO ingresa sin enrolarse
       }
-      ui.$("bioi-ins").textContent = "Encuadra tu rostro dentro del óvalo";
-      msg(reintento
-        ? "Esta vez: primero mira al frente; cuando se ilumine un lado, GIRA la cabeza hacia ese lado (como el ícono de abajo) y quédate así hasta ver el ícono de verificación facial."
-        : "Con buena luz y de frente. Cuando estés listo, pulsa el botón.");
+      ui.$("bioi-ins").textContent = "Pon tu rostro dentro del óvalo";
+      msgHtml((reintento ? "<b>Esta vez sigue estos 3 pasos con calma:</b><br>" : "")
+        + "<b>1.</b> Rostro cerca, dentro del óvalo y con luz de frente.<br>"
+        + "<b>2.</b> Mira la cámara quieto (cuenta 2, 1).<br>"
+        + "<b>3.</b> Gira la cabeza hacia la <b style=\"color:#dc2626\">flecha roja</b> y <b>quédate girado</b> hasta que el óvalo se ponga <b style=\"color:#16a34a\">verde</b>.");
       if (!(await elegir(ui, "Estoy listo", "Cancelar"))) { cerrar(); return { cancelado: true }; }
       ui.$("bioi-no").disabled = true;
 
@@ -285,7 +292,7 @@
       for (let i = 0; i < pasos.length; i++) {
         ui.$("bioi-ins").textContent = INSTR[pasos[i]] || pasos[i]; indicar(pasos[i]);
         if (pasos[i].startsWith("giro_")) {
-          msg("Gira la cabeza (unos 30°) y mantén la mirada hacia la cámara"); ui.$("bioi-cta").textContent = "";
+          msg("Gira la cabeza hacia la flecha roja (como mirando tu hombro)"); ui.$("bioi-cta").textContent = "";
           const verde = await esperarGiroVerde(pasos[i]);
           if (verde === false) {
             // Hubo medición, pero aún no alcanzó el giro correcto: damos una oportunidad extra antes de capturar.
@@ -296,13 +303,21 @@
             await esperar((reintento ? 1800 : 1000) + Math.floor(Math.random() * 1000));
           }
         } else {
-          msg("Quédate quieto mirando la cámara");
+          msg("Mira la cámara y quédate quieto");
           for (let s = 2; s > 0; s--) { ui.$("bioi-cta").textContent = s; await esperar(900); }
         }
         const v = ui.video, k = Math.min(1, 480 / v.videoWidth), cv = document.createElement("canvas");
         cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
         cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);   // sin espejo
         imgs.push(cv.toDataURL("image/jpeg", 0.85).split(",")[1]);
+        if (pasos[i].startsWith("giro_")) {
+          // Confirmación visual DESPUÉS de capturar (antes se mostraba primero y la persona volvía al frente).
+          ui.$("bioi-esc").classList.add("ok-giro");
+          ui.$("bioi-ins").textContent = "✓ Giro correcto";
+          ui.$("bioi-fl").querySelector("span").textContent = "¡Bien!";
+          ui.$("bioi-cta").textContent = "✓ BIEN";
+          try { navigator.vibrate && navigator.vibrate(120); } catch (_) { }
+        }
         // La captura de FRENTE es también la foto de ingreso (mismo proceso que la foto normal: WebP 3:4).
         if (pasos[i] === "frente" && !fotoBlob) { try { fotoBlob = await fotoDesde(v); } catch (_) { fotoBlob = null; } }
         ui.$("bioi-cta").textContent = ""; ui.$("bioi-fid").className = "ok"; await esperar(350);
@@ -316,32 +331,42 @@
     }
   }
 
+  // SEÑAL DÉBIL: reintenta el envío hasta que llegue (máx. `veces`, con esperas crecientes). Solo se reintenta
+  // cuando NO hubo respuesta (sin red, tiempo agotado) o el servidor falló (5xx); una respuesta 4xx es definitiva.
+  async function enviarConReintentos(cuerpo, timeoutMs, veces, onReintento, keepalive) {
+    let ultimo = { status: 0, d: {} };
+    for (let i = 0; i < veces; i++) {
+      if (i) { if (onReintento) try { onReintento(i); } catch (_) { } await esperar(Math.min(8000, 2000 * i)); }
+      try { ultimo = await api(cuerpo, timeoutMs, keepalive); } catch (_) { ultimo = { status: 0, d: {} }; continue; }
+      if (ultimo.status && ultimo.status < 500) return ultimo;
+    }
+    return ultimo;
+  }
+
   // Envía las capturas a la función (enrola o verifica). Nunca lanza error: el ingreso ya está guardado.
   async function procesar({ rut, asistenciaId, token, imagenes }) {
     if (!token || !imagenes || !asistenciaId) return "omitido";
-    try {
-      const r = await api({ accion: "procesar_auto", rut, asistencia_id: asistenciaId, token, imagenes, consentimiento: true }, 30000);
-      return r.status === 200 ? (r.d.resultado || "ok") : "error";
-    } catch (_) { return "error"; }
+    const r = await enviarConReintentos({ accion: "procesar_auto", rut, asistencia_id: asistenciaId, token, imagenes, consentimiento: true }, 30000, 6);
+    if (r.status === 409) return "ok";   // un envío anterior sí llegó (el desafío ya se usó)
+    return r.status === 200 ? (r.d.resultado || "ok") : "error";
   }
 
   // Revisión ANTES de registrar. Devuelve { estado }: "bloqueado" (otra persona: no registrar),
   // "repetir" (prueba de vida no superada: repetir, con una pista), "ok" (registrar) o "error"
   // (sin señal / falla: se registra igual, como antes). En el primer ingreso solo revisa la prueba de vida.
-  async function verificarPrevio({ rut, token, imagenes }) {
+  // Con señal débil se reintenta solo (hasta 5 envíos); onReintento(n) permite avisar en pantalla.
+  async function verificarPrevio({ rut, token, imagenes, onReintento }) {
     if (!token || !imagenes) return { estado: "error" };
-    try {
-      const r = await api({ accion: "procesar_auto", previo: true, rut, token, imagenes, consentimiento: true }, 30000);
-      if (r.status !== 200) return { estado: "error" };
-      if (r.d.reintentar) return { estado: "repetir", pista: r.d.pista || "" };
-      return { estado: r.d.bloqueado ? "bloqueado" : "ok" };
-    } catch (_) { return { estado: "error" }; }
+    const r = await enviarConReintentos({ accion: "procesar_auto", previo: true, rut, token, imagenes, consentimiento: true }, 30000, 5, onReintento);
+    if (r.status !== 200) return { estado: "error" };
+    if (r.d.reintentar) return { estado: "repetir", pista: r.d.pista || "", causa: r.d.causa || "" };
+    return { estado: r.d.bloqueado ? "bloqueado" : "ok" };
   }
   // Asocia la verificación previa a la asistencia recién creada (para las palomas del panel).
   async function vincular({ rut, token, asistenciaId, enSegundoPlano }) {
     if (!token || !asistenciaId) return "omitido";
-    try { const r = await api({ accion: "vincular", rut, token, asistencia_id: asistenciaId }, 15000, !!enSegundoPlano); return r.status === 200 && r.d.vinculado ? "ok" : "error"; }
-    catch (_) { return "error"; }
+    const r = await enviarConReintentos({ accion: "vincular", rut, token, asistencia_id: asistenciaId }, 15000, 6, null, !!enSegundoPlano);
+    return r.status === 200 && r.d.vinculado ? "ok" : "error";
   }
 
   window.BioIngreso = { capturar, procesar, verificarPrevio, vincular, precalentar };
