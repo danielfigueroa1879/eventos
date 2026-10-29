@@ -47,7 +47,7 @@ Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
    - si coincide (o queda en revisión ⚠) → se registra y la verificación se asocia a la asistencia (`vincular`);
    - si la función falla o no hay señal → se registra igual, como antes.
    - **prueba de vida no superada** (no giró, giró al lado contrario, rostro lejos, dos personas…) → aviso
-     "🔄 Repite la verificación" con una pista; **no se registra** hasta superarla. Al **3.er fallo seguido** ya no
+     "🔄 Repite la verificación" con una pista; **no se registra** hasta superarla. Al **6.º fallo seguido** ya no
      se le pide repetir: se registra con la foto y el intento queda vinculado al ingreso (⚠ / "no se pudo enrolar")
      para revisión del admin. Vale también para el
      **primer ingreso**: antes de registrar se revisa la prueba de vida (sin guardar nada) y, tras registrar,

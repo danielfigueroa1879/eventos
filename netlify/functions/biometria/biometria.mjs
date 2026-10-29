@@ -146,9 +146,22 @@ function pistaVida(motivos) {
   const m = (motivos || []).join(" | ");
   if (/más de un rostro/.test(m)) return "Debe aparecer solo una persona frente a la cámara.";
   if (/no se detectó rostro|muy lejos/.test(m)) return "Acércate a la cámara y deja tu rostro completo dentro del óvalo, con buena luz.";
-  if (/lado contrario|no se detectó el giro/.test(m)) return "Gira la cabeza hacia el lado que indica la flecha y mantenla hasta ver 📸.";
+  if (/lado contrario|no se detectó el giro/.test(m)) return "Gira la cabeza hacia la flecha roja (como mirando tu hombro) y quédate girado hasta que el óvalo se ponga verde.";
   if (/no mira al frente/.test(m)) return "En la primera foto mira directo a la cámara.";
   return "Repite la verificación: mira al frente y luego gira la cabeza hacia la flecha.";
+}
+
+// Agrupa un motivo de evaluarVida() en una causa corta para el panel admin.
+function causaVida(m) {
+  if (/lado contrario/.test(m)) return "Giró al lado contrario";
+  if (/no se detectó el giro/.test(m)) return "No giró lo suficiente";
+  if (/no se detectó rostro/.test(m)) return "No se vio el rostro";
+  if (/muy lejos/.test(m)) return "Rostro lejos o pequeño";
+  if (/no mira al frente/.test(m)) return "No miró al frente";
+  if (/más de un rostro/.test(m)) return "Más de un rostro";
+  if (/misma persona/.test(m)) return "Capturas no consistentes";
+  if (/idéntica/.test(m)) return "Posible foto fija";
+  return "Otra";
 }
 
 // ---------- Imágenes ----------
@@ -222,9 +235,16 @@ export default async (req) => {
       const hace7 = new Date(Date.now() - 7 * 86400000).toISOString();
       // Intentos de TODO el período guardado (máx. 60 días, ver "purgar"): totales de 7 días y, por
       // guardia, cuántos intentos tuvo con prueba de vida fallida, rostro que no coincide y verificados.
-      const [plant, ints] = await Promise.all([
+      const [plant, ints, fallidos] = await Promise.all([
         sbFetch(cfg, `/rest/v1/guardias_biometria?select=rut,fecha_enrolamiento&activo=is.true&order=fecha_enrolamiento.desc&limit=10000`),
-        sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,estado,liveness_ok,fecha&limit=50000`)]);
+        sbFetch(cfg, `/rest/v1/biometria_intentos?select=rut,estado,liveness_ok,fecha&limit=50000`),
+        sbFetch(cfg, `/rest/v1/biometria_intentos?select=detalle&liveness_ok=is.false&fecha=gte.${enc(hace7)}&limit=20000`)]);
+      // Causas de la prueba de vida fallida (7 días): cuántos intentos tuvieron cada motivo (un intento puede tener varios).
+      const causas = {};
+      fallidos.forEach(x => {
+        const vistos = new Set();
+        ((x.detalle && x.detalle.motivos) || []).forEach(m => { const c = causaVida(m); if (!vistos.has(c)) { vistos.add(c); causas[c] = (causas[c] || 0) + 1; } });
+      });
       const ints7 = ints.filter(x => x.fecha >= hace7);
       const cuenta = f => ints7.filter(f).length;
       const porRut = new Map();
@@ -242,6 +262,7 @@ export default async (req) => {
         verificados_7d: cuenta(x => x.estado === L.ESTADOS.OK),
         no_coincide_7d: cuenta(x => x.estado === L.ESTADOS.NO),
         vida_fallida_7d: cuenta(x => x.liveness_ok === false),
+        causas_vida_7d: causas,
         lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento, ...(porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 }) })) });
     }
 
@@ -302,6 +323,7 @@ export default async (req) => {
         caras: 1,
         giro: +pose.giro.toFixed(3),
         cara_frac: +cara_frac.toFixed(3),
+        lejos: cara_frac < L.CARA_MIN_FRAC,   // para que la app diga "acércate" en vez de quedar sin respuesta
         movimiento,
         contrario,
         progreso: +progreso.toFixed(3),
