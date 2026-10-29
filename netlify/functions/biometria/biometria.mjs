@@ -240,7 +240,11 @@ export default async (req) => {
     // ----- Panel admin -> resumen de enrolados (solo PIN; sin plantillas) -----
     if (b.accion === "resumen") {
       await exigirPin(cfg, b.pin);
-      const hace7 = new Date(Date.now() - 7 * 86400000).toISOString();
+      // Período de los totales: últimos 7 días, o "desde" una fecha (ISO) que elige el admin. Con "desde",
+      // las columnas por guardia también cuentan solo desde esa fecha (sin él: todo lo guardado, máx. 60 días).
+      const desdeOk = typeof b.desde === "string" && !isNaN(Date.parse(b.desde));
+      const hace7 = desdeOk ? new Date(b.desde).toISOString() : new Date(Date.now() - 7 * 86400000).toISOString();
+      const enRut = x => !desdeOk || x.fecha >= hace7;
       // Intentos de TODO el período guardado (máx. 60 días, ver "purgar"): totales de 7 días y, por
       // guardia, cuántos intentos tuvo con prueba de vida fallida, rostro que no coincide y verificados.
       const [plant, ints, fallidos] = await Promise.all([
@@ -255,14 +259,14 @@ export default async (req) => {
         ((x.detalle && x.detalle.motivos) || []).forEach(m => vistos.add(causaVida(m)));
         if (!vistos.size) vistos.add("Otra");
         const cr = causasRut.get(x.rut) || {};
-        vistos.forEach(c => { cr[c] = (cr[c] || 0) + 1; if (x.fecha >= hace7) causas[c] = (causas[c] || 0) + 1; });
+        vistos.forEach(c => { if (enRut(x)) cr[c] = (cr[c] || 0) + 1; if (x.fecha >= hace7) causas[c] = (causas[c] || 0) + 1; });
         if (x.rut) causasRut.set(x.rut, cr);
       });
       const ints7 = ints.filter(x => x.fecha >= hace7);
       const cuenta = f => ints7.filter(f).length;
       const porRut = new Map();
       ints.forEach(x => {
-        if (!x.rut) return;
+        if (!x.rut || !enRut(x)) return;
         const c = porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 };
         if (x.liveness_ok === false) c.vf++;
         if (x.estado === L.ESTADOS.NO) c.nc++;
@@ -276,6 +280,9 @@ export default async (req) => {
         no_coincide_7d: cuenta(x => x.estado === L.ESTADOS.NO),
         vida_fallida_7d: cuenta(x => x.liveness_ok === false),
         causas_vida_7d: causas,
+        // Prueba de vida superada / intentos con prueba de vida, en el período (tasa de éxito).
+        vida_ok_7d: cuenta(x => x.liveness_ok === true),
+        desde: desdeOk ? hace7 : null,
         lista: plant.map(x => ({ rut: x.rut, fecha: x.fecha_enrolamiento, ...(porRut.get(x.rut) || { vf: 0, nc: 0, ok: 0 }), causas: causasRut.get(x.rut) || {} })) });
     }
 
