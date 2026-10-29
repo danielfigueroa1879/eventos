@@ -234,6 +234,7 @@
           let r;
           try { r = await api({ accion: "pose_live", rut, direccion, imagen: live }, 6000); } catch (_) { r = null; }
           enVuelo--;
+          ultimaRespuesta = Date.now();
           if (fin) return;
           if (!r || r.status >= 500) {
             fallidas++;
@@ -249,7 +250,12 @@
           if (seq > ultimoSeq) { ultimoSeq = seq; pintarProgresoGiro(d); msg(pistaVivo(d)); }
           cerrarSiCorresponde();
         };
-        const tic = setInterval(enviar, CADA_MS);
+        // Respuestas lentas (señal débil): se avisa que el giro se está enviando, sin cortar la guía.
+        let ultimaRespuesta = Date.now();
+        const tic = setInterval(() => {
+          if (!fin && enVuelo > 0 && Date.now() - ultimaRespuesta > 2000) msg("📶 Señal muy débil, pero tu giro se está enviando… gira hacia la flecha y espera");
+          enviar();
+        }, CADA_MS);
         enviar();
       });
     }
