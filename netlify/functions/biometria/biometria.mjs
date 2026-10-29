@@ -145,7 +145,7 @@ async function exigirAsistenciaReciente(cfg, rut, asisId) {
 // Pista para el guardia cuando no supera la prueba de vida (sin revelar umbrales ni puntajes).
 function pistaVida(motivos) {
   const m = (motivos || []).join(" | ");
-  if (/más de un rostro/.test(m)) return "Debe aparecer solo una persona frente a la cámara.";
+  if (/más de un rostro/.test(m)) return "Que no haya otra persona cerca o detrás tuyo: solo tu rostro frente a la cámara.";
   if (/no se detectó rostro|muy lejos/.test(m)) return "Acércate a la cámara y deja tu rostro completo dentro del óvalo, con buena luz.";
   if (/lado contrario|no se detectó el giro/.test(m)) return "Gira la cabeza hacia la flecha roja (como mirando tu hombro) y quédate girado hasta que el óvalo se ponga verde.";
   if (/no mira al frente/.test(m)) return "En la primera foto mira directo a la cámara.";
@@ -176,18 +176,25 @@ function decodificar(v, b64) {
   return im;
 }
 // El detector acepta rostros desde 0,6 (barba, rostro ancho o poca luz bajaban el puntaje y "no se
-// detectaba rostro"). Un rostro ADICIONAL solo cuenta si es una detección segura (>= 0,8), para no
-// rechazar por "más de un rostro" a causa de detecciones débiles del fondo.
-const CARA_EXTRA_MIN = 0.8;
-const contarCaras = caras => caras.length ? 1 + caras.slice(1).filter(c => c.score >= CARA_EXTRA_MIN).length : 0;
+// detectaba rostro"). El rostro PRINCIPAL es el más grande (la persona frente al teléfono), no el de mayor
+// puntaje. Otro rostro solo cuenta si es una detección segura (>= 0,8) y de tamaño parecido (>= 60% del
+// principal): la gente que hace fila DETRÁS se ve mucho más chica y antes causaba "más de un rostro"
+// (74 de 167 fallos en 7 días) y dejaba la guía del giro sin ponerse verde.
+const CARA_EXTRA_MIN = 0.8, CARA_EXTRA_TAM = 0.6;
+function elegirCaras(caras) {
+  if (!caras.length) return { principal: null, n: 0 };
+  const principal = caras.reduce((a, c) => c.box[2] > a.box[2] ? c : a);
+  const extra = caras.filter(c => c !== principal && c.score >= CARA_EXTRA_MIN && c.box[2] >= principal.box[2] * CARA_EXTRA_TAM).length;
+  return { principal, n: 1 + extra };
+}
 async function analizar(m, pasos, imagenes) {
   if (!Array.isArray(imagenes) || imagenes.length !== pasos.length) throw new ErrorCliente(`se esperaban ${pasos.length} imágenes`);
   const frames = [];
   for (let i = 0; i < pasos.length; i++) {
     const im = decodificar(m.v, imagenes[i]);
-    const caras = await m.v.detectar(m.det, im);
-    const f = { paso: pasos[i], caras: contarCaras(caras), ancho: im.w };
-    if (caras.length) { f.cara = caras[0]; f.pose = m.v.pose(caras[0]); f.emb = await m.v.embedding(m.rec, im, caras[0]); }
+    const { principal, n } = elegirCaras(await m.v.detectar(m.det, im));
+    const f = { paso: pasos[i], caras: n, ancho: im.w };
+    if (principal) { f.cara = principal; f.pose = m.v.pose(principal); f.emb = await m.v.embedding(m.rec, im, principal); }
     frames.push(f);
   }
   return frames;
@@ -307,9 +314,9 @@ export default async (req) => {
       limitePose(rut);
       const m = await cargarModelos();
       const im = decodificar(m.v, b.imagen);
-      const caras = await m.v.detectar(m.det, im);
-      if (contarCaras(caras) !== 1) return json({ ok: true, caras: contarCaras(caras), listo: false });
-      const cara = caras[0], pose = m.v.pose(cara), cara_frac = cara.box[2] / im.w;
+      const { principal: cara, n } = elegirCaras(await m.v.detectar(m.det, im));
+      if (n !== 1) return json({ ok: true, caras: n, listo: false });
+      const pose = m.v.pose(cara), cara_frac = cara.box[2] / im.w;
       const dir = b.direccion === "izquierda" ? "izquierda" : b.direccion === "derecha" ? "derecha" : null;
       let listo = false, progreso = 0, contrario = false, movimiento = false;
       if (dir && cara_frac >= L.CARA_MIN_FRAC) {

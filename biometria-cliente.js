@@ -189,7 +189,7 @@
     // Indicación EN VIVO según lo que ve el servidor en ese momento (rostro, distancia, lado, avance).
     const pistaVivo = d => {
       if (!d.caras) return "No vemos tu rostro: acércate y busca luz de frente";
-      if (d.caras > 1) return "Debe aparecer solo una persona";
+      if (d.caras > 1) return "Que nadie se acerque detrás tuyo: solo tu rostro";
       if (d.lejos) return "Acerca más el teléfono a tu cara";
       if (d.listo) return "¡Así! Quédate girado…";
       if (d.contrario) return "Hacia el OTRO lado: hacia la flecha roja";
