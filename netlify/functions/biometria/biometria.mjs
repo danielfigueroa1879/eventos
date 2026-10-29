@@ -161,13 +161,18 @@ function decodificar(v, b64) {
   if (im.w > MAX_IMG_LADO || im.h > MAX_IMG_LADO) throw new ErrorCliente("imagen demasiado grande");
   return im;
 }
+// El detector acepta rostros desde 0,6 (barba, rostro ancho o poca luz bajaban el puntaje y "no se
+// detectaba rostro"). Un rostro ADICIONAL solo cuenta si es una detección segura (>= 0,8), para no
+// rechazar por "más de un rostro" a causa de detecciones débiles del fondo.
+const CARA_EXTRA_MIN = 0.8;
+const contarCaras = caras => caras.length ? 1 + caras.slice(1).filter(c => c.score >= CARA_EXTRA_MIN).length : 0;
 async function analizar(m, pasos, imagenes) {
   if (!Array.isArray(imagenes) || imagenes.length !== pasos.length) throw new ErrorCliente(`se esperaban ${pasos.length} imágenes`);
   const frames = [];
   for (let i = 0; i < pasos.length; i++) {
     const im = decodificar(m.v, imagenes[i]);
     const caras = await m.v.detectar(m.det, im);
-    const f = { paso: pasos[i], caras: caras.length, ancho: im.w };
+    const f = { paso: pasos[i], caras: contarCaras(caras), ancho: im.w };
     if (caras.length) { f.cara = caras[0]; f.pose = m.v.pose(caras[0]); f.emb = await m.v.embedding(m.rec, im, caras[0]); }
     frames.push(f);
   }
@@ -276,7 +281,7 @@ export default async (req) => {
       const m = await cargarModelos();
       const im = decodificar(m.v, b.imagen);
       const caras = await m.v.detectar(m.det, im);
-      if (caras.length !== 1) return json({ ok: true, caras: caras.length, listo: false });
+      if (contarCaras(caras) !== 1) return json({ ok: true, caras: contarCaras(caras), listo: false });
       const cara = caras[0], pose = m.v.pose(cara), cara_frac = cara.box[2] / im.w;
       const dir = b.direccion === "izquierda" ? "izquierda" : b.direccion === "derecha" ? "derecha" : null;
       let listo = false, progreso = 0, contrario = false, movimiento = false;

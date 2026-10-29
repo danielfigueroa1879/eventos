@@ -190,7 +190,8 @@
       // AHORRO DE SERVIDOR: máximo 8 consultas por giro, una cada ~0,5 s (antes ~17, cada 0,35 s).
       // El color del óvalo cambia con transición suave entre lecturas (se ve fluido sin más consultas).
       // Si el servidor no responde bien (error, límite), se deja de consultar y se usa la espera simple.
-      const limite = Date.now() + 6500, MAX_CONSULTAS = 8;
+      // En el 2.º intento o más hay un poco más de tiempo para lograr el giro.
+      const limite = Date.now() + (reintento ? 9500 : 6500), MAX_CONSULTAS = reintento ? 12 : 8;
       let consecutivos = 0, huboRespuesta = false, consultas = 0;
       while (Date.now() < limite && consultas < MAX_CONSULTAS) {
         let r;
@@ -204,16 +205,8 @@
         if (r && r.status === 200 && r.d && r.d.listo) {
           consecutivos++;
           // Dos lecturas seguidas evitan que un único frame accidental pinte verde.
-          if (consecutivos >= 2) {
-            ui.$("bioi-esc").classList.add("ok-giro");
-            ui.$("bioi-ins").textContent = "✓ Giro correcto";
-            ui.$("bioi-fl").querySelector("span").textContent = "¡Bien!";
-            ui.$("bioi-cta").textContent = "✓ BIEN"; ui.$("bioi-fid").className = "ok";
-            msg("Mantén la posición y la mirada hacia la cámara");
-            try { navigator.vibrate && navigator.vibrate(120); } catch (_) { }
-            await esperar(350);
-            return true;
-          }
+          // Se vuelve AL TIRO (sin esperas): la foto del giro se toma mientras la cabeza sigue girada.
+          if (consecutivos >= 2) return true;
         } else consecutivos = 0;
         await esperar(500);
       }
@@ -303,6 +296,14 @@
         cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
         cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);   // sin espejo
         imgs.push(cv.toDataURL("image/jpeg", 0.85).split(",")[1]);
+        if (pasos[i].startsWith("giro_")) {
+          // Confirmación visual DESPUÉS de capturar (antes se mostraba primero y la persona volvía al frente).
+          ui.$("bioi-esc").classList.add("ok-giro");
+          ui.$("bioi-ins").textContent = "✓ Giro correcto";
+          ui.$("bioi-fl").querySelector("span").textContent = "¡Bien!";
+          ui.$("bioi-cta").textContent = "✓ BIEN";
+          try { navigator.vibrate && navigator.vibrate(120); } catch (_) { }
+        }
         // La captura de FRENTE es también la foto de ingreso (mismo proceso que la foto normal: WebP 3:4).
         if (pasos[i] === "frente" && !fotoBlob) { try { fotoBlob = await fotoDesde(v); } catch (_) { fotoBlob = null; } }
         ui.$("bioi-cta").textContent = ""; ui.$("bioi-fid").className = "ok"; await esperar(350);

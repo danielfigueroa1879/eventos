@@ -3244,6 +3244,7 @@
       let procUI = null;                // pantalla "Procesando tu ingreso"
       // Prueba de vida NO superada: el ingreso no se registra; debe repetir la verificación.
       let bioVidaFallos = 0;            // pruebas de vida no superadas (desde el 2.º intento: guía reforzada)
+      const BIO_VIDA_MAX_FALLOS = 3;    // al 3.er fallo se registra igual (con foto) y queda para revisión
       const avisoRepetirVida = (pista) => {
         bioVidaFallos++;
         openModal(`<div class="text-center">
@@ -3579,9 +3580,13 @@
                 try { v = (await conTimeout(window.BioIngreso.verificarPrevio({ rut: formatRut(rut.value), token: bio.token, imagenes: bio.imagenes }), 35000)) || v; } catch (_) { }
                 submit.disabled = false;
                 if (v.estado === "bloqueado") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; bioBloqueos++; avisoNoCoincide(formatRut(rut.value)); return; }
-                if (v.estado === "repetir") { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; avisoRepetirVida(v.pista); return; }
+                // Prueba de vida no superada: se repite. Al 3.er fallo seguido NO se le sigue pidiendo (había guardias
+                // con 9+ intentos): se registra con la foto y el intento queda vinculado al ingreso para revisión del
+                // admin (⚠ o "no se pudo enrolar"). El bloqueo por rostro de OTRA persona (arriba) sigue igual.
+                if (v.estado === "repetir" && bioVidaFallos < BIO_VIDA_MAX_FALLOS - 1) { procUI.cerrar(); procUI = null; fotoBlob = null; bioPend = null; avisoRepetirVida(v.pista); return; }
+                if (v.estado === "repetir") { bioVidaFallos++; bioPend = { ...bio, previo: true, previoOk: false }; }
                 // Primer ingreso: tras registrar se enrola (procesar). Ya enrolado: tras registrar se vincula.
-                bioPend = enrolar ? bio : { ...bio, previo: true, previoOk: v.estado === "ok" };
+                else bioPend = enrolar ? bio : { ...bio, previo: true, previoOk: v.estado === "ok" };
               }
             }
           }

@@ -47,7 +47,9 @@ Con el interruptor encendido, en lugar de "Foto de verificación" el guardia ve:
    - si coincide (o queda en revisión ⚠) → se registra y la verificación se asocia a la asistencia (`vincular`);
    - si la función falla o no hay señal → se registra igual, como antes.
    - **prueba de vida no superada** (no giró, giró al lado contrario, rostro lejos, dos personas…) → aviso
-     "🔄 Repite la verificación" con una pista; **no se registra** hasta superarla. Vale también para el
+     "🔄 Repite la verificación" con una pista; **no se registra** hasta superarla. Al **3.er fallo seguido** ya no
+     se le pide repetir: se registra con la foto y el intento queda vinculado al ingreso (⚠ / "no se pudo enrolar")
+     para revisión del admin. Vale también para el
      **primer ingreso**: antes de registrar se revisa la prueba de vida (sin guardar nada) y, tras registrar,
      se enrola con las mismas capturas. Si el rostro es claramente de otra persona, manda el bloqueo ⛔.
    Los rechazos quedan en `biometria_intentos` sin asistencia. Un guardia rechazado por error: el admin puede
