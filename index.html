@@ -4846,7 +4846,7 @@
       // Interruptor "Biometría" POR EVENTO: columna eventos.biometria (false = solo foto en este evento).
       // Los demás eventos no cambian. El interruptor general sigue siendo config "biometria_piloto".
       cancelAnimationFrame(ajustarBanner._raf); ajustarBanner._raf = requestAnimationFrame(ajustarBanner);
-      const btnBioEnr = $("#bioEnrolados"); if (btnBioEnr) btnBioEnr.addEventListener("click", modalEnrolados);
+      const btnBioEnr = $("#bioEnrolados"); if (btnBioEnr) btnBioEnr.addEventListener("click", () => modalEnrolados(enrDesdeGuardado()));
       const btnBioQR = $("#toggleBioQR");
       if (btnBioQR) btnBioQR.addEventListener("click", () => {
         const on = ev.biometria !== false;
@@ -5300,13 +5300,19 @@
     window.addEventListener("resize", () => ajustarBanner());
     // ENROLADOS (solo admin con PIN): totales y lista de guardias con plantilla facial. Se consulta SOLO al
     // abrir la ventana (una llamada a la función + nombres desde la caché de guardias).
-    async function modalEnrolados() {
+    // Período del panel de enrolados: "" = últimos 7 días, o una fecha "AAAA-MM-DD" (desde esa fecha, hora local).
+    // Se recuerda en esta pestaña para no tener que elegirlo cada vez.
+    const enrDesdeGuardado = () => { try { return sessionStorage.getItem("os10_enr_desde") || ""; } catch (_) { return ""; } };
+    async function modalEnrolados(desde) {
+      desde = /^\d{4}-\d{2}-\d{2}$/.test(desde || "") ? desde : "";
+      try { sessionStorage.setItem("os10_enr_desde", desde); } catch (_) { }
+      const desdeIso = desde ? new Date(+desde.slice(0, 4), +desde.slice(5, 7) - 1, +desde.slice(8, 10)).toISOString() : "";
       let pin = (() => { try { return sessionStorage.getItem("os10_admin_pin") || ""; } catch (_) { return ""; } })();
       if (!pin) { pin = prompt("Biometría: ingresa el PIN de administrador") || ""; if (!pin) return; try { sessionStorage.setItem("os10_admin_pin", pin); } catch (_) { } }
       openModal(`<div class="text-center text-slate-500 py-6">🧬 Cargando enrolados…</div>`);
       let d;
       try {
-        const r = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "resumen", pin }) });
+        const r = await fetch("/.netlify/functions/biometria", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accion: "resumen", pin, ...(desdeIso ? { desde: desdeIso } : {}) }) });
         d = await r.json().catch(() => ({}));
         if (r.status === 401) { try { sessionStorage.removeItem("os10_admin_pin"); } catch (_) { } closeModal(); toast("PIN incorrecto.", "danger", 4000); return; }
         if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
@@ -5351,17 +5357,38 @@
           <div><h2 class="font-bold text-lg text-slate-800 leading-tight">🧬 Guardias enrolados</h2><p class="text-xs text-slate-500">Con verificación facial registrada. Solo administrador.</p></div>
           <button id="enrX" class="btn btn-ghost px-2.5 py-1 text-sm" aria-label="Cerrar">✕</button></div>
         <style>.enrThR{width:2.5rem}@media (min-width:640px){.enrThR{width:6.25rem}}</style>
-        <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5 mb-2">${tile(d.enrolados || 0, "Enrolados", "#dbeafe")}${tile(d.nuevos_7d || 0, "Nuevos (7 días)", "#dcfce7")}${tile(d.verificados_7d || 0, "Verificados (7 días)", "#e0e7ff")}${tile(d.no_coincide_7d || 0, "⛔ No coincide (7 días)", "#fee2e2")}${tile(d.vida_fallida_7d || 0, "🔄 Vida fallida (7 días)", "#fef3c7")}</div>
-        ${Object.keys(d.causas_vida_7d || {}).length ? `<div class="text-[11.5px] text-slate-600 mb-2 rounded-lg px-2 py-1.5" style="background:#fffbeb;border:1px solid #fde68a"><b class="text-amber-800">Causas de vida fallida (7 días):</b> ${Object.entries(d.causas_vida_7d).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${esc(c)} <b class="tabular-nums">${n}</b>`).join(" · ")}</div>` : ""}
+        ${(() => {
+          // Selector de período + tasa de éxito (prueba de vida superada / intentos) del período elegido.
+          const hoy = new Date(), hoyTxt = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+          const per = desde ? (desde === hoyTxt ? "hoy" : "desde " + fechaFmt(desde)) : "7 días";
+          const intentos = (d.vida_ok_7d || 0) + (d.vida_fallida_7d || 0);
+          const exito = intentos ? Math.round(100 * (d.vida_ok_7d || 0) / intentos) + "%" : "—";
+          return `<div class="flex flex-wrap items-center gap-2 mb-2 text-sm">
+            <span class="text-slate-500 text-xs font-semibold">Período:</span>
+            <select id="enrPeriodo" class="fld text-sm h-8 py-0.5 w-auto"><option value="7d"${!desde ? " selected" : ""}>Últimos 7 días</option><option value="hoy"${desde === hoyTxt ? " selected" : ""}>Hoy</option><option value="fecha"${desde && desde !== hoyTxt ? " selected" : ""}>Desde una fecha…</option></select>
+            <input id="enrDesde" type="date" class="fld text-sm h-8 py-0.5 w-auto${desde && desde !== hoyTxt ? "" : " hidden"}" value="${esc(desde || hoyTxt)}" max="${hoyTxt}">
+          </div>
+          <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-2">${tile(d.enrolados || 0, "Enrolados", "#dbeafe")}${tile(d.nuevos_7d || 0, `Nuevos (${per})`, "#dcfce7")}${tile(d.verificados_7d || 0, `Verificados (${per})`, "#e0e7ff")}${tile(d.no_coincide_7d || 0, `⛔ No coincide (${per})`, "#fee2e2")}${tile(d.vida_fallida_7d || 0, `🔄 Vida fallida (${per})`, "#fef3c7")}${tile(exito, `✅ Éxito (${intentos} intentos)`, "#d1fae5")}</div>`;
+        })()}
+        ${Object.keys(d.causas_vida_7d || {}).length ? `<div class="text-[11.5px] text-slate-600 mb-2 rounded-lg px-2 py-1.5" style="background:#fffbeb;border:1px solid #fde68a"><b class="text-amber-800">Causas de vida fallida (${desde ? "desde " + esc(fechaFmt(desde)) : "7 días"}):</b> ${Object.entries(d.causas_vida_7d).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${esc(c)} <b class="tabular-nums">${n}</b>`).join(" · ")}</div>` : ""}
         <div class="flex items-center gap-2 mb-1.5">
           <input id="enrBuscar" type="search" class="fld text-sm h-9 py-1 flex-1 min-w-0" placeholder="Buscar por RUT o nombre…">
           <select id="enrOrden" class="fld text-sm h-9 py-1 w-auto flex-shrink-0" title="Orden de la lista"><option value="recientes">Más recientes</option><option value="az">Nombre A–Z</option><option value="vf">Más vida fallida</option><option value="nc">Más "no coincide"</option></select>
         </div>
-        <div class="flex items-center justify-between gap-2 mb-1"><div id="enrCuenta" class="text-[11px] text-slate-500"></div><div class="text-[11px] text-slate-400">Intentos por guardia: últimos 60 días</div></div>
+        <div class="flex items-center justify-between gap-2 mb-1"><div id="enrCuenta" class="text-[11px] text-slate-500"></div><div class="text-[11px] text-slate-400">Intentos por guardia: ${desde ? "desde " + esc(fechaFmt(desde)) : "últimos 60 días"}</div></div>
         ${items.length ? `<div class="border border-slate-200 rounded-lg overflow-auto" style="max-height:calc(92vh - 260px);min-height:180px">
           <table class="w-full text-[13px] table-fixed">            <thead class="sticky top-0 bg-slate-100 text-slate-600 text-[11px] uppercase tracking-wide"><tr><th class="py-1.5 pl-2 pr-1 text-right" style="width:2.75rem">#</th><th class="py-1.5 px-2 text-left">Nombre</th><th class="py-1.5 px-2 text-left hidden sm:table-cell" style="width:7.25rem">RUT</th><th class="py-1.5 px-2 text-left hidden sm:table-cell" style="width:6.5rem">Enrolado</th><th class="py-1.5 px-1 text-center hidden sm:table-cell normal-case tracking-normal leading-tight" style="width:5rem" title="Intentos con prueba de vida no superada">🔄 Vida<br>fallida</th><th class="py-1.5 px-1 text-center hidden sm:table-cell normal-case tracking-normal leading-tight" style="width:5rem" title="Intentos en que el rostro no coincidió">⛔ No<br>coincide</th><th class="py-1.5 px-1 text-center hidden sm:table-cell normal-case tracking-normal leading-tight" style="width:5rem" title="Ingresos con identidad verificada">✓ Verifi-<br>cados</th><th class="enrThR"></th></tr></thead>
             <tbody id="enrTbody"></tbody></table></div>` : `<div class="text-center text-slate-400 py-6 text-sm">Aún no hay guardias enrolados.</div>`}`);
       $("#enrX").addEventListener("click", closeModal);
+      // Cambio de período: se vuelve a consultar con el nuevo "desde".
+      const hoyP = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, "0")}-${String(h.getDate()).padStart(2, "0")}`; })();
+      $("#enrPeriodo").addEventListener("change", e => {
+        const v = e.target.value;
+        if (v === "7d") modalEnrolados("");
+        else if (v === "hoy") modalEnrolados(hoyP);
+        else { const f = $("#enrDesde"); f.classList.remove("hidden"); f.focus(); try { f.showPicker && f.showPicker(); } catch (_) { } }
+      });
+      $("#enrDesde").addEventListener("change", e => { if (e.target.value) modalEnrolados(e.target.value); });
       if (items.length) pintar(); else filtrar();
       $("#enrBuscar").addEventListener("input", filtrar);
       $("#enrOrden").addEventListener("change", e => { orden = e.target.value; pintar(); });
