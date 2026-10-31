@@ -2391,7 +2391,8 @@
           const pMini = hacerMini();
           let mini = esWebp ? null : await pMini;
           // 1) Cloudflare R2: la función entrega enlaces de subida firmados y el navegador sube directo.
-          //    Si R2 aún no está configurado o falla, se usa Supabase Storage como antes.
+          //    Las fotos van SOLO a R2 (protegidas por PIN y borrado a las 12 h). Si falla, NO se usa
+          //    Supabase: el error vuelve a la cola del teléfono (FotoCola), que reintenta a R2 más tarde.
           let enR2 = false;
           try {
             let d;
@@ -2407,10 +2408,10 @@
             enR2 = true;   // la foto ya está en R2: nada de esto se reenvía a Supabase
             await pMiniR2;
           } catch (e) {
-            // Rechazo DEFINITIVO de la función (400/401/404/409: ids inválidos, asistencia inexistente o
-            // que YA tiene foto): se detiene aquí. Solo un fallo técnico (red, 5xx, R2 caído) usa el respaldo.
-            if (e && e.status >= 400 && e.status < 500) throw e;
-            console.warn("foto en R2 (se usa Supabase):", e && e.message);
+            // Rechazo DEFINITIVO (400/401/404/409) o fallo técnico (red, 5xx, R2 caído): se informa el error.
+            // La cola del teléfono reintenta los fallos técnicos dentro del plazo de subida (3 h).
+            if (!(e && e.status >= 400 && e.status < 500)) console.warn("foto en R2 (se reintentará):", e && e.message);
+            throw e;
           }
           if (enR2) {
             // La foto YA está en R2: si falla guardar la referencia se reintenta SOLO ese paso
@@ -2423,15 +2424,6 @@
             }
             throw err;
           }
-          // 2) Supabase Storage (respaldo).
-          if (!mini) mini = await pMini;
-          const up = await sb.storage.from("ingresos").upload(path, blob, { contentType: blob.type || "image/webp", upsert: true, cacheControl: "86400" });
-          if (up.error) throw up.error;
-          try { if (mini) await sb.storage.from("ingresos").upload(rutaMini(path), mini, { contentType: "image/webp", upsert: true, cacheControl: "86400" }); } catch (e) { console.warn("miniatura:", e && e.message); }
-          // Bucket PRIVADO: se guarda la RUTA (no una URL pública). El panel genera un enlace firmado
-          // temporal al mostrar la foto, así no queda ningún enlace abierto/permanente a la imagen.
-          await guardarRefFoto(asisId, path);
-          return path;
         },
         // RETENCIÓN: borra del bucket las fotos con más de N días (por defecto FOTO_RETENCION_DIAS)
         // y limpia su referencia, tanto en asistencias como en el historial de partidos archivados.
