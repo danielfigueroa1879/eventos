@@ -2041,7 +2041,8 @@
       // FOTOS EN CLOUDFLARE R2: las fotos nuevas se guardan en R2 y su ruta en la base lleva el
       // prefijo "r2:" (r2:<evento_id>/<asistencia_id>.webp). Las antiguas (sin prefijo) siguen en
       // Supabase Storage. Los enlaces de R2 los firma la función de Netlify (las claves de R2 están
-      // solo allí) con una fecha fija por semana: el enlace no cambia entre recargas ni entre equipos,
+      // solo allí, y exige el PIN de administrador) con una fecha fija cada 30 min y vencen a la hora:
+      // el enlace no cambia entre recargas ni entre equipos dentro de esa ventana,
       // así el navegador reutiliza la foto que ya bajó. Se recuerdan en este equipo hasta que vencen.
       const FOTOS_API = "/.netlify/functions/fotos";
       const esR2 = p => String(p || "").startsWith("r2:");
@@ -2061,8 +2062,10 @@
         const enR2 = pendientes.filter(esR2), faltan = pendientes.filter(p => !esR2(p));
         for (let i = 0; i < enR2.length; i += 200) {
           const lote = enR2.slice(i, i + 200);
+          const pin = pinAdmin();
+          if (!pin) continue;   // ver fotos exige el PIN de administrador (lo comprueba la función)
           try {
-            const d = await apiFotos({ accion: "ver", paths: lote.map(p => p.slice(3)) });
+            const d = await apiFotos({ accion: "ver", pin, paths: lote.map(p => p.slice(3)) });
             lote.forEach(p => { const u = d.urls && d.urls[p.slice(3)]; if (u) firmas.set(p, { url: u, vence: d.vence }); });
           } catch (e) { console.warn("firmar fotos R2:", e && e.message); }
         }
@@ -2261,7 +2264,7 @@
           const pedir = async claves => {
             const res = {};
             for (let i = 0; i < claves.length; i += 60) {
-              try { const d = await apiFotos({ accion: "bajar", paths: claves.slice(i, i + 60) }); Object.assign(res, d.datos || {}); }
+              try { const pin = pinAdmin(); if (!pin) break; const d = await apiFotos({ accion: "bajar", pin, paths: claves.slice(i, i + 60) }); Object.assign(res, d.datos || {}); }
               catch (e) { console.warn("bajar fotos R2:", e && e.message); }
             }
             return res;
@@ -9591,7 +9594,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       if (recien.length) toast(`🔴 ${recien.length === 1 ? "Nuevo guardia" : recien.length + " guardias nuevos"}: ${recien.join(", ")} · pendiente de aprobación del administrador`, false, 7000);
     }
     async function renderEmpresa(slug, opts) {
-      VER_FOTOS_EMPRESA = true;   // la empresa ve las fotos de ingreso (sin poder descargarlas)
+      VER_FOTOS_EMPRESA = false;  // la empresa NO ve fotos: ver fotos exige el PIN de administrador
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
       let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (e) { }
       if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }

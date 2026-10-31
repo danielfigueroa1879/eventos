@@ -135,3 +135,11 @@ Las fotos antiguas guardadas en Supabase Storage (sin `r2:`) no se borran con es
 La misma función borra también los **datos biométricos** (plantilla cifrada e intentos) de los guardias que
 ya no tienen ingresos en ningún evento vigente. Para eso necesita la variable `SUPABASE_SERVICE_ROLE_KEY` en
 Netlify (la misma que usa la biometría). Pon siempre la fecha del evento: un evento sin fecha nunca "termina".
+
+## 🔑 Ver fotos exige PIN (enlaces de 1 hora)
+
+- La función `fotos` solo entrega enlaces para **ver** o **bajar** fotos si recibe el **PIN de administrador**
+  (lo comprueba en Supabase). El panel lo envía solo, con el PIN con que se entró.
+- Cada enlace para ver una foto **vence en 1 hora**.
+- La vista de **empresa** ya **no muestra fotos** (solo la lista de guardias).
+- Subir la foto al registrar el ingreso sigue sin PIN (lo hace el guardia), con enlace de 10 minutos.
