@@ -16,8 +16,8 @@
 // tiene ingresos en ningún evento vigente (evento sin terminar).
 // Si el guardia vuelve en otro evento, su primer ingreso crea una plantilla nueva.
 //
-// REGISTRO DE ASISTENCIA (requiere SUPABASE_SERVICE_ROLE_KEY): 24 h después de terminado el evento se
-// borran sus asistencias (RUT, hora de ingreso, etc.); en partidos archivados, 24 h después del cierre se
+// REGISTRO DE ASISTENCIA (requiere SUPABASE_SERVICE_ROLE_KEY): 7 días después de terminado el evento se
+// borran sus asistencias (RUT, hora de ingreso, etc.); en partidos archivados, 7 días después del cierre se
 // borran las filas del historial (RUT, nombre, teléfono...), y queda solo la cabecera (partido, fecha, total).
 // No se toca la base de guardias (guardias_central) ni el evento.
 
@@ -31,7 +31,7 @@ export const RETENCION_MS = 0;   // se borra al terminar el evento (sin plazo ad
 // Las plantillas/intentos recién creados (menos de 15 min) no se tocan: evita borrar uno que se está
 // creando justo mientras se registra la asistencia.
 const MARGEN_BIO_MS = 15 * 60 * 1000;
-export const RETENCION_ASIS_MS = 24 * 60 * 60 * 1000;   // registro de asistencia: 24 h después del término
+export const RETENCION_ASIS_MS = 7 * 24 * 60 * 60 * 1000;   // registro de asistencia: 7 días después del término
 const ZONA = "America/Santiago";
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const RE_UUID = new RegExp(`^${UUID}$`, "i");
@@ -176,7 +176,7 @@ async function borrarAsistencias(eventos, ahora, historialOk) {
     .map(h => h.id).filter(id => RE_UUID.test(id));
   for (let i = 0; i < hist.length; i += 50)
     await del(`partidos_historial_asist?historial_id=in.(${hist.slice(i, i + 50).join(",")})`);
-  console.log(`borrar-fotos: asistencias borradas de ${vencidos.length} evento(s) terminado(s) hace más de 24 h`);
+  console.log(`borrar-fotos: asistencias borradas de ${vencidos.length} evento(s) terminado(s) hace más de 7 días`);
 }
 
 export default async () => {
