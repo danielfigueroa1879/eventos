@@ -144,10 +144,10 @@ Netlify (la misma que usa la biometría). Pon siempre la fecha del evento: un ev
 - La vista de **empresa** ya **no muestra fotos** (solo la lista de guardias).
 - Subir la foto al registrar el ingreso sigue sin PIN (lo hace el guardia), con enlace de 10 minutos.
 
-## 🗑️ Borrado del registro de asistencia (7 días después del evento)
+## 🗑️ Borrado del registro de asistencia (11 días después del evento)
 
 La misma función `borrar-fotos` borra el **registro de asistencia** (RUT, hora de ingreso, etc.) de cada
-evento **7 días después de terminado**. En los partidos archivados borra las
-filas del historial (RUT, nombre, teléfono…) 7 días después del cierre y deja solo la cabecera (partido, fecha y total).
+evento **11 días después de terminado**. En los partidos archivados borra las
+filas del historial (RUT, nombre, teléfono…) 11 días después del cierre y deja solo la cabecera (partido, fecha y total).
 No se toca la base de guardias (`guardias_central`) ni el evento. Necesita `SUPABASE_SERVICE_ROLE_KEY`.
-**Descarga el Excel/PDF del evento antes de que pasen esos 7 días si necesitas conservarlo.**
+**Descarga el Excel/PDF del evento antes de que pasen esos 11 días si necesitas conservarlo.**
