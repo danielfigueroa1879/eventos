@@ -15,6 +15,11 @@
 // plantilla cifrada (guardias_biometria) y los intentos (biometria_intentos) de cada RUT que ya no
 // tiene ingresos en ningún evento vigente (evento sin terminar).
 // Si el guardia vuelve en otro evento, su primer ingreso crea una plantilla nueva.
+//
+// REGISTRO DE ASISTENCIA (requiere SUPABASE_SERVICE_ROLE_KEY): 7 días después de terminado el evento se
+// borran sus asistencias (RUT, hora de ingreso, etc.); en partidos archivados, 7 días después del cierre se
+// borran las filas del historial (RUT, nombre, teléfono...), y queda solo la cabecera (partido, fecha, total).
+// No se toca la base de guardias (guardias_central) ni el evento.
 
 import { prefirmar } from "./fotos.mjs";
 import { normRut } from "./biometria/logica.mjs";
@@ -26,6 +31,7 @@ export const RETENCION_MS = 0;   // se borra al terminar el evento (sin plazo ad
 // Las plantillas/intentos recién creados (menos de 15 min) no se tocan: evita borrar uno que se está
 // creando justo mientras se registra la asistencia.
 const MARGEN_BIO_MS = 15 * 60 * 1000;
+export const RETENCION_ASIS_MS = 7 * 24 * 60 * 60 * 1000;   // registro de asistencia: 7 días después del término
 const ZONA = "America/Santiago";
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const RE_UUID = new RegExp(`^${UUID}$`, "i");
@@ -153,6 +159,26 @@ async function borrarBiometria(eventos, ahora) {
   console.log(`borrar-fotos: biometría borrada de ${plantillas.length} plantilla(s) y de los intentos de ${intentos.length} RUT`);
 }
 
+// Registro de asistencia: se ejecuta DESPUÉS del borrado de fotos (la ruta de algunas fotos de
+// partidos solo está en el historial).
+async function borrarAsistencias(eventos, ahora, historialOk) {
+  const clave = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!clave) return;
+  const del = ruta => sbServicio(clave, ruta, { method: "DELETE", headers: { prefer: "return=minimal" } });
+  const vencidos = eventos.filter(ev => { const f = finEvento(ev); return f != null && ahora >= f + RETENCION_ASIS_MS; })
+    .map(ev => ev.id).filter(id => RE_UUID.test(id));
+  for (let i = 0; i < vencidos.length; i += 50)
+    await del(`asistencias?evento_id=in.(${vencidos.slice(i, i + 50).join(",")})`);
+  // Si falló el borrado de fotos del historial, sus filas se conservan (guardan la ruta de la foto).
+  if (!historialOk) return;
+  const limite = new Date(ahora - RETENCION_ASIS_MS).toISOString();
+  const hist = (await sbServicio(clave, `partidos_historial?select=id&cerrado_at=lt.${encodeURIComponent(limite)}&limit=5000`))
+    .map(h => h.id).filter(id => RE_UUID.test(id));
+  for (let i = 0; i < hist.length; i += 50)
+    await del(`partidos_historial_asist?historial_id=in.(${hist.slice(i, i + 50).join(",")})`);
+  console.log(`borrar-fotos: asistencias borradas de ${vencidos.length} evento(s) terminado(s) hace más de 7 días`);
+}
+
 export default async () => {
   const ahora = Date.now();
   const eventos = await sbGet("eventos?select=id,tipo,usa_turnos,turno_horas,turno_inicio,fecha_evento,fecha_hasta");
@@ -160,7 +186,7 @@ export default async () => {
 
   const cfg = configR2();
   if (!cfg) { console.warn("borrar-fotos: R2 no configurado"); return; }
-  let borradas = 0;
+  let borradas = 0, historialOk = false;
 
   // 1) Eventos terminados: se borra toda su carpeta en R2.
   for (const ev of eventos) {
@@ -193,9 +219,12 @@ export default async () => {
       const claves = (await listarPrefijo(cfg, c + "/")).filter(k => vencidas.has(k));
       if (claves.length) borradas += await borrarClaves(cfg, claves);
     }
+    historialOk = true;
   } catch (e) { console.error("borrar-fotos historial:", e && e.message); }
 
   console.log(`borrar-fotos: ${borradas} archivo(s) borrado(s)`);
+
+  try { await borrarAsistencias(eventos, ahora, historialOk); } catch (e) { console.error("borrar-fotos asistencias:", e && e.message); }
 };
 
 

@@ -6267,6 +6267,28 @@
         c.supervisores,
       ];
     }
+    // TÉRMINO DEL EVENTO (hora de Chile), igual que la función de borrado (netlify/functions/borrar-fotos.mjs):
+    // con turnos, al terminar el último turno que empieza el último día; sin turnos / partido, a las 24:00
+    // del último día. null si el evento no tiene fecha. Al llegar ese momento se borran fotos y biometría.
+    function finEventoMs(ev) {
+      const dia = ev && (ev.fecha_hasta || ev.fecha_evento);
+      if (!dia || !/^\d{4}-\d{2}-\d{2}/.test(String(dia))) return null;
+      const desfase = ms => {
+        try {
+          const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Santiago", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+          return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000;
+        } catch (_) { return -new Date(ms).getTimezoneOffset() * 60000; }
+      };
+      const enChile = minutos => { const [y, m, d] = String(dia).slice(0, 10).split("-").map(Number); const local = Date.UTC(y, m - 1, d) + minutos * 60000; return local - desfase(local - desfase(local)); };
+      if (ev.tipo === "partido" || ev.usa_turnos === false) return enChile(24 * 60);
+      let H = parseFloat(ev.turno_horas); if (!(H > 0)) H = 12; H = Math.min(24, Math.max(1, H));
+      const m = String(ev.turno_inicio || "08:00").match(/^(\d{1,2}):(\d{2})/);
+      const ini = m ? Math.min(23, +m[1]) * 60 + Math.min(59, +m[2]) : 8 * 60;
+      let ultimo = ini % (H * 60);
+      while (ultimo + H * 60 < 24 * 60) ultimo += H * 60;
+      return enChile(ultimo + H * 60);
+    }
+    const eventoTerminado = ev => { const f = finEventoMs(ev); return f != null && Date.now() >= f; };
     // Evento PENDIENTE: no archivado y su fecha de término (o de inicio) aún no pasa. Sin fecha = pendiente.
     function eventoPendiente(ev) {
       if (eventoArchivado(ev)) return false;
@@ -9647,6 +9669,10 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
         </div>
         <button id="empMenuBtn" type="button" class="md:hidden relative flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-xl text-white active:bg-white/15" aria-label="Opciones" title="Opciones"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO_ENGRANAJE}</svg></button>
       </div>
+      ${eventoTerminado(ev) ? `<div id="empAvisoFin" role="status" class="mt-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 text-sm leading-snug flex gap-3 items-start">
+        <span class="text-xl leading-none" aria-hidden="true">🗑️</span>
+        <div><b>Evento terminado.</b> Las <b>fotografías de ingreso</b> y los <b>datos biométricos</b> de este evento serán eliminados automáticamente (o ya fueron eliminados), según lo informado a los guardias (Ley N° 19.628 y Ley N° 21.719).</div>
+      </div>` : ""}
       <div class="hidden md:flex items-center gap-2 mt-0 flex-wrap" id="empBarra">
         <button id="empDist2" class="btn bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-sm text-sm px-4 py-1.5 font-semibold">${ICO.mapa} Distribución de Facciones ${ICO.flecha}</button>
         <button id="empQr2" class="btn bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-sm text-sm px-4 py-1.5 font-semibold">${ICO.qr} QR y Estado del Evento ${ICO.ajustes}</button>
@@ -9821,6 +9847,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
           const tn = eventoUsaTurnos(ev) ? calcularTurno(a.hora_ingreso, ev) : null;
           if (tn) tiempos.push(tn.fin.getTime() + GRACIA_TURNO_MS);
         });
+        const finEv = finEventoMs(ev); if (finEv != null) tiempos.push(finEv);   // muestra el aviso de borrado al terminar
         const prox = Math.min(...tiempos.filter(t => t > ahora));
         if (isFinite(prox)) EMPRESA_STATE._vence = setTimeout(() => { if (Data.refrescar) Data.refrescar(); if (!pausaApp.saltar()) repintar(); }, Math.min(prox - ahora + 1000, 2 ** 31 - 1));
       };
