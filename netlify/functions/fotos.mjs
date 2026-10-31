@@ -7,13 +7,16 @@
 // Las fotos NO pasan por esta función: solo entrega enlaces firmados y el navegador sube/descarga
 // directo desde R2 (sin costo de descarga). Acciones (POST JSON a /.netlify/functions/fotos):
 //   { accion: "subir",  evento_id, asistencia_id, tipo, tipoMini } -> enlaces PUT (foto + miniatura)
-//   { accion: "ver",    paths: ["<evento>/<asistencia>.webp", ...] } -> { urls: {path: url}, vence }
+//   { accion: "ver",    pin, paths: ["<evento>/<asistencia>.webp", ...] } -> { urls: {path: url}, vence }
+//   { accion: "bajar",  pin, paths: [...] } -> miniaturas en base64 (respaldo del PDF/Excel)
+//      (ver y bajar exigen el PIN de administrador: sin él responden 401)
 //   { accion: "borrar", pin, paths: [...] } | { accion: "borrar", pin, prefijo: "<evento_id>" }
 //      -> { borradas, fallidas: [...] }   (pin = PIN de administrador; sin él responde 401)
 //
-// CACHÉ: los enlaces de lectura se firman con una fecha FIJA por ventana de 6 días y duran 7 días.
-// Así el mismo archivo tiene el MISMO enlace en cada recarga y en todos los equipos, y el navegador
-// usa la copia que ya tiene en vez de volver a descargarla.
+// ENLACES DE 1 HORA: los enlaces de lectura vencen 1 h después de firmados. Se firman con una fecha
+// FIJA por ventana de 30 min, así el mismo archivo tiene el MISMO enlace durante esa ventana (en cada
+// recarga y en todos los equipos) y el navegador usa la copia que ya tiene. Cada enlace entregado
+// sirve entre 30 y 60 minutos.
 
 import crypto from "node:crypto";
 
@@ -22,10 +25,10 @@ import crypto from "node:crypto";
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://ixdpjkfkbndcijowynxn.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZHBqa2ZrYm5kY2lqb3d5bnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTgxNTIsImV4cCI6MjEwNzMzNDE1Mn0.qeeELjWAkMcDviavQSvsC5IQvLB-iG-KkdpdH3OCHdI";
 
-const VENTANA_S = 6 * 86400;       // la fecha de firma cambia cada 6 días
-const VIGENCIA_S = 7 * 86400;      // máximo permitido por S3/R2 para un enlace firmado
+const VENTANA_S = 30 * 60;         // la fecha de firma cambia cada 30 min
+const VIGENCIA_S = 60 * 60;        // el enlace para ver una foto vence a la hora de firmado
 const SUBIDA_S = 10 * 60;          // el enlace de subida dura 10 min
-const CACHE_FOTO = "private, max-age=604800";
+const CACHE_FOTO = "private, max-age=3600";
 const TIPOS = ["image/webp", "image/jpeg", "image/png"];
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const RE_UUID = new RegExp(`^${UUID}$`, "i");
@@ -180,6 +183,7 @@ export default async (req) => {
     }
 
     if (b.accion === "ver") {
+      if (!(await pinAdminValido(b.pin))) return json({ error: "no autorizado" }, 401);
       const paths = Array.isArray(b.paths) ? b.paths.slice(0, 300) : [];
       const fecha = inicioVentana();
       const urls = {};
@@ -191,6 +195,7 @@ export default async (req) => {
     // (CORS), la función baja las miniaturas (~4 KB c/u) y las devuelve en base64. Solo se usa al
     // exportar y solo para las fotos que fallaron.
     if (b.accion === "bajar") {
+      if (!(await pinAdminValido(b.pin))) return json({ error: "no autorizado" }, 401);
       const paths = (Array.isArray(b.paths) ? b.paths.slice(0, 60) : []).filter(p => typeof p === "string" && RE_RUTA.test(p));
       const datos = {};
       await Promise.all(paths.map(async clave => {

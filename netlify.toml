@@ -11,3 +11,8 @@
 # Aviso por correo "comenzaron los ingresos" (lo llama un disparador de Supabase; ver supabase-aviso-ingreso.sql).
 [functions.aviso-ingreso]
   node_bundler = "esbuild"
+
+# Borrado automático de las fotos de ingreso 12 h después de terminado cada evento (se ejecuta cada hora).
+[functions.borrar-fotos]
+  node_bundler = "esbuild"
+  schedule = "@hourly"

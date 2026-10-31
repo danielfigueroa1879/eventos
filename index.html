@@ -2041,7 +2041,8 @@
       // FOTOS EN CLOUDFLARE R2: las fotos nuevas se guardan en R2 y su ruta en la base lleva el
       // prefijo "r2:" (r2:<evento_id>/<asistencia_id>.webp). Las antiguas (sin prefijo) siguen en
       // Supabase Storage. Los enlaces de R2 los firma la función de Netlify (las claves de R2 están
-      // solo allí) con una fecha fija por semana: el enlace no cambia entre recargas ni entre equipos,
+      // solo allí, y exige el PIN de administrador) con una fecha fija cada 30 min y vencen a la hora:
+      // el enlace no cambia entre recargas ni entre equipos dentro de esa ventana,
       // así el navegador reutiliza la foto que ya bajó. Se recuerdan en este equipo hasta que vencen.
       const FOTOS_API = "/.netlify/functions/fotos";
       const esR2 = p => String(p || "").startsWith("r2:");
@@ -2061,8 +2062,10 @@
         const enR2 = pendientes.filter(esR2), faltan = pendientes.filter(p => !esR2(p));
         for (let i = 0; i < enR2.length; i += 200) {
           const lote = enR2.slice(i, i + 200);
+          const pin = pinAdmin();
+          if (!pin) continue;   // ver fotos exige el PIN de administrador (lo comprueba la función)
           try {
-            const d = await apiFotos({ accion: "ver", paths: lote.map(p => p.slice(3)) });
+            const d = await apiFotos({ accion: "ver", pin, paths: lote.map(p => p.slice(3)) });
             lote.forEach(p => { const u = d.urls && d.urls[p.slice(3)]; if (u) firmas.set(p, { url: u, vence: d.vence }); });
           } catch (e) { console.warn("firmar fotos R2:", e && e.message); }
         }
@@ -2261,7 +2264,7 @@
           const pedir = async claves => {
             const res = {};
             for (let i = 0; i < claves.length; i += 60) {
-              try { const d = await apiFotos({ accion: "bajar", paths: claves.slice(i, i + 60) }); Object.assign(res, d.datos || {}); }
+              try { const pin = pinAdmin(); if (!pin) break; const d = await apiFotos({ accion: "bajar", pin, paths: claves.slice(i, i + 60) }); Object.assign(res, d.datos || {}); }
               catch (e) { console.warn("bajar fotos R2:", e && e.message); }
             }
             return res;
@@ -2829,7 +2832,7 @@
         <div class="text-center">
           <h2 class="font-bold text-slate-800 text-base mb-1">📸 Foto de verificación</h2>
           <p class="text-xs text-slate-500 mb-1">Centra tu rostro dentro del óvalo y toma la foto para finalizar tu ingreso.</p>
-          <p class="text-[10.5px] text-slate-400 mb-3 leading-snug">🔒 Solo para control e identificación de ingreso (Leyes N° 19.628 y N° 21.719). No se usa reconocimiento facial.</p>
+          <p class="text-[10.5px] text-slate-400 mb-3 leading-snug">🔒 Solo para control e identificación de ingreso (Leyes N° 19.628 y N° 21.719). Se borra 12 horas después de terminado el evento. No se usa reconocimiento facial.</p>
           <div id="cap_stage" class="relative mx-auto rounded-2xl overflow-hidden bg-white shadow-inner" style="width:100%;max-width:300px;aspect-ratio:3/4;">
             <video id="cap_video" playsinline autoplay muted class="absolute inset-0 w-full h-full object-cover" style="transform:scaleX(-1)"></video>
             <img id="cap_preview" class="absolute inset-0 w-full h-full object-cover" style="display:none" alt="Foto tomada">
@@ -3345,7 +3348,7 @@
 
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
         ${fotoRequerida ? `<div class="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-          <p class="text-[11px] text-slate-500 leading-snug" style="text-align:justify">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. <span id="g_avisoBio">No se realiza reconocimiento facial.</span> Los datos se procesan de forma <b>cifrada</b>.</p>
+          <p class="text-[11px] text-slate-500 leading-snug" style="text-align:justify">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso a este evento. La fotografía se <b>borra automáticamente 12 horas después de terminado el evento</b>. <span id="g_avisoBio">No se realiza reconocimiento facial.</span> Los datos se procesan de forma <b>cifrada</b>.</p>
         </div>` : ""}
       </div>
 
@@ -3427,7 +3430,7 @@
       });
       rut.addEventListener("blur", lookup);
       // Con la verificación facial activa, el aviso de datos lo dice (se pide consentimiento aparte).
-      bioRutsP.then(set => { const a = $("#g_avisoBio"); if (a && set && set.size) a.textContent = "Si corresponde verificación facial (comparación 1:1 solo con tu propio registro), se te pedirá tu consentimiento antes de usarla."; }).catch(() => { });
+      bioRutsP.then(set => { const a = $("#g_avisoBio"); if (a && set && set.size) a.textContent = "Si corresponde verificación facial (comparación 1:1 solo con tu propio registro), se te pedirá tu consentimiento antes de usarla. Esos datos también se borran 12 horas después de terminado el evento."; }).catch(() => { });
       rut.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); lookup(); } });
 
       async function lookup() {
@@ -9591,7 +9594,7 @@ ${isPart ? `* Resolución: ${state.resolucion_num} (${state.resolucion_fecha})
       if (recien.length) toast(`🔴 ${recien.length === 1 ? "Nuevo guardia" : recien.length + " guardias nuevos"}: ${recien.join(", ")} · pendiente de aprobación del administrador`, false, 7000);
     }
     async function renderEmpresa(slug, opts) {
-      VER_FOTOS_EMPRESA = true;   // la empresa ve las fotos de ingreso (sin poder descargarlas)
+      VER_FOTOS_EMPRESA = false;  // la empresa NO ve fotos: ver fotos exige el PIN de administrador
       app.innerHTML = `<div class="min-h-screen flex items-center justify-center text-slate-400">Cargando…</div>`;
       let ev = null; try { ev = await Data.getEventoBySlug(slug); } catch (e) { }
       if (!ev) { app.innerHTML = `<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-6 text-center"><div class="text-4xl mb-2">🚫</div><h1 class="font-bold text-slate-800">Evento no encontrado</h1></div></div>`; return; }

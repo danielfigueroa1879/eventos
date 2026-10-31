@@ -120,3 +120,26 @@ Si `foto_url` no empieza con `r2:`, revisa en Netlify → **Logs → Functions �
 
 Caché: los enlaces de lectura se firman con una fecha fija por semana (duran 7 días), así el
 enlace no cambia en cada recarga y el navegador reutiliza la foto ya descargada.
+
+## 🗑️ Borrado automático de fotos (12 h después del evento)
+
+La función programada `netlify/functions/borrar-fotos.mjs` corre sola **cada hora** y borra de R2
+la foto y la miniatura de cada ingreso **12 horas después de terminado el evento** (hora de Chile):
+- Evento con turnos: al terminar el último turno del último día (`fecha_hasta` o `fecha_evento`).
+- Evento sin turnos / partido: a las 24:00 del último día.
+- Partido cerrado y archivado: desde la hora del cierre.
+
+Usa las mismas variables de R2 ya configuradas en Netlify. Un evento sin fecha no se toca.
+Las fotos antiguas guardadas en Supabase Storage (sin `r2:`) no se borran con esta función.
+
+La misma función borra también los **datos biométricos** (plantilla cifrada e intentos) de los guardias que
+ya no tienen ingresos en ningún evento vigente. Para eso necesita la variable `SUPABASE_SERVICE_ROLE_KEY` en
+Netlify (la misma que usa la biometría). Pon siempre la fecha del evento: un evento sin fecha nunca "termina".
+
+## 🔑 Ver fotos exige PIN (enlaces de 1 hora)
+
+- La función `fotos` solo entrega enlaces para **ver** o **bajar** fotos si recibe el **PIN de administrador**
+  (lo comprueba en Supabase). El panel lo envía solo, con el PIN con que se entró.
+- Cada enlace para ver una foto **vence en 1 hora**.
+- La vista de **empresa** ya **no muestra fotos** (solo la lista de guardias).
+- Subir la foto al registrar el ingreso sigue sin PIN (lo hace el guardia), con enlace de 10 minutos.
