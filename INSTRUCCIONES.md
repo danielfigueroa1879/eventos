@@ -118,16 +118,16 @@ Cloudflare → R2 → bucket `guardias` → **Settings → CORS Policy → Add/E
 
 Si `foto_url` no empieza con `r2:`, revisa en Netlify → **Logs → Functions → fotos** el error.
 
-Caché: los enlaces de lectura se firman con una fecha fija por semana (duran 7 días), así el
-enlace no cambia en cada recarga y el navegador reutiliza la foto ya descargada.
+Caché: los enlaces de lectura se firman con una fecha fija cada 30 minutos y vencen a la hora, así el
+enlace no cambia en cada recarga dentro de esa ventana y el navegador reutiliza la foto ya descargada.
 
-## 🗑️ Borrado automático de fotos (12 h después del evento)
+## 🗑️ Borrado automático de fotos (al terminar el evento)
 
-La función programada `netlify/functions/borrar-fotos.mjs` corre sola **cada hora** y borra de R2
-la foto y la miniatura de cada ingreso **12 horas después de terminado el evento** (hora de Chile):
+La función programada `netlify/functions/borrar-fotos.mjs` corre sola **cada 15 minutos** y borra de R2
+la foto y la miniatura de cada ingreso **al terminar el evento** (hora de Chile):
 - Evento con turnos: al terminar el último turno del último día (`fecha_hasta` o `fecha_evento`).
 - Evento sin turnos / partido: a las 24:00 del último día.
-- Partido cerrado y archivado: desde la hora del cierre.
+- Partido cerrado y archivado: al cerrarlo.
 
 Usa las mismas variables de R2 ya configuradas en Netlify. Un evento sin fecha no se toca.
 Las fotos antiguas guardadas en Supabase Storage (sin `r2:`) no se borran con esta función.
