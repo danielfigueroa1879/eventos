@@ -2829,7 +2829,7 @@
         <div class="text-center">
           <h2 class="font-bold text-slate-800 text-base mb-1">📸 Foto de verificación</h2>
           <p class="text-xs text-slate-500 mb-1">Centra tu rostro dentro del óvalo y toma la foto para finalizar tu ingreso.</p>
-          <p class="text-[10.5px] text-slate-400 mb-3 leading-snug">🔒 Solo para control e identificación de ingreso (Leyes N° 19.628 y N° 21.719). No se usa reconocimiento facial.</p>
+          <p class="text-[10.5px] text-slate-400 mb-3 leading-snug">🔒 Solo para control e identificación de ingreso (Leyes N° 19.628 y N° 21.719). Se borra 12 horas después de terminado el evento. No se usa reconocimiento facial.</p>
           <div id="cap_stage" class="relative mx-auto rounded-2xl overflow-hidden bg-white shadow-inner" style="width:100%;max-width:300px;aspect-ratio:3/4;">
             <video id="cap_video" playsinline autoplay muted class="absolute inset-0 w-full h-full object-cover" style="transform:scaleX(-1)"></video>
             <img id="cap_preview" class="absolute inset-0 w-full h-full object-cover" style="display:none" alt="Foto tomada">
@@ -3345,7 +3345,7 @@
 
         <button id="g_submit" class="btn btn-p w-full text-base" disabled>Ingrese su RUT</button>
         ${fotoRequerida ? `<div class="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-          <p class="text-[11px] text-slate-500 leading-snug" style="text-align:justify">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso de esta fiscalización O.S.10. <span id="g_avisoBio">No se realiza reconocimiento facial.</span> Los datos se procesan de forma <b>cifrada</b>.</p>
+          <p class="text-[11px] text-slate-500 leading-snug" style="text-align:justify">🔒 <b>Aviso de datos (Ley N° 19.628, vigente; y Ley N° 21.719 desde el 01-12-2026):</b> al presionar el botón aceptas que tu <b>fotografía</b> se capture y conserve <b>únicamente</b> para el control e identificación de ingreso a este evento. La fotografía se <b>borra automáticamente 12 horas después de terminado el evento</b>. <span id="g_avisoBio">No se realiza reconocimiento facial.</span> Los datos se procesan de forma <b>cifrada</b>.</p>
         </div>` : ""}
       </div>
 
