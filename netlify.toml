@@ -12,7 +12,7 @@
 [functions.aviso-ingreso]
   node_bundler = "esbuild"
 
-# Borrado automático de las fotos de ingreso 12 h después de terminado cada evento (se ejecuta cada hora).
+# Borrado automático de fotos y datos biométricos al terminar cada evento (se ejecuta cada 15 minutos).
 [functions.borrar-fotos]
   node_bundler = "esbuild"
-  schedule = "@hourly"
+  schedule = "*/15 * * * *"

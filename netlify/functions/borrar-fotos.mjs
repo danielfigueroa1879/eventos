@@ -1,7 +1,7 @@
 // Netlify Scheduled Function: BORRADO AUTOMÁTICO de las fotos de ingreso y de los datos
-// biométricos 12 h después de terminado cada evento.
+// biométricos al terminar cada evento.
 //
-// Se ejecuta sola cada hora (ver netlify.toml) y no se puede llamar desde internet.
+// Se ejecuta sola cada 15 minutos (ver netlify.toml) y no se puede llamar desde internet.
 // Usa las mismas variables de entorno de R2 que fotos.mjs (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
 // R2_ENDPOINT, R2_BUCKET_NAME). Solo LEE Supabase (eventos e historial de partidos) con la clave pública.
 //
@@ -9,11 +9,11 @@
 //   - Evento con turnos: al terminar el último turno que empieza el último día (fecha_hasta o fecha_evento).
 //   - Evento sin turnos / partido: a las 24:00 del último día.
 //   - Partido cerrado y archivado: al momento del cierre (cerrado_at).
-// Pasadas 12 h de ese término se borran de R2 la foto y su miniatura. Un evento sin fecha no se toca.
+// Al llegar ese término se borran de R2 la foto y su miniatura. Un evento sin fecha no se toca.
 //
 // BIOMETRÍA (requiere SUPABASE_SERVICE_ROLE_KEY, la misma de la función "biometria"): se borran la
 // plantilla cifrada (guardias_biometria) y los intentos (biometria_intentos) de cada RUT que ya no
-// tiene ingresos en ningún evento vigente (evento sin terminar, o terminado hace menos de 12 h).
+// tiene ingresos en ningún evento vigente (evento sin terminar).
 // Si el guardia vuelve en otro evento, su primer ingreso crea una plantilla nueva.
 
 import { prefirmar } from "./fotos.mjs";
@@ -22,7 +22,10 @@ import { normRut } from "./biometria/logica.mjs";
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://ixdpjkfkbndcijowynxn.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZHBqa2ZrYm5kY2lqb3d5bnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTgxNTIsImV4cCI6MjEwNzMzNDE1Mn0.qeeELjWAkMcDviavQSvsC5IQvLB-iG-KkdpdH3OCHdI";
 
-export const RETENCION_MS = 12 * 60 * 60 * 1000;   // 12 h después de terminado el evento
+export const RETENCION_MS = 0;   // se borra al terminar el evento (sin plazo adicional)
+// Las plantillas/intentos recién creados (menos de 15 min) no se tocan: evita borrar uno que se está
+// creando justo mientras se registra la asistencia.
+const MARGEN_BIO_MS = 15 * 60 * 1000;
 const ZONA = "America/Santiago";
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const RE_UUID = new RegExp(`^${UUID}$`, "i");
@@ -118,6 +121,7 @@ async function borrarBiometria(eventos, ahora) {
   const clave = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!clave) { console.warn("borrar-fotos: sin SUPABASE_SERVICE_ROLE_KEY, no se borra la biometría"); return; }
   const limite = new Date(ahora - RETENCION_MS).toISOString();
+  const limiteFilas = new Date(ahora - Math.max(RETENCION_MS, MARGEN_BIO_MS)).toISOString();
 
   // RUT que todavía tienen un evento vigente: sus datos biométricos se conservan.
   const vigentes = new Set();
@@ -127,7 +131,7 @@ async function borrarBiometria(eventos, ahora) {
     const filas = await sbServicio(clave, `asistencias?select=rut&evento_id=in.(${evVigentes.slice(i, i + 50).join(",")})&limit=100000`);
     for (const f of filas) { const r = normRut(f.rut); if (r) vigentes.add(r); }
   }
-  // Partidos cerrados hace menos de 12 h (sus asistencias ya pasaron al historial).
+  // Partidos cerrados dentro del plazo de retención (con plazo 0, ninguno).
   const hist = (await sbServicio(clave, `partidos_historial?select=id&cerrado_at=gte.${encodeURIComponent(limite)}&limit=2000`))
     .map(h => h.id).filter(id => RE_UUID.test(id));
   for (let i = 0; i < hist.length; i += 50) {
@@ -135,17 +139,17 @@ async function borrarBiometria(eventos, ahora) {
     for (const f of filas) { const r = normRut(f.rut); if (r) vigentes.add(r); }
   }
 
-  // Plantillas e intentos de más de 12 h de RUT sin evento vigente.
-  const plantillas = [...new Set((await sbServicio(clave, `guardias_biometria?select=rut&fecha_enrolamiento=lt.${encodeURIComponent(limite)}&limit=100000`))
+  // Plantillas e intentos (de más de 15 min de antigüedad) de RUT sin evento vigente.
+  const plantillas = [...new Set((await sbServicio(clave, `guardias_biometria?select=rut&fecha_enrolamiento=lt.${encodeURIComponent(limiteFilas)}&limit=100000`))
     .map(f => f.rut))].filter(r => !vigentes.has(normRut(r)));
-  const intentos = [...new Set((await sbServicio(clave, `biometria_intentos?select=rut&fecha=lt.${encodeURIComponent(limite)}&limit=100000`))
+  const intentos = [...new Set((await sbServicio(clave, `biometria_intentos?select=rut&fecha=lt.${encodeURIComponent(limiteFilas)}&limit=100000`))
     .map(f => f.rut))].filter(r => !vigentes.has(normRut(r)));
   const borrarDe = async (ruta, ruts) => {
     for (let i = 0; i < ruts.length; i += 100)
       await sbServicio(clave, ruta + `rut=in.(${lista(ruts.slice(i, i + 100))})`, { method: "DELETE", headers: { prefer: "return=minimal" } });
   };
-  await borrarDe(`biometria_intentos?fecha=lt.${encodeURIComponent(limite)}&`, intentos);
-  await borrarDe(`guardias_biometria?fecha_enrolamiento=lt.${encodeURIComponent(limite)}&`, plantillas);
+  await borrarDe(`biometria_intentos?fecha=lt.${encodeURIComponent(limiteFilas)}&`, intentos);
+  await borrarDe(`guardias_biometria?fecha_enrolamiento=lt.${encodeURIComponent(limiteFilas)}&`, plantillas);
   console.log(`borrar-fotos: biometría borrada de ${plantillas.length} plantilla(s) y de los intentos de ${intentos.length} RUT`);
 }
 
@@ -158,7 +162,7 @@ export default async () => {
   if (!cfg) { console.warn("borrar-fotos: R2 no configurado"); return; }
   let borradas = 0;
 
-  // 1) Eventos terminados hace más de 12 h: se borra toda su carpeta en R2.
+  // 1) Eventos terminados: se borra toda su carpeta en R2.
   for (const ev of eventos) {
     const fin = finEvento(ev);
     if (fin == null || ahora < fin + RETENCION_MS || !RE_UUID.test(ev.id)) continue;
@@ -168,7 +172,7 @@ export default async () => {
     } catch (e) { console.error("borrar-fotos evento", ev.id, e && e.message); }
   }
 
-  // 2) Partidos cerrados hace más de 12 h: se borran las fotos que quedaron en su historial
+  // 2) Partidos ya cerrados y archivados: se borran las fotos que quedaron en su historial
   //    (el evento del partido se reutiliza, por eso no se borra su carpeta completa). Solo se
   //    piden a R2 las fotos que todavía existen (se lista la carpeta del evento una vez).
   try {
