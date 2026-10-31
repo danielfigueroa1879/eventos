@@ -131,3 +131,7 @@ la foto y la miniatura de cada ingreso **12 horas después de terminado el event
 
 Usa las mismas variables de R2 ya configuradas en Netlify. Un evento sin fecha no se toca.
 Las fotos antiguas guardadas en Supabase Storage (sin `r2:`) no se borran con esta función.
+
+La misma función borra también los **datos biométricos** (plantilla cifrada e intentos) de los guardias que
+ya no tienen ingresos en ningún evento vigente. Para eso necesita la variable `SUPABASE_SERVICE_ROLE_KEY` en
+Netlify (la misma que usa la biometría). Pon siempre la fecha del evento: un evento sin fecha nunca "termina".

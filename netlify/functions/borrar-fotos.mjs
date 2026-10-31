@@ -1,5 +1,5 @@
-// Netlify Scheduled Function: BORRADO AUTOMÁTICO de las fotos de ingreso 12 h después de
-// terminado cada evento.
+// Netlify Scheduled Function: BORRADO AUTOMÁTICO de las fotos de ingreso y de los datos
+// biométricos 12 h después de terminado cada evento.
 //
 // Se ejecuta sola cada hora (ver netlify.toml) y no se puede llamar desde internet.
 // Usa las mismas variables de entorno de R2 que fotos.mjs (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
@@ -10,8 +10,14 @@
 //   - Evento sin turnos / partido: a las 24:00 del último día.
 //   - Partido cerrado y archivado: al momento del cierre (cerrado_at).
 // Pasadas 12 h de ese término se borran de R2 la foto y su miniatura. Un evento sin fecha no se toca.
+//
+// BIOMETRÍA (requiere SUPABASE_SERVICE_ROLE_KEY, la misma de la función "biometria"): se borran la
+// plantilla cifrada (guardias_biometria) y los intentos (biometria_intentos) de cada RUT que ya no
+// tiene ingresos en ningún evento vigente (evento sin terminar, o terminado hace menos de 12 h).
+// Si el guardia vuelve en otro evento, su primer ingreso crea una plantilla nueva.
 
 import { prefirmar } from "./fotos.mjs";
+import { normRut } from "./biometria/logica.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://ixdpjkfkbndcijowynxn.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZHBqa2ZrYm5kY2lqb3d5bnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NTgxNTIsImV4cCI6MjEwNzMzNDE1Mn0.qeeELjWAkMcDviavQSvsC5IQvLB-iG-KkdpdH3OCHdI";
@@ -98,14 +104,61 @@ async function borrarClaves(cfg, claves) {
   return n;
 }
 
+// ---------- Biometría: tablas cerradas, solo con la service_role key ----------
+async function sbServicio(clave, ruta, opts = {}) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${ruta}`, {
+    ...opts, headers: { apikey: clave, authorization: `Bearer ${clave}`, "content-type": "application/json", ...(opts.headers || {}) },
+  });
+  if (!r.ok) throw new Error("supabase " + r.status + " " + ruta.split("?")[0]);
+  return r.status === 204 ? null : r.json();
+}
+const lista = ruts => ruts.map(r => encodeURIComponent('"' + r + '"')).join(",");
+
+async function borrarBiometria(eventos, ahora) {
+  const clave = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!clave) { console.warn("borrar-fotos: sin SUPABASE_SERVICE_ROLE_KEY, no se borra la biometría"); return; }
+  const limite = new Date(ahora - RETENCION_MS).toISOString();
+
+  // RUT que todavía tienen un evento vigente: sus datos biométricos se conservan.
+  const vigentes = new Set();
+  const evVigentes = eventos.filter(ev => { const f = finEvento(ev); return f == null || ahora < f + RETENCION_MS; })
+    .map(ev => ev.id).filter(id => RE_UUID.test(id));
+  for (let i = 0; i < evVigentes.length; i += 50) {
+    const filas = await sbServicio(clave, `asistencias?select=rut&evento_id=in.(${evVigentes.slice(i, i + 50).join(",")})&limit=100000`);
+    for (const f of filas) { const r = normRut(f.rut); if (r) vigentes.add(r); }
+  }
+  // Partidos cerrados hace menos de 12 h (sus asistencias ya pasaron al historial).
+  const hist = (await sbServicio(clave, `partidos_historial?select=id&cerrado_at=gte.${encodeURIComponent(limite)}&limit=2000`))
+    .map(h => h.id).filter(id => RE_UUID.test(id));
+  for (let i = 0; i < hist.length; i += 50) {
+    const filas = await sbServicio(clave, `partidos_historial_asist?select=rut&historial_id=in.(${hist.slice(i, i + 50).join(",")})&limit=100000`);
+    for (const f of filas) { const r = normRut(f.rut); if (r) vigentes.add(r); }
+  }
+
+  // Plantillas e intentos de más de 12 h de RUT sin evento vigente.
+  const plantillas = [...new Set((await sbServicio(clave, `guardias_biometria?select=rut&fecha_enrolamiento=lt.${encodeURIComponent(limite)}&limit=100000`))
+    .map(f => f.rut))].filter(r => !vigentes.has(normRut(r)));
+  const intentos = [...new Set((await sbServicio(clave, `biometria_intentos?select=rut&fecha=lt.${encodeURIComponent(limite)}&limit=100000`))
+    .map(f => f.rut))].filter(r => !vigentes.has(normRut(r)));
+  const borrarDe = async (ruta, ruts) => {
+    for (let i = 0; i < ruts.length; i += 100)
+      await sbServicio(clave, ruta + `rut=in.(${lista(ruts.slice(i, i + 100))})`, { method: "DELETE", headers: { prefer: "return=minimal" } });
+  };
+  await borrarDe(`biometria_intentos?fecha=lt.${encodeURIComponent(limite)}&`, intentos);
+  await borrarDe(`guardias_biometria?fecha_enrolamiento=lt.${encodeURIComponent(limite)}&`, plantillas);
+  console.log(`borrar-fotos: biometría borrada de ${plantillas.length} plantilla(s) y de los intentos de ${intentos.length} RUT`);
+}
+
 export default async () => {
+  const ahora = Date.now();
+  const eventos = await sbGet("eventos?select=id,tipo,usa_turnos,turno_horas,turno_inicio,fecha_evento,fecha_hasta");
+  try { await borrarBiometria(eventos, ahora); } catch (e) { console.error("borrar-fotos biometría:", e && e.message); }
+
   const cfg = configR2();
   if (!cfg) { console.warn("borrar-fotos: R2 no configurado"); return; }
-  const ahora = Date.now();
   let borradas = 0;
 
   // 1) Eventos terminados hace más de 12 h: se borra toda su carpeta en R2.
-  const eventos = await sbGet("eventos?select=id,tipo,usa_turnos,turno_horas,turno_inicio,fecha_evento,fecha_hasta");
   for (const ev of eventos) {
     const fin = finEvento(ev);
     if (fin == null || ahora < fin + RETENCION_MS || !RE_UUID.test(ev.id)) continue;

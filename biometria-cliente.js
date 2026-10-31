@@ -271,7 +271,7 @@
       ui.capa.classList.add("cons");
       ui.$("bioi-cons").innerHTML = `<div class="cab">🔒 <span id="bioi-ctit">${t0.tit}</span></div><div class="cue">
         <p>Tu foto de ingreso se usará para verificar tu identidad (verificación facial), solo en los ingresos a eventos.</p>
-        <small>Ley N° 19.628 y Ley N° 21.719. Puedes pedir su eliminación al administrador.</small></div>`;
+        <small>Ley N° 19.628 y Ley N° 21.719. Los datos biométricos se borran automáticamente 12 horas después de terminado el evento; también puedes pedir su eliminación antes al administrador.</small></div>`;
       ui.$("bioi-no").style.display = "none";
       pDesafio.then(x => { if (x.status === 200 && x.d.modo === "enrolamiento") { ui.$("bioi-ctit").textContent = textos(true).tit; } });
       await elegir(ui, "Acepto y continúo", "");

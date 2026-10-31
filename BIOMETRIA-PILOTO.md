@@ -75,7 +75,13 @@ con buscador y **Restablecer**. Consulta la función (`accion: "resumen"`) solo 
 - `guardias_biometria`: plantilla **cifrada** (AES-256-GCM, ligada al RUT), modelo, versión, fecha, consentimiento.
 - `biometria_intentos`: tipo, estado, score, resultado de la prueba de vida, medidas y tiempos. **Sin imágenes.**
 
-### Limpieza automática (cada 2 meses / 60 días)
+### Borrado automático (12 h después de terminado el evento)
+La función programada `netlify/functions/borrar-fotos.mjs` (cada hora, con `SUPABASE_SERVICE_ROLE_KEY`) borra la
+plantilla y los intentos de cada RUT que ya no tiene ingresos en ningún evento vigente (evento sin terminar o
+terminado hace menos de 12 h). El guardia se vuelve a enrolar solo en su primer ingreso del siguiente evento.
+Los eventos **sin fecha** nunca terminan, así que sus guardias conservan la plantilla: pon siempre la fecha.
+
+### Limpieza de respaldo (60 días)
 Al abrir el panel admin (como máximo cada 6 h, junto con la purga de fotos) se llama a la función con
 `accion: "purgar"` y el PIN de admin. La función borra:
 - los `biometria_intentos` con más de 60 días;

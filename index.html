@@ -3427,7 +3427,7 @@
       });
       rut.addEventListener("blur", lookup);
       // Con la verificación facial activa, el aviso de datos lo dice (se pide consentimiento aparte).
-      bioRutsP.then(set => { const a = $("#g_avisoBio"); if (a && set && set.size) a.textContent = "Si corresponde verificación facial (comparación 1:1 solo con tu propio registro), se te pedirá tu consentimiento antes de usarla."; }).catch(() => { });
+      bioRutsP.then(set => { const a = $("#g_avisoBio"); if (a && set && set.size) a.textContent = "Si corresponde verificación facial (comparación 1:1 solo con tu propio registro), se te pedirá tu consentimiento antes de usarla. Esos datos también se borran 12 horas después de terminado el evento."; }).catch(() => { });
       rut.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); lookup(); } });
 
       async function lookup() {
